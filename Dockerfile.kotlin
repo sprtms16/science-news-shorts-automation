@@ -1,0 +1,10 @@
+FROM gradle:8.5-jdk17
+
+WORKDIR /app
+
+# Copy project files
+COPY build.gradle.kts .
+COPY src ./src
+
+# Build and Run
+CMD ["gradle", "run"]

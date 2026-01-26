@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ai-media-service:
+    build: ./ai-media-service
+    container_name: shorts-ai-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./shared-data:/app/output
+      - ~/.cache/huggingface:/root/.cache/huggingface # Model Caching
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    restart: unless-stopped
+
+  shorts-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile.kotlin
+    container_name: shorts-controller
+    depends_on:
+      - ai-media-service
+    volumes:
+      - ./shared-data:/app/shared-data
+    environment:
+      - AI_SERVICE_URL=http://shorts-ai-service:8000

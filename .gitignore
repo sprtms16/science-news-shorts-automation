@@ -1,0 +1,29 @@
+# IntelliJ
+.idea/
+*.iml
+*.iws
+
+# Gradle
+.gradle/
+build/
+gradle/
+gradlew
+gradlew.bat
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.venv
+ai-media-service/output/
+
+# Docker & Shared Data
+shared-data/
+*.mp3
+*.mp4
+*.jpg
+
+# OS
+.DS_Store
