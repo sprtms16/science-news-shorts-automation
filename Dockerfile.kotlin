@@ -2,9 +2,17 @@ FROM gradle:8.5-jdk17
 
 WORKDIR /app
 
+# Install FFmpeg and Korean Fonts
+RUN apt-get update && apt-get install -y ffmpeg fonts-nanum && rm -rf /var/lib/apt/lists/*
+
+
 # Copy project files
 COPY build.gradle.kts .
 COPY src ./src
 
 # Build and Run
-CMD ["gradle", "run"]
+# Build
+RUN gradle clean build -x test
+
+# Run
+CMD ["gradle", "bootRun"]

@@ -27,3 +27,4 @@ shared-data/
 
 # OS
 .DS_Store
+client_secret.json

@@ -9,3 +9,4 @@ transformers
 accelerate
 opencv-python-headless
 pillow
+mutagen
