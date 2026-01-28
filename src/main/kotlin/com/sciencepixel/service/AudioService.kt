@@ -8,7 +8,11 @@ import java.io.File
 
 @Service
 class AudioService {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+        .writeTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
     // Docker Internal Hostname: shorts-ai-service (container_name) or ai-media-service (service name)
     // We configured container_name in docker-compose as shorts-ai-service
     private val PYTHON_SERVICE_URL = "http://shorts-ai-service:8000/generate-audio"
@@ -53,5 +57,40 @@ class AudioService {
             
             return resJson.optDouble("duration", 5.0) // Mock duration if not enabled in Python yet
         }
+    }
+
+    private val BGM_SERVICE_URL = "http://shorts-ai-service:8000/generate-bgm"
+
+    fun generateBgm(prompt: String, duration: Int, outputFile: File): Boolean {
+        println("🎵 Requesting AI BGM: '$prompt' ($duration sec)")
+        val json = JSONObject().put("prompt", prompt).put("duration", duration).toString()
+        val request = Request.Builder()
+            .url(BGM_SERVICE_URL)
+            .post(RequestBody.create("application/json".toMediaType(), json))
+            .build()
+        
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    println("❌ BGM Generation Error: ${response.message}")
+                    return false
+                }
+                
+                val resJson = JSONObject(response.body?.string() ?: "{}")
+                val generatedFilename = resJson.getString("filename")
+                val sharedDir = File("shared-data")
+                val sourceFile = File(sharedDir, generatedFilename)
+                
+                if (sourceFile.exists()) {
+                    sourceFile.copyTo(outputFile, overwrite = true)
+                    sourceFile.delete()
+                    println("✅ AI BGM saved: ${outputFile.name}")
+                    return true
+                }
+            }
+        } catch (e: Exception) {
+            println("❌ BGM Network Error: ${e.message}")
+        }
+        return false
     }
 }

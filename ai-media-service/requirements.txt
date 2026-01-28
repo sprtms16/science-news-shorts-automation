@@ -10,3 +10,4 @@ accelerate
 opencv-python-headless
 pillow
 mutagen
+scipy

@@ -22,6 +22,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-batch")
     implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
     implementation("org.springframework.boot:spring-boot-starter-web") // Optional: for exposing endpoints later
+    implementation("org.springframework.kafka:spring-kafka") // Kafka Event-Driven Architecture
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     
@@ -34,9 +35,11 @@ dependencies {
     // JSON
     implementation("org.json:json:20231013")
     
-    // YouTube API
-    implementation("com.google.apis:google-api-services-youtube:v3-rev222-1.25.0")
+    // YouTube API (Official Libraries)
+    implementation("com.google.apis:google-api-services-youtube:v3-rev20231011-2.0.0")
+    implementation("com.google.api-client:google-api-client:2.2.0")
     implementation("com.google.auth:google-auth-library-oauth2-http:1.19.0")
+    implementation("com.google.http-client:google-http-client-jackson2:1.44.1")
 
     // Database for Batch Metadata & Meta
     runtimeOnly("com.h2database:h2")

@@ -2,6 +2,7 @@ package com.sciencepixel.batch
 
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.ProductionService
 import org.springframework.batch.item.ItemProcessor
@@ -21,7 +22,8 @@ class VideoProcessor(
         }
 
         return try {
-            val videoPath = productionService.produceVideo(item)
+            val result = productionService.produceVideo(item)
+            val videoPath = result.filePath
             
             VideoHistory(
                 title = item.title,

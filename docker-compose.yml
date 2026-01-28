@@ -1,4 +1,32 @@
 services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: shorts-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: shorts-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    restart: unless-stopped
+
   ai-media-service:
     build: ./ai-media-service
     container_name: shorts-ai-service
@@ -35,21 +63,29 @@ services:
     container_name: shorts-controller
     ports:
       - "8080:8080"
+      - "8888:8888" # YouTube OAuth Callback
     depends_on:
       - ai-media-service
       - mongo
+      - kafka
     volumes:
       - ./shared-data:/app/shared-data
+      - ./client_secret.json:/app/client_secret.json
+      - ./tokens:/app/tokens
     env_file:
       - .env
     environment:
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
-      # Variables below are loaded from .env automatically if present in host or env_file
-      # But explicit env_file is safer in some compose versions.
-      # Also, we can use direct value references if we want strict binding.
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
+      # 알림 설정 (선택사항)
+      - NOTIFICATION_DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL:-}
+      - NOTIFICATION_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
 
 volumes:
   mongo-data:
+
+

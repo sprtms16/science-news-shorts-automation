@@ -1,6 +1,7 @@
 package com.sciencepixel.service
 
 import com.sciencepixel.domain.NewsItem
+import com.sciencepixel.domain.ProductionResult
 import org.springframework.stereotype.Service
 import java.io.File
 
@@ -12,21 +13,24 @@ class ProductionService(
 ) {
     
     // Entry point for Batch Job
-    fun produceVideo(news: NewsItem): String {
+    fun produceVideo(news: NewsItem): ProductionResult {
         println("🎬 Producing video for: ${news.title}")
         
         // 1. Script Generation (Gemini)
-        val scenes = geminiService.writeScript(news.title, news.summary)
-        if (scenes.isEmpty()) {
+        val response = geminiService.writeScript(news.title, news.summary)
+        if (response.scenes.isEmpty()) {
             println("⚠️ No script generated for ${news.title}")
-            return ""
+            return ProductionResult("", emptyList())
         }
         
-        return produceVideoFromScenes(news.title, scenes)
+        val keywords = response.scenes.map { it.keyword }.distinct()
+        val filePath = produceVideoFromScenes(news.title, response.scenes, response.mood)
+        
+        return ProductionResult(filePath, keywords)
     }
 
     // Core Logic - 3 Phase Pipeline
-    private fun produceVideoFromScenes(title: String, scenes: List<Scene>): String {
+    private fun produceVideoFromScenes(title: String, scenes: List<Scene>, mood: String): String {
         val workspace = File("shared-data/workspace_${System.currentTimeMillis()}").apply { mkdirs() }
         val clipFiles = mutableListOf<File>()
         val durations = mutableListOf<Double>()
@@ -41,7 +45,7 @@ class ProductionService(
             val audioFile = File(workspace, "audio_$i.mp3")
             val clipFile = File(workspace, "clip_$i.mp4")
 
-            // 1. Video (Pexels)
+            // 1. Video (Pexels - License: Free to use, no attribution required)
             if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: ${scene.sentence}", videoFile)) {
                 println("⚠️ Skipping scene $i due to no video found")
                 return@forEachIndexed
@@ -77,7 +81,7 @@ class ProductionService(
         mergeClipsWithoutSubtitles(clipFiles, mergedFile, workspace)
         
         val finalOutput = File(workspace.parentFile, "shorts_${System.currentTimeMillis()}.mp4")
-        burnSubtitles(mergedFile, srtFile, finalOutput)
+        burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
         
         println("✅ Final video with synced subtitles: ${finalOutput.absolutePath}")
         return finalOutput.absolutePath
@@ -95,14 +99,22 @@ class ProductionService(
         if (audio.exists()) {
             cmd.add("-i")
             cmd.add(audio.absolutePath)
+        } else {
+            // Generate silence if audio is missing to maintain stream consistency
+            cmd.add("-f")
+            cmd.add("lavfi")
+            cmd.add("-i")
+            cmd.add("anullsrc=channel_layout=stereo:sample_rate=44100")
         }
         
         cmd.addAll(listOf("-t", "$duration", "-vf", vfFilter, "-r", "60"))
         
-        if (audio.exists()) {
-            cmd.addAll(listOf("-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-c:a", "aac"))
-        } else {
-            cmd.addAll(listOf("-c:v", "libx264", "-an"))
+        // Map video (0:v) and audio (1:a) - audio is either file or silence
+        cmd.addAll(listOf("-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-c:a", "aac"))
+        
+        if (!audio.exists()) {
+             // Shortest ensures it matches the duration constraint (though -t handles it too)
+             cmd.add("-shortest")
         }
         
         cmd.addAll(listOf("-preset", "fast", output.absolutePath))
@@ -209,32 +221,63 @@ class ProductionService(
         }
     }
 
-    // Phase 3b: Burn subtitles into final video
-    private fun burnSubtitles(inputVideo: File, srtFile: File, output: File) {
-        // Use FFmpeg subtitles filter with styling
-        // Note: SRT path needs to be escaped for Windows/special characters
+    // Phase 3b: Burn subtitles and Mix BGM into final video
+    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File) {
         val srtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
-        
         val subtitleFilter = "subtitles='$srtPath':force_style='FontName=NanumGothic,FontSize=10,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=0.8,Shadow=0.5,Alignment=2,MarginV=50'"
         
-        val cmd = listOf(
-            "ffmpeg", "-y",
-            "-i", inputVideo.absolutePath,
-            "-vf", subtitleFilter,
-            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-            "-c:a", "copy",
-            "-movflags", "+faststart",
-            output.absolutePath
-        )
+        // Find BGM file (Random selection from matching mood files)
+        val bgmDir = File("shared-data/bgm").apply { mkdirs() }
+        val bgmFiles = bgmDir.listFiles { _, name -> name.startsWith(mood) && name.endsWith(".mp3") }
         
-        println("Executing FFmpeg Burn Subtitles: ${cmd.joinToString(" ")}")
+        var bgmFile = if (!bgmFiles.isNullOrEmpty()) {
+             bgmFiles.random()
+        } else {
+             File(bgmDir, "$mood.mp3") // Fallback
+        }
+        
+        // 1. Check Local File
+        if (!bgmFile.exists()) {
+            println("⚠️ Local BGM not found for '$mood'. Trying AI Generation...")
+            val aiBgmFile = File(workspace.parentFile, "ai_bgm_${System.currentTimeMillis()}.wav")
+            
+            // Generate for 15 seconds (will loop)
+            val prompt = "$mood style cinematic background music, high quality"
+            if (audioService.generateBgm(prompt, 15, aiBgmFile)) {
+                bgmFile = aiBgmFile
+            }
+        }
+        
+        val cmd = mutableListOf("ffmpeg", "-y", "-i", inputVideo.absolutePath)
+        
+        if (bgmFile.exists()) {
+            println("🎵 Mixing BGM: ${bgmFile.name} (Mood: $mood)")
+            cmd.addAll(listOf("-stream_loop", "-1", "-i", bgmFile.absolutePath))
+            
+            // Filter complex: mix voice and bgm (volume 0.30)
+            // [0:v] is video from input 0
+            // [0:a] is audio from input 0 (TTS)
+            // [1:a] is audio from input 1 (BGM)
+            // mix voice(1.0) and bgm(0.30) -> duration=first (matches TTS length)
+            cmd.addAll(listOf(
+                "-filter_complex", "[1:a]volume=0.20[bgm];[0:a][bgm]amix=inputs=2:duration=first[aout];[0:v]$subtitleFilter[vout]",
+                "-map", "[vout]", "-map", "[aout]"
+            ))
+        } else {
+            println("⚠️ BGM file not found and Generation failed. Skipping BGM.")
+            cmd.addAll(listOf("-vf", subtitleFilter, "-c:a", "copy"))
+        }
+        
+        cmd.addAll(listOf("-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", output.absolutePath))
+        
+        println("Executing FFmpeg Production (Phase 3): ${cmd.joinToString(" ")}")
         val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val processOutput = process.inputStream.bufferedReader().readText()
         val exitCode = process.waitFor()
         if (exitCode != 0) {
-            println("FFmpeg Subtitle Burn Error (exit $exitCode): $processOutput")
+            println("FFmpeg Production Error (exit $exitCode): $processOutput")
         } else {
-            println("✅ Subtitles burned successfully: ${output.absolutePath}")
+            println("✅ Final Video Created Successfully: ${output.absolutePath}")
         }
     }
 }
