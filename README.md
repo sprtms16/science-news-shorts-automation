@@ -54,7 +54,7 @@ graph TD
     end
 ```
 
-## 🔧 Tech Stack
+## 💻 Tech Stack
 ### Backend & Core
 - **Language**: Kotlin (JDK 17)
 - **Framework**: Spring Boot 3.2, Spring Batch
@@ -63,13 +63,43 @@ graph TD
 
 ### AI & Media Processing
 - **LLM**: Google Gemini 1.5 (Script & Metadata Generation)
-- **Voice**: Edge-TTS (Neural Text-to-Speech)
+- **Voice**: Microsoft Edge-TTS (Neural Text-to-Speech)
 - **Audio AI**: Hugging Face `facebook/musicgen-small` (Python Microservice)
 - **Video Engine**: FFmpeg (Clipping, Filtering, Rendering)
 
 ### DevOps & Infrastructure
 - **Container**: Docker, Docker Compose
 - **Scheduling**: Spring Scheduler (Cron)
+
+## 📦 Installation & Setup
+
+### Prerequisites
+- Docker & Docker Compose
+- Java 17+ (for local development)
+- Google Cloud Project (YouTube Data API v3, Gemini API enabled)
+- Pexels API Key
+
+### Configuration
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/sprtms16/science-news-shorts-automation.git
+   cd science-news-shorts-automation
+   ```
+
+2. **API Keys Setup**
+   - `tokens/` 디렉토리에 YouTube OAuth2 자격 증명 파일(`StoredCredential`)이나 `client_secret.json`을 위치시킵니다.
+   - Pexels 및 Gemini API Key는 환경 변수 또는 설정 파일에 입력합니다.
+
+3. **Build & Run (Docker)**
+   전체 시스템은 Docker Compose로 구성되어 있어 한 번의 명령으로 실행 가능합니다.
+   ```bash
+   # Build and Start all services
+   docker-compose up -d --build
+   ```
+
+4. **Verify Services**
+   - **Controller API**: `http://localhost:8080/swagger-ui.html` (if enabled) or check logs.
+   - **Kafka UI** (Optional): `http://localhost:9000` (if configured).
 
 ## 💡 Smart Logic Highlights
 ### 1. Quota-Aware Scheduling
@@ -99,4 +129,4 @@ POST /manual/batch/topic
 ```
 
 ---
-*Created by SciencePixel Automation Team*
+*Created by sprtms16*
