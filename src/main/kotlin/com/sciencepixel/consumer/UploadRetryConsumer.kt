@@ -30,6 +30,18 @@ class UploadRetryConsumer(
         val event = objectMapper.readValue(message, UploadFailedEvent::class.java)
         println("📥 Received UploadFailedEvent: ${event.videoId} (Retry: ${event.retryCount})")
 
+        // ⚠️ Quota Exceeded Check - Do NOT retry if quota exceeded
+        if (event.reason.lowercase().contains("quota")) {
+            println("🛑 YouTube quota exceeded. Stopping retry loop. Video: ${event.videoId}")
+            repository.findById(event.videoId).ifPresent { video ->
+                repository.save(video.copy(
+                    status = "QUOTA_EXCEEDED",
+                    retryCount = event.retryCount
+                ))
+            }
+            return // Exit immediately, do not retry
+        }
+
         if (event.retryCount < MAX_RETRY_COUNT) {
             // 재시도: VideoCreatedEvent를 다시 발행
             println("🔄 Retrying upload (${event.retryCount + 1}/$MAX_RETRY_COUNT)")

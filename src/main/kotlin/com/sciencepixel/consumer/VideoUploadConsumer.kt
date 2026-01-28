@@ -37,6 +37,17 @@ class VideoUploadConsumer(
         println("📥 Received VideoCreatedEvent: ${event.videoId}")
 
         try {
+            val videoOpt = repository.findById(event.videoId)
+            if (videoOpt.isPresent && videoOpt.get().status == "UPLOADED" && videoOpt.get().youtubeUrl.isNotBlank()) {
+                println("⏭️ Video ${event.videoId} already uploaded to YouTube. Skipping duplicate upload.")
+                // Update filePath if it was missing but now we have it from event
+                val video = videoOpt.get()
+                if (video.filePath.isBlank()) {
+                    repository.save(video.copy(filePath = event.filePath))
+                }
+                return
+            }
+
             val file = File(event.filePath)
             
             if (file.exists()) {

@@ -21,27 +21,35 @@ class CleanupService(
             return
         }
 
+        val cleanupThreshold = System.currentTimeMillis() - (24 * 60 * 60 * 1000) // 24 hours ago
         var deletedCount = 0
+        
         uploadedVideos.forEach { video ->
             try {
                 val file = File(video.filePath)
                 if (file.exists()) {
-                    if (file.delete()) {
-                        println("🗑️ Deleted file for '${video.title}': ${file.path}")
-                        deletedCount++
+                    // Only delete if the file is older than 24 hours
+                    if (file.lastModified() < cleanupThreshold) {
+                        if (file.delete()) {
+                            println("🗑️ Deleted file for '${video.title}': ${file.path}")
+                            deletedCount++
+                            
+                            // Update DB to reflect cleanup (preserve other metadata)
+                            repository.save(video.copy(
+                                filePath = "", // Clear path to indicate deletion
+                                summary = video.summary + "\n[System] Resource cleaned up at ${LocalDateTime.now()}"
+                            ))
+                        } else {
+                            println("⚠️ Failed to delete file: ${file.path}")
+                        }
                     } else {
-                        println("⚠️ Failed to delete file: ${file.path}")
+                        println("ℹ️ Skipping recently uploaded file (within 24h): ${file.name}")
                     }
                 } else {
                     println("⚠️ File not found (already deleted?): ${video.filePath}")
+                    // Clean up DB entry even if file is missing if marked as UPLOADED but path is set
+                    repository.save(video.copy(filePath = ""))
                 }
-
-                // Update DB to reflect cleanup (preserve other metadata)
-                repository.save(video.copy(
-                    filePath = "", // Clear path to indicate deletion
-                    summary = video.summary + "\n[System] Resource cleaned up at ${LocalDateTime.now()}"
-                ))
-
             } catch (e: Exception) {
                 println("❌ Error cleaning up video '${video.title}': ${e.message}")
             }

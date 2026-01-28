@@ -15,6 +15,9 @@ data class VideoHistory(
     val filePath: String = "",
     val youtubeUrl: String = "",
     val status: String = "PENDING_PROCESSING", // PENDING_PROCESSING, COMPLETED, RETRY_PENDING, REGENERATING, UPLOADED, FILE_NOT_FOUND, REGEN_FAILED, ERROR
+    val description: String = "", // YouTube description (Korean)
+    val tags: List<String> = emptyList(), // Hashtags
+    val sources: List<String> = emptyList(), // Reference URLs/Sources
     val retryCount: Int = 0,  // Retry count for upload failures
     val regenCount: Int = 0,  // Regeneration attempt count
     val createdAt: LocalDateTime = LocalDateTime.now(),
@@ -38,7 +41,23 @@ data class NewsItem(
 
 data class ProductionResult(
     val filePath: String,
-    val keywords: List<String>
+    val keywords: List<String>,
+    val title: String = "",
+    val description: String = "",
+    val tags: List<String> = emptyList(),
+    val sources: List<String> = emptyList()
 )
 
 interface QuotaUsageRepository : MongoRepository<QuotaUsage, String>
+
+@Document(collection = "system_prompt")
+data class SystemPrompt(
+    @Id
+    val id: String, // "script_prompt", "vision_prompt" for example
+    val content: String,
+    val description: String = "",
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+)
+
+interface SystemPromptRepository : MongoRepository<SystemPrompt, String>
+

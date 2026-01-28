@@ -1,0 +1,236 @@
+package com.sciencepixel.controller
+
+import com.sciencepixel.domain.SystemPrompt
+import com.sciencepixel.domain.SystemPromptRepository
+import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.service.GeminiService
+import org.springframework.core.io.Resource
+import org.springframework.core.io.UrlResource
+import org.springframework.data.domain.Sort
+import org.springframework.http.HttpHeaders
+import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+import java.io.File
+import java.nio.file.Paths
+import java.time.LocalDateTime
+import java.time.ZoneId
+
+@RestController
+@RequestMapping("/admin")
+@CrossOrigin(origins = ["*"])
+class AdminController(
+    private val videoRepository: VideoHistoryRepository,
+    private val promptRepository: SystemPromptRepository,
+    private val geminiService: GeminiService,
+    private val eventPublisher: com.sciencepixel.event.KafkaEventPublisher
+) {
+
+    @PostMapping("/videos/{id}/metadata/regenerate")
+    fun regenerateMetadata(@PathVariable id: String): ResponseEntity<VideoHistory> {
+        val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
+        
+        val response = geminiService.regenerateMetadataOnly(video.title, video.summary)
+        
+        val updated = video.copy(
+            title = response.title.ifEmpty { video.title },
+            description = response.description,
+            tags = response.tags,
+            sources = response.sources,
+            updatedAt = LocalDateTime.now()
+        )
+        
+        return ResponseEntity.ok(videoRepository.save(updated))
+    }
+
+    @PostMapping("/videos/rematch-files")
+    fun rematchFilesWithDb(): ResponseEntity<Map<String, Any>> {
+        val outputDir = File("/app/shared-data")
+        if (!outputDir.exists()) {
+            return ResponseEntity.ok(mapOf("matched" to 0, "message" to "Directory /app/shared-data not found"))
+        }
+
+        val videoFiles = outputDir.listFiles()?.filter { it.isFile && it.name.lowercase().endsWith(".mp4") } ?: emptyList()
+        var matchedCount = 0
+        val matchedVideos = mutableListOf<String>()
+
+        val videosToMatch = videoRepository.findAll().filter { 
+            (it.filePath.isBlank() || !File(it.filePath).exists()) && it.status != "UPLOADED"
+        }
+
+        for (video in videosToMatch) {
+            val videoCreatedAt = video.createdAt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val videoTitleSlug = video.title.take(20).replace(Regex("[^a-zA-Z0-9가-힣]"), "_").lowercase()
+            
+            // Try to find matching file
+            val matchingFile = videoFiles.find { file ->
+                val fileName = file.name.lowercase()
+                
+                // 1. Title Slug Match (High Precision)
+                if (fileName.contains(videoTitleSlug)) {
+                    return@find true
+                }
+                
+                // 2. Timestamp Match (Fallback for files without title slug or with truncated titles)
+                if (fileName.startsWith("shorts_")) {
+                    val namePart = fileName.substringBeforeLast(".")
+                    val fileTimestampStr = namePart.substringAfterLast("_")
+                    val fileTimestamp = fileTimestampStr.toLongOrNull()
+                    
+                    if (fileTimestamp != null) {
+                        val diff = java.lang.Math.abs(fileTimestamp - videoCreatedAt)
+                        diff <= 900000L // 15 minutes
+                    } else false
+                } else false
+            }
+
+            if (matchingFile != null) {
+                videoRepository.save(video.copy(
+                    filePath = matchingFile.absolutePath,
+                    status = if (video.status == "FILE_NOT_FOUND" || video.status == "PROCESSING") "COMPLETED" else video.status,
+                    updatedAt = LocalDateTime.now()
+                ))
+                matchedCount++
+                matchedVideos.add("${video.id}: ${matchingFile.name}")
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "matched" to matchedCount,
+            "total_without_file" to videosToMatch.size,
+            "matched_videos" to matchedVideos.take(20)
+        ))
+    }
+
+    @PostMapping("/videos/regenerate-missing-files")
+    fun regenerateMissingFiles(): ResponseEntity<Map<String, Any>> {
+        val targetVideos = videoRepository.findAll().filter {
+            (it.filePath.isBlank() || !File(it.filePath).exists()) && it.status != "UPLOADED"
+        }
+
+        var triggeredCount = 0
+        targetVideos.forEach { video ->
+            // Update status (Preserve UPLOADED status to avoid re-uploading)
+            val nextStatus = if (video.status == "UPLOADED") "UPLOADED" else "REGENERATING"
+            videoRepository.save(video.copy(status = nextStatus, updatedAt = LocalDateTime.now()))
+            
+            eventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
+                videoId = video.id ?: "",
+                title = video.title,
+                summary = video.summary,
+                link = video.link,
+                regenCount = video.regenCount
+            ))
+            triggeredCount++
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "triggered" to triggeredCount,
+            "message" to "Triggered regeneration for $triggeredCount videos."
+        ))
+    }
+
+    @PostMapping("/videos/regenerate-all-metadata")
+    fun regenerateAllMetadata(): ResponseEntity<Map<String, Any>> {
+        val allVideos = videoRepository.findAll()
+        val videosToUpdate = allVideos.filter { video ->
+            !video.title.any { it in '\uAC00'..'\uD7A3' }
+        }
+
+        var updatedCount = 0
+        val results = mutableListOf<String>()
+
+        for (video in videosToUpdate.take(10)) {
+            try {
+                val response = geminiService.regenerateMetadataOnly(video.title, video.summary)
+                videoRepository.save(video.copy(
+                    title = response.title.ifEmpty { video.title },
+                    description = response.description,
+                    tags = response.tags,
+                    sources = response.sources,
+                    updatedAt = LocalDateTime.now()
+                ))
+                updatedCount++
+                results.add("✅ ${video.id}: ${video.title} -> ${response.title}")
+                Thread.sleep(500)
+            } catch (e: Exception) {
+                results.add("❌ ${video.id}: ${e.message}")
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "updated" to updatedCount,
+            "total_non_korean" to videosToUpdate.size,
+            "results" to results
+        ))
+    }
+
+    @GetMapping("/videos")
+    fun getAllVideos(): List<VideoHistory> = videoRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
+
+    @GetMapping("/videos/{id}")
+    fun getVideo(@PathVariable id: String): ResponseEntity<VideoHistory> {
+        return videoRepository.findById(id).map { ResponseEntity.ok(it) }.orElse(ResponseEntity.notFound().build())
+    }
+
+    @PutMapping("/videos/{id}/status")
+    fun updateVideoStatus(@PathVariable id: String, @RequestBody request: UpdateStatusRequest): ResponseEntity<VideoHistory> {
+        val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
+        
+        var updated = video.copy(
+            status = request.status,
+            youtubeUrl = request.youtubeUrl ?: video.youtubeUrl,
+            updatedAt = LocalDateTime.now()
+        )
+
+        // If manually setting to UPLOADED, clean up the file
+        if (request.status == "UPLOADED") {
+            try {
+                if (video.filePath.isNotBlank()) {
+                    val file = File(video.filePath)
+                    if (file.exists() && file.delete()) {
+                        println("🗑️ Manually marked as UPLOADED. Deleted file: ${file.path}")
+                    }
+                }
+                updated = updated.copy(filePath = "")
+            } catch (e: Exception) {
+                println("⚠️ Failed to delete file for manual upload: ${e.message}")
+            }
+        }
+        
+        return ResponseEntity.ok(videoRepository.save(updated))
+    }
+
+    @GetMapping("/videos/{id}/download")
+    fun downloadVideo(@PathVariable id: String): ResponseEntity<Resource> {
+        val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
+        if (video.filePath.isBlank()) return ResponseEntity.notFound().build()
+
+        return try {
+            val path = Paths.get(video.filePath)
+            val resource = UrlResource(path.toUri())
+            if (resource.exists() && resource.isReadable) {
+                ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType("video/mp4"))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${video.id}.mp4\"")
+                    .body(resource)
+            } else ResponseEntity.notFound().build()
+        } catch (e: Exception) {
+            ResponseEntity.internalServerError().build()
+        }
+    }
+
+    @GetMapping("/prompts")
+    fun getAllPrompts(): List<SystemPrompt> = promptRepository.findAll()
+
+    @GetMapping("/prompts/{id}")
+    fun getPrompt(@PathVariable id: String): ResponseEntity<SystemPrompt> {
+        return promptRepository.findById(id).map { ResponseEntity.ok(it) }.orElse(ResponseEntity.notFound().build())
+    }
+
+    @PostMapping("/prompts")
+    fun savePrompt(@RequestBody prompt: SystemPrompt): SystemPrompt = promptRepository.save(prompt.copy(updatedAt = LocalDateTime.now()))
+}
+
+data class UpdateStatusRequest(val status: String, val youtubeUrl: String? = null)

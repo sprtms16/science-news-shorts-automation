@@ -26,11 +26,14 @@ class VideoProcessor(
             val videoPath = result.filePath
             
             VideoHistory(
-                title = item.title,
-                summary = item.summary,
+                title = result.title.ifEmpty { item.title },
+                summary = item.summary, // Keep original summary for reference
+                description = result.description, // New Korean formatted description
                 link = item.link,
                 filePath = videoPath,
-                status = "COMPLETED"
+                status = "COMPLETED",
+                tags = result.tags,
+                sources = result.sources
             )
         } catch (e: Exception) {
             println("⚠️ Failed to process: ${item.title} - ${e.message}")

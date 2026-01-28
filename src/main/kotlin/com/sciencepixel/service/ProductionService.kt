@@ -26,7 +26,14 @@ class ProductionService(
         val keywords = response.scenes.map { it.keyword }.distinct()
         val filePath = produceVideoFromScenes(news.title, response.scenes, response.mood)
         
-        return ProductionResult(filePath, keywords)
+        return ProductionResult(
+            filePath = filePath,
+            keywords = keywords,
+            title = response.title,
+            description = response.description,
+            tags = response.tags,
+            sources = response.sources
+        )
     }
 
     // Core Logic - 3 Phase Pipeline
@@ -80,7 +87,10 @@ class ProductionService(
         val mergedFile = File(workspace, "merged_no_subs.mp4")
         mergeClipsWithoutSubtitles(clipFiles, mergedFile, workspace)
         
-        val finalOutput = File(workspace.parentFile, "shorts_${System.currentTimeMillis()}.mp4")
+        val sanitizedTitle = title.take(20)
+            .replace(Regex("[^a-zA-Z0-9가-힣]"), "_")
+            .lowercase()
+        val finalOutput = File(workspace.parentFile, "shorts_${sanitizedTitle}_${System.currentTimeMillis()}.mp4")
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
         
         println("✅ Final video with synced subtitles: ${finalOutput.absolutePath}")

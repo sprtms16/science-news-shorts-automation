@@ -13,13 +13,23 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 data class Scene(val sentence: String, val keyword: String)
-data class ScriptResponse(val scenes: List<Scene>, val mood: String)
+data class ScriptResponse(
+    val scenes: List<Scene>, 
+    val mood: String,
+    val title: String = "",
+    val description: String = "",
+    val tags: List<String> = emptyList(),
+    val sources: List<String> = emptyList()
+)
 
 @Service
-class GeminiService(@Value("\${gemini.api-key}") private val apiKeyString: String) {
+class GeminiService(
+    @Value("\${gemini.api-key}") private val apiKeyString: String,
+    private val promptRepository: com.sciencepixel.domain.SystemPromptRepository
+) {
     private val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).build()
     private val CHANNEL_NAME = "사이언스 픽셀"
-    
+
     // Parse keys from comma-separated string
     private val apiKeys: List<String> by lazy {
         apiKeyString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
@@ -145,49 +155,63 @@ class GeminiService(@Value("\${gemini.api-key}") private val apiKeyString: Strin
         return null
     }
 
-    // 1. 한국어 대본 작성
-    fun writeScript(title: String, summary: String): ScriptResponse {
-        val prompt = """
+    // Default Prompts (Fallbacks)
+    private val DEFAULT_SCRIPT_PROMPT = """
             [Role]
             You are '$CHANNEL_NAME', a famous Korean science Shorts YouTuber.
             Your task is to explain the following English news in **KOREAN** (`한국어`).
 
             [Input News]
-            Title: $title
-            Summary: $summary
+            Title: {title}
+            Summary: {summary}
 
             [Rules]
-            1. **Language:** MUST BE KOREAN (한국어). Do not output English sentences in the script.
+            1. **Language:** MUST BE KOREAN (한국어). Do not output English sentences in the script/title/description (except keywords).
             2. **Target Audience:** High school and university students interested in science. Use appropriate vocabulary - not too childish, not too academic.
             3. **Content Level:** Explain complex topics in an engaging, accessible way. Include interesting facts and "wow" moments.
-            4. **Target Duration:** The final video should be close to **60 seconds**.
-            5. **Number of sentences:** EXACTLY 13 to 14 sentences. No more, no less.
-            6. **Sentence length:** Each sentence should be short, natural, and spoken-friendly.
-            7. **Channel intro:** FIRST sentence MUST be a greeting introducing the channel: "안녕하세요, $CHANNEL_NAME 입니다!" or similar.
-            8. **Opening hook:** SECOND sentence should be a catchy hook about the topic (e.g., "오늘은 정말 놀라운 소식을 전해드릴게요!").
-            9. **Channel name:** Naturally mention '$CHANNEL_NAME' at least once more in the script.
-            10. **CTA (Call-to-Action):** End with a friendly closing like "유익하셨다면 구독과 좋아요 부탁드려요!"
-            11. **Each sentence must pair with a video clip.** The `keyword` should describe what the video should show.
-            12. **Keywords must be general English terms** suitable for Pexels video search. Avoid overly specific or abstract words.
-
-            [BGM Mood]
-            Choose one mood for the video's background music based on the news content:
-            - "calm" for relaxing, peaceful topics
-            - "exciting" for breakthrough discoveries or amazing facts
-            - "tech" for technology, AI, robotics topics
-            - "epic" for space, universe, grand scale topics
+            4. **Duration:** ~60 seconds (13-14 sentences).
+            5. **Intro/Outro:** Start with "$CHANNEL_NAME" greeting, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
+            6. **Evidence & Sources:** You MUST provide a brief "Verification Note" checking accuracy and list sources (e.g., "Nature", "NASA") in the JSON output.
+            7. **Description:** Write a compelling YouTube description including the summary and sources.
 
             [Output Format - JSON Only]
-            Return ONLY a valid JSON object with this exact structure (no markdown, no explanation):
+            Return ONLY a valid JSON object with this exact structure:
             {
+                "title": "Korean Title (Catchy, <40 chars)",
+                "description": "Korean Description for YouTube (Include summary and sources clearly)",
+                "tags": ["tag1", "tag2", "tag3"],
+                "sources": ["source1", "source2"],
+                "verification": "Fact check note (e.g., 'Verified from Nature journal')",
                 "scenes": [
-                    {"sentence": "한국어 문장1", "keyword": "english search keyword"},
-                    {"sentence": "한국어 문장2", "keyword": "english search keyword"},
+                    {"sentence": "Korean Sentence 1", "keyword": "english search keyword"},
                     ...
                 ],
                 "mood": "calm|exciting|tech|epic"
             }
-        """.trimIndent()
+    """.trimIndent()
+
+    // ...
+
+    // 1. 한국어 대본 작성
+    fun writeScript(title: String, summary: String): ScriptResponse {
+        val promptId = "script_prompt_v2" 
+        // ... (Repo logic omitted for brevity in replace, but assuming context allows targeting)
+        var promptTemplate = promptRepository.findById(promptId).map { it.content }.orElse(null)
+        
+        if (promptTemplate == null) {
+            println("ℹ️ Prompt '$promptId' not found in DB. Saving default.")
+            promptRepository.save(com.sciencepixel.domain.SystemPrompt(
+                id = promptId,
+                content = DEFAULT_SCRIPT_PROMPT,
+                description = "Enhanced Science News Script Prompt with Metadata"
+            ))
+            promptTemplate = DEFAULT_SCRIPT_PROMPT
+        }
+        
+        val prompt = promptTemplate
+            .replace("{title}", title)
+            .replace("{summary}", summary)
+
         
         val responseText = callGeminiWithRetry(prompt) ?: return ScriptResponse(emptyList(), "tech")
         
@@ -205,6 +229,30 @@ class GeminiService(@Value("\${gemini.api-key}") private val apiKeyString: Strin
                 .trim()
 
             val parsedContent = JSONObject(content)
+            
+            // Safe Parsing
+            val titleRes = parsedContent.optString("title", title)
+            val descRes = parsedContent.optString("description", summary)
+            
+            // Tags
+            val tagsList = mutableListOf<String>()
+            val tagsArray = parsedContent.optJSONArray("tags")
+            if (tagsArray != null) {
+                for (i in 0 until tagsArray.length()) {
+                    tagsList.add(tagsArray.getString(i))
+                }
+            }
+            
+            // Sources
+            val sourcesList = mutableListOf<String>()
+            val sourcesArray = parsedContent.optJSONArray("sources")
+            if (sourcesArray != null) {
+                for (i in 0 until sourcesArray.length()) {
+                    sourcesList.add(sourcesArray.getString(i))
+                }
+            }
+
+            // Scenes
             val scenesArray = parsedContent.getJSONArray("scenes")
             val scenes = (0 until scenesArray.length()).map { i ->
                 val scene = scenesArray.getJSONObject(i)
@@ -212,8 +260,8 @@ class GeminiService(@Value("\${gemini.api-key}") private val apiKeyString: Strin
             }
             val mood = parsedContent.optString("mood", "tech")
             
-            println("✅ Script Generated: ${scenes.size} scenes, Mood: $mood")
-            ScriptResponse(scenes, mood)
+            println("✅ Script Generated: ${scenes.size} scenes, Mood: $mood, Title: $titleRes")
+            ScriptResponse(scenes, mood, titleRes, descRes, tagsList, sourcesList)
         } catch (e: Exception) {
             println("❌ Script Parse Error: ${e.message}")
             println("Response: ${responseText.take(500)}")
@@ -281,6 +329,89 @@ class GeminiService(@Value("\${gemini.api-key}") private val apiKeyString: Strin
         } catch (e: Exception) {
             println("  Vision Error for '$keyword': ${e.message}")
             true // Default to true on error
+        }
+    }
+
+    // 3. Metadata Renewal (Metadata Only)
+    fun regenerateMetadataOnly(currentTitle: String, currentSummary: String): ScriptResponse {
+        val prompt = """
+            [Task]
+            You are '$CHANNEL_NAME'. Update the metadata for this existing science news video into **KOREAN**.
+            The video is already made, so just generate the Title, Description, Tags, and Sources.
+
+            [Input Info]
+            Original Title: $currentTitle
+            Original Summary: $currentSummary
+
+            [Rules]
+            1. **Language:** MUST BE KOREAN (한국어).
+            2. **Title:** Catchy YouTube Shorts title (<40 chars). KOREAN ONLY.
+            3. **Description:** Informative YouTube description. PLAIN TEXT ONLY. NO HTML tags or links. Include brief summary.
+            4. **Tags:** 5-8 relevant hashtags (Korean/English mix). Do NOT include '#' prefix.
+            5. **Sources:** ONLY source names (e.g., "Nature", "NASA", "ScienceDaily"). NO URLs or HTML.
+
+            [Output Format - JSON Only]
+            Return ONLY a valid JSON object:
+            {
+                "title": "한글 제목",
+                "description": "한글 설명 (HTML 없이 순수 텍스트)",
+                "tags": ["과학", "science", "news"],
+                "sources": ["Nature", "NASA"],
+                "verification": "검증 노트"
+            }
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return ScriptResponse(emptyList(), "tech")
+
+        return try {
+            val jsonResponse = JSONObject(responseText)
+            val content = jsonResponse.getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .removePrefix("```json")
+                .removeSuffix("```")
+                .trim()
+
+            val parsedContent = JSONObject(content)
+            
+            // Safe Parsing
+            val titleRes = parsedContent.optString("title", currentTitle)
+            // Clean description - remove any HTML tags
+            val rawDesc = parsedContent.optString("description", currentSummary)
+            val descRes = rawDesc.replace(Regex("<[^>]*>"), "").trim()
+            
+            // Tags with defaults
+            val tagsList = mutableListOf("SciencePixel", "Shorts", "과학")
+            val tagsArray = parsedContent.optJSONArray("tags")
+            if (tagsArray != null) {
+                for (i in 0 until tagsArray.length()) {
+                    val tag = tagsArray.getString(i).removePrefix("#").trim()
+                    if (tag.isNotEmpty() && tag !in tagsList) tagsList.add(tag)
+                }
+            }
+
+            // Sources - clean any URLs
+            val sourcesList = mutableListOf<String>()
+            val sourcesArray = parsedContent.optJSONArray("sources")
+            if (sourcesArray != null) {
+                for (i in 0 until sourcesArray.length()) {
+                    val source = sourcesArray.getString(i)
+                        .replace(Regex("<[^>]*>"), "") // Remove HTML
+                        .replace(Regex("https?://\\S+"), "") // Remove URLs
+                        .trim()
+                    if (source.isNotEmpty()) sourcesList.add(source)
+                }
+            }
+
+            // Do NOT generate scenes. Return empty scenes.
+            ScriptResponse(emptyList(), "tech", titleRes, descRes, tagsList, sourcesList)
+        } catch (e: Exception) {
+            println("❌ Metadata Regen Error: ${e.message}")
+            ScriptResponse(emptyList(), "tech", currentTitle, currentSummary, listOf("SciencePixel", "Shorts"))
         }
     }
 

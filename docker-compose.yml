@@ -81,9 +81,17 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
       # 알림 설정 (선택사항)
-      - NOTIFICATION_DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL:-}
       - NOTIFICATION_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+
+  frontend-server:
+    build: ./frontend
+    container_name: shorts-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - shorts-controller
+    restart: unless-stopped
 
 volumes:
   mongo-data:
