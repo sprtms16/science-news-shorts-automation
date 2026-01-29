@@ -30,3 +30,10 @@ shared-data/
 client_secret.json
 tokens/
 
+# Logs & State
+*.log
+*.txt
+vpn-state/*.log*
+vpn-state/*.txt
+vpn-state/*.conf
+
