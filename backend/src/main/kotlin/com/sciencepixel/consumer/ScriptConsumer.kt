@@ -2,6 +2,7 @@ package com.sciencepixel.consumer
 
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.RssNewItemEvent
 import com.sciencepixel.event.ScriptCreatedEvent
@@ -33,7 +34,7 @@ class ScriptConsumer(
             // 1. Create or Get History (Idempotency)
             val history = getOrCreateHistory(event)
             
-            if (history.status == "COMPLETED" || history.status == "UPLOADED") {
+            if (history.status == VideoStatus.COMPLETED || history.status == VideoStatus.UPLOADED) {
                 println("⚠️ Video already completed for: ${event.title}. Skipping.")
                 return
             }
@@ -45,7 +46,7 @@ class ScriptConsumer(
             if (scriptResponse.scenes.isEmpty()) {
                 println("⚠️ Empty script generated. Marking as ERROR.")
                 videoHistoryRepository.save(history.copy(
-                    status = "ERROR_SCRIPT_EMPTY",
+                    status = VideoStatus.ERROR_SCRIPT_EMPTY,
                     updatedAt = LocalDateTime.now()
                 ))
                 return
@@ -53,9 +54,11 @@ class ScriptConsumer(
 
             // 3. Update History with Script Data
             val updatedHistory = videoHistoryRepository.save(history.copy(
-                status = "SCRIPT_READY",
+                status = VideoStatus.SCRIPT_READY,
+                title = scriptResponse.title, // Update title with the generated Korean title
                 description = scriptResponse.description, // Correctly use description field
                 tags = scriptResponse.tags,
+                sources = scriptResponse.sources,
                 updatedAt = LocalDateTime.now()
             ))
 
@@ -80,7 +83,7 @@ class ScriptConsumer(
 
     private fun getOrCreateHistory(event: RssNewItemEvent): VideoHistory {
         // Simple check by link (assuming unique per news)
-        val existing = videoHistoryRepository.findAll().find { it.link == event.url }
+        val existing = videoHistoryRepository.findByLink(event.url)
         if (existing != null) return existing
 
         val initialVideo = VideoHistory(
@@ -88,7 +91,7 @@ class ScriptConsumer(
             title = event.title,
             summary = "", // Initial summary
             link = event.url,
-            status = "QUEUED",
+            status = VideoStatus.QUEUED,
             createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now()
         )

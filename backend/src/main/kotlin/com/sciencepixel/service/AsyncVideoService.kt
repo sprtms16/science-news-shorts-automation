@@ -3,6 +3,7 @@ package com.sciencepixel.service
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.VideoCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
@@ -40,8 +41,12 @@ class AsyncVideoService(
                 val history = videoHistoryRepository.findById(historyId).orElse(null)
                 if (history != null) {
                     val completedVideo = videoHistoryRepository.save(history.copy(
-                        status = "COMPLETED",
+                        status = VideoStatus.COMPLETED,
                         filePath = filePath,
+                        title = result.title.ifBlank { history.title },
+                        description = result.description.ifBlank { history.description },
+                        tags = if (result.tags.isNotEmpty()) result.tags else history.tags,
+                        sources = if (result.sources.isNotEmpty()) result.sources else history.sources,
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                     
@@ -67,7 +72,7 @@ class AsyncVideoService(
                 val history = videoHistoryRepository.findById(historyId).orElse(null)
                 if (history != null) {
                     videoHistoryRepository.save(history.copy(
-                        status = "FAILED",
+                        status = VideoStatus.PERMANENTLY_FAILED,
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                 }
@@ -79,7 +84,7 @@ class AsyncVideoService(
             val history = videoHistoryRepository.findById(historyId).orElse(null)
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
-                    status = "ERROR",
+                    status = VideoStatus.ERROR,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }

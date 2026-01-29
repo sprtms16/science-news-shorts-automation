@@ -3,6 +3,7 @@ package com.sciencepixel.consumer
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.YoutubeService
@@ -38,7 +39,7 @@ class VideoUploadConsumer(
 
         try {
             val videoOpt = repository.findById(event.videoId)
-            if (videoOpt.isPresent && videoOpt.get().status == "UPLOADED" && videoOpt.get().youtubeUrl.isNotBlank()) {
+            if (videoOpt.isPresent && videoOpt.get().status == VideoStatus.UPLOADED && videoOpt.get().youtubeUrl.isNotBlank()) {
                 println("⏭️ Video ${event.videoId} already uploaded to YouTube. Skipping duplicate upload.")
                 // Update filePath if it was missing but now we have it from event
                 val video = videoOpt.get()
@@ -89,7 +90,7 @@ class VideoUploadConsumer(
                 // Update DB
                 repository.findById(event.videoId).ifPresent { video ->
                     repository.save(video.copy(
-                        status = "UPLOADED",
+                        status = VideoStatus.UPLOADED,
                         youtubeUrl = youtubeUrl,
                         updatedAt = java.time.LocalDateTime.now()
                     ))

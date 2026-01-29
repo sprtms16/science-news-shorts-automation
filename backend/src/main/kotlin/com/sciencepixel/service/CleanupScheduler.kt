@@ -6,6 +6,7 @@ import org.springframework.stereotype.Component
 import com.sciencepixel.service.GeminiService
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import java.io.File
 
 @Component
@@ -41,7 +42,7 @@ class CleanupScheduler(
     private fun runSafetyCheck() {
         // Check COMPLETED and PENDING videos (not UPLOADED)
         val targetVideos = videoRepository.findAll().filter { 
-            it.status == "COMPLETED" || it.status.contains("PENDING") 
+            it.status == VideoStatus.COMPLETED || it.status == VideoStatus.PENDING_PROCESSING || it.status == VideoStatus.RETRY_PENDING 
         }
 
         if (targetVideos.isEmpty()) return

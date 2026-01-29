@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.domain.VideoStatus
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 
@@ -36,7 +37,7 @@ class UploadRetryConsumer(
             println("🛑 YouTube quota exceeded. Stopping retry loop. Video: ${event.videoId}")
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = "QUOTA_EXCEEDED",
+                    status = VideoStatus.QUOTA_EXCEEDED,
                     retryCount = event.retryCount,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
@@ -50,7 +51,7 @@ class UploadRetryConsumer(
             
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = "RETRY_PENDING",
+                    status = VideoStatus.RETRY_PENDING,
                     retryCount = event.retryCount + 1,
                     updatedAt = java.time.LocalDateTime.now()
                 ))

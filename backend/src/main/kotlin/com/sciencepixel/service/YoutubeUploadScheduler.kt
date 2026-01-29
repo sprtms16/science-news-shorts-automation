@@ -3,6 +3,7 @@ package com.sciencepixel.service
 import com.sciencepixel.domain.SystemSetting
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.repository.SystemSettingRepository
@@ -66,7 +67,7 @@ class YoutubeUploadScheduler(
 
         // COMPLETED, RETRY_PENDING 또는 QUOTA_EXCEEDED 상태의 비디오를 처리
         val pendingVideos = allVideos.filter { 
-            it.status == "COMPLETED" || it.status == "RETRY_PENDING" || it.status == "QUOTA_EXCEEDED"
+            it.status == VideoStatus.COMPLETED || it.status == VideoStatus.RETRY_PENDING || it.status == VideoStatus.QUOTA_EXCEEDED
         }.sortedBy { it.createdAt } // 오래된 순으로 처리
         
         println("📦 Found ${pendingVideos.size} pending videos.")
@@ -116,7 +117,7 @@ class YoutubeUploadScheduler(
                 
                 // Update Status
                 val updated = video.copy(
-                    status = "UPLOADED",
+                    status = VideoStatus.UPLOADED,
                     youtubeUrl = videoId,
                     retryCount = 0
                 )
@@ -145,7 +146,7 @@ class YoutubeUploadScheduler(
                 return false
             } else {
                 val errorVideo = video.copy(
-                    status = "ERROR",
+                    status = VideoStatus.ERROR,
                     summary = video.summary + "\nUpload Error: ${e.message}"
                 )
                 repository.save(errorVideo)
@@ -175,7 +176,7 @@ class YoutubeUploadScheduler(
         if (video.regenCount < MAX_REGEN_COUNT) {
             triggerRegeneration(video)
         } else {
-            repository.save(video.copy(status = "ERROR", summary = video.summary + "\n[System] Marked as ERROR due to lack of title/file."))
+            repository.save(video.copy(status = VideoStatus.ERROR, summary = video.summary + "\n[System] Marked as ERROR due to lack of title/file."))
         }
     }
 
@@ -184,7 +185,7 @@ class YoutubeUploadScheduler(
          if (currentRetry < MAX_RETRY_COUNT) {
              println("⏳ File not found (Retry ${currentRetry + 1}/$MAX_RETRY_COUNT): ${video.filePath}")
              repository.save(video.copy(
-                 status = "RETRY_PENDING",
+                 status = VideoStatus.RETRY_PENDING,
                  retryCount = currentRetry + 1
              ))
          } else {
@@ -202,7 +203,7 @@ class YoutubeUploadScheduler(
         
         if (regenCount >= MAX_REGEN_COUNT) {
             println("🚫 Max regeneration attempts reached for: ${video.title}")
-            repository.save(video.copy(status = "REGEN_FAILED"))
+            repository.save(video.copy(status = VideoStatus.REGEN_FAILED))
             return
         }
         
@@ -211,7 +212,7 @@ class YoutubeUploadScheduler(
         try {
             // 상태를 REGENERATING으로 변경
             repository.save(video.copy(
-                status = "REGENERATING",
+                status = VideoStatus.REGENERATING,
                 regenCount = regenCount + 1,
                 retryCount = 0
             ))
@@ -229,20 +230,20 @@ class YoutubeUploadScheduler(
             if (newFilePath.isNotBlank()) {
                 println("✅ Regeneration successful: $newFilePath")
                 repository.save(video.copy(
-                    status = "COMPLETED",
+                    status = VideoStatus.COMPLETED,
                     filePath = newFilePath,
                     retryCount = 0,
                     regenCount = regenCount + 1
                 ))
             } else {
                 println("❌ Regeneration failed: Empty file path")
-                repository.save(video.copy(status = "REGEN_FAILED"))
+                repository.save(video.copy(status = VideoStatus.REGEN_FAILED))
             }
             
         } catch (e: Exception) {
             println("❌ Regeneration error: ${e.message}")
             e.printStackTrace()
-            repository.save(video.copy(status = "REGEN_FAILED"))
+            repository.save(video.copy(status = VideoStatus.REGEN_FAILED))
         }
     }
 }

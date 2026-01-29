@@ -1,6 +1,7 @@
 package com.sciencepixel.batch
 
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.VideoCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
@@ -20,7 +21,7 @@ class MongoWriter(
         
         // Kafka 이벤트 발행 - COMPLETED 상태인 비디오만
         savedItems.forEach { video ->
-            if (video.status == "COMPLETED" && video.filePath.isNotBlank() && video.id != null) {
+            if (video.status == VideoStatus.COMPLETED && video.filePath.isNotBlank() && video.id != null) {
                 kafkaEventPublisher.publishVideoCreated(VideoCreatedEvent(
                     videoId = video.id!!,
                     title = video.title,

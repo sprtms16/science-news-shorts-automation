@@ -2,6 +2,7 @@ package com.sciencepixel.batch
 
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.repository.SystemSettingRepository
@@ -25,7 +26,7 @@ class VideoProcessor(
             .map { it.value.toIntOrNull() ?: 10 }
             .orElse(10)
         
-        val currentActive = videoHistoryRepository.findAll().filter { it.status != "UPLOADED" && it.status != "FAILED" && it.status != "ERROR" }.size
+        val currentActive = videoHistoryRepository.findAll().filter { it.status != VideoStatus.UPLOADED && it.status != VideoStatus.REGEN_FAILED && it.status != VideoStatus.ERROR }.size
         if (currentActive >= limit) {
             println("🛑 Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping: ${item.title}")
             return null
@@ -55,7 +56,7 @@ class VideoProcessor(
                 title = item.title,
                 summary = item.summary,
                 link = item.link,
-                status = "QUEUED",
+                status = VideoStatus.QUEUED,
                 createdAt = java.time.LocalDateTime.now(),
                 updatedAt = java.time.LocalDateTime.now()
             )
