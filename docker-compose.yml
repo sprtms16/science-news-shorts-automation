@@ -1,27 +1,116 @@
-version: '3.8'
-
 services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: shorts-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: shorts-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    restart: unless-stopped
+
   ai-media-service:
-    build: ./ai-media-service
+    build: ./backend/ai-media-service
     container_name: shorts-ai-service
     ports:
       - "8000:8000"
     volumes:
       - ./shared-data:/app/output
       - ~/.cache/huggingface:/root/.cache/huggingface # Model Caching
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     restart: unless-stopped
 
+  mongo:
+    image: mongo:latest
+    container_name: shorts-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
   shorts-controller:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile.kotlin
     container_name: shorts-controller
+    ports:
+      - "8080:8080"
+      - "8888:8888" # YouTube OAuth Callback
     depends_on:
       - ai-media-service
+      - mongo
+      - kafka
     volumes:
       - ./shared-data:/app/shared-data
+      - ./backend/client_secret.json:/app/client_secret.json
+      - ./backend/tokens:/app/tokens
+    env_file:
+      - .env
     environment:
       - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      # 알림 설정 (선택사항)
+      - NOTIFICATION_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+
+  frontend-server:
+    build: ./frontend
+    container_name: shorts-frontend
+    network_mode: "service:tailscale"
+    depends_on:
+      - tailscale
+      - shorts-controller
+    restart: unless-stopped
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: shorts-admin
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+    ports:
+      - "3000:80"
+    volumes:
+      - ./vpn-state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+
+

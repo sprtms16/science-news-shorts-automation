@@ -1,0 +1,21 @@
+FROM gradle:8.5-jdk17
+
+WORKDIR /app
+
+# Install FFmpeg and Korean Fonts
+RUN apt-get update && apt-get install -y ffmpeg fonts-nanum && rm -rf /var/lib/apt/lists/*
+
+
+# Copy project files
+COPY build.gradle.kts .
+COPY src ./src
+
+# Set Gradle memory options to avoid OOM
+ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1536m"
+
+# Build and Run
+# Build
+RUN gradle clean build -x test --stacktrace --no-daemon
+
+# Run
+CMD ["gradle", "bootRun"]
