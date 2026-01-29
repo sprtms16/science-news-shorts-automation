@@ -19,4 +19,4 @@ RUN gradle clean build -x test --stacktrace --no-daemon --info
 
 # Run
 RUN find build/libs -name "*.jar" -not -name "*plain.jar" -exec cp {} build/libs/app.jar \;
-ENTRYPOINT ["sh", "-c", "exec java -jar build/libs/*.jar"]
+ENTRYPOINT ["sh", "-c", "exec java -jar build/libs/app.jar"]
