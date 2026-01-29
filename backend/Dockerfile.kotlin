@@ -18,4 +18,5 @@ ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1536m"
 RUN gradle clean build -x test --stacktrace --no-daemon --info
 
 # Run
-ENTRYPOINT ["java", "-jar", "build/libs/app-1.0-SNAPSHOT.jar"]
+RUN find build/libs -name "*.jar" -not -name "*plain.jar" -exec cp {} build/libs/app.jar \;
+ENTRYPOINT ["java", "-jar", "build/libs/app.jar"]
