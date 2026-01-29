@@ -56,7 +56,8 @@ class VideoProcessor(
                 summary = item.summary,
                 link = item.link,
                 status = "QUEUED",
-                createdAt = java.time.LocalDateTime.now()
+                createdAt = java.time.LocalDateTime.now(),
+                updatedAt = java.time.LocalDateTime.now()
             )
             videoHistoryRepository.save(initialVideo)
             

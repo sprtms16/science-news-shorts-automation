@@ -86,7 +86,7 @@ class ProductionService(
 
     // AI 품질 검수 로직 활성화
     fun checkVideoRelevance(thumbnailUrl: String, keyword: String): Boolean {
-        return pexelsService.checkVideoRelevance(thumbnailUrl, keyword)
+        return geminiService.checkVideoRelevance(thumbnailUrl, keyword)
     }
 
     // Entry point for Batch Job (Legacy - Deprecated)

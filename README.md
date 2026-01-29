@@ -10,7 +10,7 @@
 ## 🚀 Key Features
 - **Zero-Touch Automation**: RSS 피드 수집부터 유튜브 업로드까지 전 과정 자동화.
 - **AI-Powered Content Creation**:
-  - **Scripting**: Google Gemini 3 (Experimental Preview)를 활용하여 뉴스 요약 및 쇼츠 전용 대본/키워드 생성.
+  - **Scripting**: Google Gemini 3 (Experimental Preview) 및 2.5 Flash를 활용하여 뉴스 요약 및 쇼츠 전용 대본/키워드 생성.
   - **Voice**: Microsoft Edge-TTS를 사용한 자연스러운 한국어 나레이션.
   - **Audio**: Text-to-Music (MusicGen) 모델을 활용하여 분위기에 맞는 BGM 생성 및 매칭.
 - **Dynamic Video Production**:
@@ -67,7 +67,7 @@ graph TD
 - **Message Broker**: Apache Kafka (Confluent Platform)
 
 ### AI & Media Processing
-- **LLM**: Google Gemini 3 (Script & Metadata Generation)
+- **LLM**: Google Gemini 3 Experimental & 2.5 Flash (Script & Metadata Generation)
 - **Voice**: Microsoft Edge-TTS (Neural Text-to-Speech)
 - **Audio AI**: Hugging Face `facebook/musicgen-small` (Python Microservice)
 - **Video Engine**: FFmpeg (Clipping, Filtering, Rendering)

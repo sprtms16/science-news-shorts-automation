@@ -15,7 +15,7 @@ ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1536m"
 
 # Build and Run
 # Build
-RUN gradle clean build -x test --stacktrace --no-daemon
+RUN gradle clean build -x test --stacktrace --no-daemon --info
 
 # Run
-ENTRYPOINT ["java", "-jar", "build/libs/backend-0.0.1-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "build/libs/app-1.0-SNAPSHOT.jar"]

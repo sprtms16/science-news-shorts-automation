@@ -84,7 +84,8 @@ class ManualGenerationController(
                 val history = VideoHistory(
                     title = scienceNews.title,
                     summary = scienceNews.summary,
-                    link = "manual_batch_topic"
+                    link = "manual_batch_topic",
+                    updatedAt = java.time.LocalDateTime.now()
                 )
                 val saved = videoHistoryRepository.save(history)
                 val videoId = saved.id ?: ""
@@ -183,7 +184,8 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = "PROCESSING"
+            status = "PROCESSING",
+            updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
         
@@ -243,7 +245,8 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = "PROCESSING"
+            status = "PROCESSING",
+            updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
         
@@ -254,7 +257,8 @@ class ManualGenerationController(
             return if (filePath.isNotEmpty()) {
                 val completedVideo = videoHistoryRepository.save(savedHistory.copy(
                     status = "COMPLETED",
-                    filePath = filePath
+                    filePath = filePath,
+                    updatedAt = java.time.LocalDateTime.now()
                 ))
                 
                 if (completedVideo.id != null) {
@@ -270,11 +274,17 @@ class ManualGenerationController(
                 
                 "✅ Video created successfully: $filePath (Queued for Upload via Kafka)"
             } else {
-                videoHistoryRepository.save(savedHistory.copy(status = "FAILED"))
+                videoHistoryRepository.save(savedHistory.copy(
+                    status = "FAILED",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
                 "❌ Failed to create video."
             }
         } catch (e: Exception) {
-            videoHistoryRepository.save(savedHistory.copy(status = "ERROR"))
+            videoHistoryRepository.save(savedHistory.copy(
+                status = "ERROR",
+                updatedAt = java.time.LocalDateTime.now()
+            ))
             e.printStackTrace()
             return "❌ Error: ${e.message}"
         }

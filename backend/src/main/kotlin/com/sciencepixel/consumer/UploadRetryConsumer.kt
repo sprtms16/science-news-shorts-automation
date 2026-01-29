@@ -37,7 +37,8 @@ class UploadRetryConsumer(
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
                     status = "QUOTA_EXCEEDED",
-                    retryCount = event.retryCount
+                    retryCount = event.retryCount,
+                    updatedAt = java.time.LocalDateTime.now()
                 ))
             }
             return // Exit immediately, do not retry
@@ -50,7 +51,8 @@ class UploadRetryConsumer(
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
                     status = "RETRY_PENDING",
-                    retryCount = event.retryCount + 1
+                    retryCount = event.retryCount + 1,
+                    updatedAt = java.time.LocalDateTime.now()
                 ))
                 
                 // 다시 VideoCreatedEvent 발행 (retryCount 증가, 키워드 유지)

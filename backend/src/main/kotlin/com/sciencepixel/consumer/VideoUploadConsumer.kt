@@ -43,7 +43,10 @@ class VideoUploadConsumer(
                 // Update filePath if it was missing but now we have it from event
                 val video = videoOpt.get()
                 if (video.filePath.isBlank()) {
-                    repository.save(video.copy(filePath = event.filePath))
+                    repository.save(video.copy(
+                        filePath = event.filePath,
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
                 }
                 return
             }
@@ -87,7 +90,8 @@ class VideoUploadConsumer(
                 repository.findById(event.videoId).ifPresent { video ->
                     repository.save(video.copy(
                         status = "UPLOADED",
-                        youtubeUrl = youtubeUrl
+                        youtubeUrl = youtubeUrl,
+                        updatedAt = java.time.LocalDateTime.now()
                     ))
                 }
 

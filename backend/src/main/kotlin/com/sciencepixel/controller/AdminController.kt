@@ -391,7 +391,8 @@ class AdminController(
                         title = newMeta.title,
                         description = newMeta.description,
                         tags = newMeta.tags,
-                        sources = newMeta.sources
+                        sources = newMeta.sources,
+                        updatedAt = LocalDateTime.now()
                     )
                     needsSave = true
                     localizedCount++
@@ -409,7 +410,11 @@ class AdminController(
                 }
 
                 if (needsRegen && video.status != "PROCESSING" && video.status != "REGENERATING") {
-                    currentVideo = currentVideo.copy(status = "REGENERATING", regenCount = video.regenCount + 1)
+                    currentVideo = currentVideo.copy(
+                        status = "REGENERATING", 
+                        regenCount = video.regenCount + 1,
+                        updatedAt = LocalDateTime.now()
+                    )
                     needsSave = true
                     
                     // Trigger Regeneration Event

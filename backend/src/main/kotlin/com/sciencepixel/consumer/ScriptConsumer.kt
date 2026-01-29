@@ -44,15 +44,19 @@ class ScriptConsumer(
 
             if (scriptResponse.scenes.isEmpty()) {
                 println("⚠️ Empty script generated. Marking as ERROR.")
-                videoHistoryRepository.save(history.copy(status = "ERROR_SCRIPT_EMPTY"))
+                videoHistoryRepository.save(history.copy(
+                    status = "ERROR_SCRIPT_EMPTY",
+                    updatedAt = LocalDateTime.now()
+                ))
                 return
             }
 
             // 3. Update History with Script Data
             val updatedHistory = videoHistoryRepository.save(history.copy(
                 status = "SCRIPT_READY",
-                summary = scriptResponse.description, // Use AI description
-                tags = scriptResponse.tags
+                description = scriptResponse.description, // Correctly use description field
+                tags = scriptResponse.tags,
+                updatedAt = LocalDateTime.now()
             ))
 
             // 4. Publish next event
@@ -79,13 +83,15 @@ class ScriptConsumer(
         val existing = videoHistoryRepository.findAll().find { it.link == event.url }
         if (existing != null) return existing
 
-        return videoHistoryRepository.save(VideoHistory(
+        val initialVideo = VideoHistory(
             id = UUID.randomUUID().toString(),
             title = event.title,
+            summary = "", // Initial summary
             link = event.url,
-            status = "PROCESSING_SCRIPT",
-            summary = "",
-            createdAt = LocalDateTime.now()
-        ))
+            status = "QUEUED",
+            createdAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now()
+        )
+        return videoHistoryRepository.save(initialVideo)
     }
 }

@@ -41,7 +41,8 @@ class AsyncVideoService(
                 if (history != null) {
                     val completedVideo = videoHistoryRepository.save(history.copy(
                         status = "COMPLETED",
-                        filePath = filePath
+                        filePath = filePath,
+                        updatedAt = java.time.LocalDateTime.now()
                     ))
                     
                     // Kafka 이벤트 발행 - YouTube 업로드 트리거 (키워드 포함)
@@ -65,7 +66,10 @@ class AsyncVideoService(
             } else {
                 val history = videoHistoryRepository.findById(historyId).orElse(null)
                 if (history != null) {
-                    videoHistoryRepository.save(history.copy(status = "FAILED"))
+                    videoHistoryRepository.save(history.copy(
+                        status = "FAILED",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
                 }
                 notificationService.notifyError(news.title, "비디오 생성 실패")
                 println("❌ [ASYNC] Video creation failed")
@@ -74,7 +78,10 @@ class AsyncVideoService(
         } catch (e: Exception) {
             val history = videoHistoryRepository.findById(historyId).orElse(null)
             if (history != null) {
-                videoHistoryRepository.save(history.copy(status = "ERROR"))
+                videoHistoryRepository.save(history.copy(
+                    status = "ERROR",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
             notificationService.notifyError(news.title, e.message ?: "알 수 없는 에러")
             println("❌ [ASYNC] Error: ${e.message}")

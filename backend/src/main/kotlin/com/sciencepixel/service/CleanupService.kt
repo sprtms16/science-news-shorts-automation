@@ -37,7 +37,8 @@ class CleanupService(
                             // Update DB to reflect cleanup (preserve other metadata)
                             repository.save(video.copy(
                                 filePath = "", // Clear path to indicate deletion
-                                summary = video.summary + "\n[System] Resource cleaned up at ${LocalDateTime.now()}"
+                                description = video.description + "\n[System] Resource cleaned up at ${LocalDateTime.now()}",
+                                updatedAt = LocalDateTime.now()
                             ))
                         } else {
                             println("⚠️ Failed to delete file: ${file.path}")
@@ -48,7 +49,10 @@ class CleanupService(
                 } else {
                     println("⚠️ File not found (already deleted?): ${video.filePath}")
                     // Clean up DB entry even if file is missing if marked as UPLOADED but path is set
-                    repository.save(video.copy(filePath = ""))
+                    repository.save(video.copy(
+                        filePath = "",
+                        updatedAt = LocalDateTime.now()
+                    ))
                 }
             } catch (e: Exception) {
                 println("❌ Error cleaning up video '${video.title}': ${e.message}")
@@ -81,7 +85,10 @@ class CleanupService(
                     if (file.exists()) {
                         file.delete()
                     }
-                    repository.save(video.copy(status = "PERMANENTLY_FAILED"))
+                    repository.save(video.copy(
+                        status = "PERMANENTLY_FAILED",
+                        updatedAt = LocalDateTime.now()
+                    ))
                     println("🚩 Marked video as PERMANENTLY_FAILED (record preserved): ${video.title}")
                     deletedCount++
                 }
@@ -170,7 +177,10 @@ class CleanupService(
                 }
                 
                 // Update status instead of deleting the record
-                repository.save(video.copy(status = "STALE_JOB_ABANDONED"))
+                repository.save(video.copy(
+                    status = "STALE_JOB_ABANDONED",
+                    updatedAt = LocalDateTime.now()
+                ))
                 println("🚩 Marked stale job as ABANDONED: ${video.title} (Created: ${video.createdAt})")
                 deletedCount++
             } catch (e: Exception) {

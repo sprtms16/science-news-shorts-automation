@@ -30,7 +30,10 @@ class RenderConsumer(
 
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
-                videoHistoryRepository.save(history.copy(status = "RENDERING"))
+                videoHistoryRepository.save(history.copy(
+                    status = "RENDERING",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
 
             // Call Production Service to finalize video (Merge & Burn)
@@ -45,14 +48,18 @@ class RenderConsumer(
 
             if (finalPath.isEmpty()) {
                 println("❌ Rendering failed (empty path).")
-                videoHistoryRepository.save(history!!.copy(status = "ERROR_RENDERING"))
+                videoHistoryRepository.save(history!!.copy(
+                    status = "ERROR_RENDERING",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
                 return
             }
 
             // Update History to COMPLETED (Ready for Upload)
             val completedHistory = videoHistoryRepository.save(history!!.copy(
                 status = "COMPLETED",
-                filePath = finalPath
+                filePath = finalPath,
+                updatedAt = java.time.LocalDateTime.now()
             ))
 
             // Publish 'video.created' -> This triggers the existing VideoUploadConsumer!
