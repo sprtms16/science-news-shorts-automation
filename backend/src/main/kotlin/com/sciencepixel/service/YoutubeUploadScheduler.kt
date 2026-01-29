@@ -18,7 +18,8 @@ class YoutubeUploadScheduler(
     private val repository: VideoHistoryRepository,
     private val youtubeService: YoutubeService,
     private val productionService: ProductionService,
-    private val systemSettingRepository: SystemSettingRepository
+    private val systemSettingRepository: SystemSettingRepository,
+    private val notificationService: NotificationService
 ) {
     
     companion object {
@@ -63,9 +64,9 @@ class YoutubeUploadScheduler(
         val statusCounts = allVideos.groupingBy { it.status }.eachCount()
         println("📊 Current Video Statuses: $statusCounts")
 
-        // COMPLETED 또는 RETRY_PENDING 상태의 비디오를 처리
+        // COMPLETED, RETRY_PENDING 또는 QUOTA_EXCEEDED 상태의 비디오를 처리
         val pendingVideos = allVideos.filter { 
-            it.status == "COMPLETED" || it.status == "RETRY_PENDING" 
+            it.status == "COMPLETED" || it.status == "RETRY_PENDING" || it.status == "QUOTA_EXCEEDED"
         }.sortedBy { it.createdAt } // 오래된 순으로 처리
         
         println("📦 Found ${pendingVideos.size} pending videos.")
@@ -120,6 +121,13 @@ class YoutubeUploadScheduler(
                     retryCount = 0
                 )
                 repository.save(updated)
+
+                try {
+                    notificationService.notifyUploadComplete(video.title, videoId)
+                } catch (e: Exception) {
+                    println("⚠️ Failed to send Discord notification for scheduler upload: ${e.message}")
+                }
+
                 println("✅ Upload Success: ${updated.youtubeUrl}")
                 return true
             } else {

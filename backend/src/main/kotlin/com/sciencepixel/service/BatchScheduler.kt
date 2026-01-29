@@ -35,9 +35,9 @@ class BatchScheduler(
             .map { it.value.toIntOrNull() ?: 10 }
             .orElse(10)
 
-        // 3. Count Active/Pending videos (Exclude UPLOADED)
+        // 3. Count Active/Pending videos (Exclude UPLOADED and those waiting for upload)
         val activeVideos = videoHistoryRepository.findAll().filter { 
-            it.status != "UPLOADED" 
+            it.status != "UPLOADED" && it.status != "COMPLETED" && it.status != "QUOTA_EXCEEDED" && it.status != "RETRY_PENDING"
         }
         val activeCount = activeVideos.size
 

@@ -46,6 +46,21 @@ class AdminController(
         ))
     }
 
+    @PostMapping("/maintenance/reset-quota-status")
+    fun resetQuotaStatus(): ResponseEntity<Map<String, Any>> {
+        val videos = videoRepository.findAll().filter { it.status == "QUOTA_EXCEEDED" }
+        videos.forEach {
+            videoRepository.save(it.copy(
+                status = "RETRY_PENDING",
+                updatedAt = java.time.LocalDateTime.now()
+            ))
+        }
+        return ResponseEntity.ok(mapOf(
+            "count" to videos.size,
+            "message" to "Successfully reset ${videos.size} videos from QUOTA_EXCEEDED to RETRY_PENDING."
+        ))
+    }
+
     @PostMapping("/videos/{id}/metadata/regenerate")
     fun regenerateMetadata(@PathVariable id: String): ResponseEntity<VideoHistory> {
         val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
