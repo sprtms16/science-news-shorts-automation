@@ -50,11 +50,15 @@ class AdminController(
     @PostMapping("/maintenance/reset-quota-status")
     fun resetQuotaStatus(): ResponseEntity<Map<String, Any>> {
         val videos = videoRepository.findByStatus(VideoStatus.QUOTA_EXCEEDED)
-        videos.forEach {
-            videoRepository.save(it.copy(
+        val videosToUpdate = videos.map {
+            it.copy(
                 status = VideoStatus.RETRY_PENDING,
                 updatedAt = java.time.LocalDateTime.now()
-            ))
+            )
+        }
+        
+        if (videosToUpdate.isNotEmpty()) {
+            videoRepository.saveAll(videosToUpdate)
         }
         return ResponseEntity.ok(mapOf(
             "count" to videos.size,
