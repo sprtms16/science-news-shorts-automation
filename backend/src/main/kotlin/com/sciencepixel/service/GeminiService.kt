@@ -3,7 +3,7 @@ package com.sciencepixel.service
 import org.springframework.stereotype.Service
 import org.springframework.beans.factory.annotation.Value
 import okhttp3.*
-import com.sciencepixel.domain.SystemPrompt
+import com.sciencepixel.domain.*
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import org.json.JSONArray
@@ -13,15 +13,7 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
-data class Scene(val sentence: String, val keyword: String)
-data class ScriptResponse(
-    val scenes: List<Scene>, 
-    val mood: String,
-    val title: String = "",
-    val description: String = "",
-    val tags: List<String> = emptyList(),
-    val sources: List<String> = emptyList()
-)
+
 
 @Service
 class GeminiService(

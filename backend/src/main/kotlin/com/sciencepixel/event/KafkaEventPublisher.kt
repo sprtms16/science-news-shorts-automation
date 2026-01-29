@@ -39,6 +39,32 @@ class KafkaEventPublisher(
         kafkaTemplate.send(KafkaConfig.TOPIC_REGENERATION_REQUESTED, event.videoId, json)
     }
 
+    // === SAGA Pipeline Events ===
+
+    fun publishRssNewItem(event: RssNewItemEvent) {
+        println("📤 Publishing RssNewItemEvent: ${event.url}")
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_RSS_NEW_ITEM, event.url, json) // URL as Key to prevent duplicate processing if needed
+    }
+
+    fun publishScriptCreated(event: ScriptCreatedEvent) {
+        println("📤 Publishing ScriptCreatedEvent: ${event.videoId}")
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_SCRIPT_CREATED, event.videoId, json)
+    }
+
+    fun publishAudioCreated(event: AudioCreatedEvent) {
+        println("📤 Publishing AudioCreatedEvent: ${event.videoId}")
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_AUDIO_CREATED, event.videoId, json)
+    }
+
+    fun publishVideoAssetsReady(event: VideoAssetsReadyEvent) {
+        println("📤 Publishing VideoAssetsReadyEvent: ${event.videoId}")
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_ASSETS_READY, event.videoId, json)
+    }
+
     fun publishToDeadLetterQueue(event: Any, reason: String) {
         println("💀 Publishing to DLQ: $reason")
         val json = objectMapper.writeValueAsString(event)

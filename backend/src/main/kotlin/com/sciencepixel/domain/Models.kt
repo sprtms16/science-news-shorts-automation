@@ -64,3 +64,14 @@ data class SystemSetting(
     val description: String = "",
     val updatedAt: LocalDateTime = LocalDateTime.now()
 )
+
+data class Scene(val sentence: String, val keyword: String)
+
+data class ScriptResponse(
+    val scenes: List<Scene>,
+    val mood: String,
+    val title: String = "",
+    val description: String = "",
+    val tags: List<String> = emptyList(),
+    val sources: List<String> = emptyList()
+)

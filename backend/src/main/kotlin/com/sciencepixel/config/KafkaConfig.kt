@@ -18,20 +18,40 @@ class KafkaConfig {
     @Value("\${spring.kafka.bootstrap-servers:kafka:29092}")
     private lateinit var bootstrapServers: String
 
+
     companion object {
-        const val TOPIC_VIDEO_CREATED = "video-created"
+        const val TOPIC_RSS_NEW_ITEM = "rss-new-item"
+        const val TOPIC_SCRIPT_CREATED = "script-created"
+        const val TOPIC_AUDIO_CREATED = "audio-created"
+        const val TOPIC_ASSETS_READY = "assets-ready"
+        const val TOPIC_VIDEO_READY = "video-ready"
+        
+        const val TOPIC_VIDEO_CREATED = "video-created" // Legacy support or final event
         const val TOPIC_VIDEO_UPLOADED = "video-uploaded"
         const val TOPIC_UPLOAD_FAILED = "upload-failed"
         const val TOPIC_REGENERATION_REQUESTED = "regeneration-requested"
         const val TOPIC_DLQ = "dead-letter-queue"
         
-        const val GROUP_UPLOAD = "upload-consumer-group"
+        const val GROUP_MAIN = "shorts-main-group"
+        const val GROUP_UPLOAD = "shorts-upload-group"
         const val GROUP_RETRY = "retry-consumer-group"
         const val GROUP_REGEN = "regen-consumer-group"
     }
 
     // ==================== Topics ====================
     
+    @Bean
+    fun rssNewItemTopic(): NewTopic = TopicBuilder.name(TOPIC_RSS_NEW_ITEM).partitions(1).replicas(1).build()
+
+    @Bean
+    fun scriptCreatedTopic(): NewTopic = TopicBuilder.name(TOPIC_SCRIPT_CREATED).partitions(1).replicas(1).build()
+
+    @Bean
+    fun audioCreatedTopic(): NewTopic = TopicBuilder.name(TOPIC_AUDIO_CREATED).partitions(1).replicas(1).build()
+
+    @Bean
+    fun videoReadyTopic(): NewTopic = TopicBuilder.name(TOPIC_VIDEO_READY).partitions(1).replicas(1).build()
+
     @Bean
     fun videoCreatedTopic(): NewTopic = TopicBuilder
         .name(TOPIC_VIDEO_CREATED)

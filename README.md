@@ -1,7 +1,7 @@
 # 🧪 Science News Shorts Automation
 > **AI 기반 과학 뉴스 쇼츠 자동 생성 및 업로드 파이프라인 구축 프로젝트**
 
-[![Stack](https://img.shields.io/badge/Kotlin-Spring%20Boot%203.2-purple)]() [![Stack](https://img.shields.io/badge/Architecture-Event%20Driven%20(Kafka)-red)]() [![Stack](https://img.shields.io/badge/AI-Gemini%201.5%20%2B%20MusicGen-blue)]() [![Stack](https://img.shields.io/badge/DevOps-Docker%20Compose-green)]()
+[![Stack](https://img.shields.io/badge/Kotlin-Spring%20Boot%203.2-purple)]() [![Stack](https://img.shields.io/badge/Architecture-Event%20Driven%20(Kafka)-red)]() [![Stack](https://img.shields.io/badge/AI-Gemini%201.5%20%2B%20MusicGen-blue)]() [![Stack](https://img.shields.io/badge/DevOps-Docker%20Compose-green)]() [![Version](https://img.shields.io/badge/Version-v2.2.0-orange)]()
 
 ## 📖 Project Overview
 매일 쏟아지는 최신 과학 뉴스를 1분 내외의 **숏폼(Shorts) 영상**으로 **완전 자동화(Fully Automated)** 하여 제작하고 YouTube에 업로드하는 시스템입니다.

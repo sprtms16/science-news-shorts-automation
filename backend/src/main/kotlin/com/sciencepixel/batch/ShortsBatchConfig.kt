@@ -21,7 +21,8 @@ class ShortsBatchConfig(
     private val jobRepository: JobRepository,
     private val transactionManager: PlatformTransactionManager,
     private val videoProcessor: VideoProcessor,
-    private val mongoWriter: MongoWriter
+    private val mongoWriter: MongoWriter,
+    private val rssSourceRepository: com.sciencepixel.repository.RssSourceRepository
 ) {
 
     @Bean
@@ -51,34 +52,16 @@ class ShortsBatchConfig(
     fun realRssReader(
         @Value("#{jobParameters['remainingSlots']}") remainingSlots: Long?
     ): RssItemReader {
-        val feeds = listOf(
-            // 1. Global Tech News
-            "https://techcrunch.com/feed/",
-            "https://www.wired.com/feed/rss",
-            "https://www.theverge.com/rss/index.xml",
-            "http://feeds.arstechnica.com/arstechnica/index",
-            "https://www.engadget.com/rss.xml",
-            
-            // 2. Science & Deep Tech
-            "https://www.sciencedaily.com/rss/all.xml",
-            "https://www.technologyreview.com/feed/",
-            "http://www.nature.com/nature.rss",
-            "http://rss.sciam.com/ScientificAmerican-Global",
-            
-            // 3. Korean Tech News
-            "https://news.hada.io/rss",
-            "https://zdnet.co.kr/rss/",
-            "https://www.itworld.co.kr/rss/feed/index.php",
-            "https://rss.etnews.com/Section901.xml",
-            
-            // 4. Tech Blogs
-            "https://d2.naver.com/d2.atom",
-            "https://tech.kakao.com/rss/",
-            "https://techblog.woowahan.com/feed/",
-            "https://engineering.linecorp.com/ko/feed/",
-            "http://korea.googleblog.com/atom.xml",
-            "https://news.ycombinator.com/rss"
-        )
+        // Fetch active feeds from DB
+        val activeSources = rssSourceRepository.findByIsActiveTrue()
+        val feeds = activeSources.map { it.url }
+        
+        if (feeds.isEmpty()) {
+            println("⚠️ No active RSS sources found in DB! Using fallback...")
+             return RssItemReader(listOf("https://www.wired.com/feed/rss"), remainingSlots?.toInt() ?: 10)
+        }
+        
+        println("📡 Loaded ${feeds.size} active RSS feeds from DB.")
         return RssItemReader(feeds, remainingSlots?.toInt() ?: 10)
     }
 }

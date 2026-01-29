@@ -2,6 +2,7 @@ package com.sciencepixel.service
 
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.ProductionResult
+import com.sciencepixel.domain.Scene
 import org.springframework.stereotype.Service
 import java.io.File
 
@@ -11,8 +12,79 @@ class ProductionService(
     private val audioService: AudioService,
     private val geminiService: GeminiService
 ) {
-    
-    // Entry point for Batch Job
+    data class AssetsResult(
+        val mood: String,
+        val clipPaths: List<String>,
+        val durations: List<Double>,
+        val subtitles: List<String>
+    )
+
+    fun produceAssetsOnly(title: String, scenes: List<Scene>, videoId: String): AssetsResult {
+        // Use videoId for workspace unique path
+        val workspace = File("shared-data/workspace_$videoId").apply { mkdirs() }
+        val clipFiles = mutableListOf<File>()
+        val durations = mutableListOf<Double>()
+        val subtitles = mutableListOf<String>()
+
+        println("📹 [SAGA] Phase 1: Processing scenes for $videoId")
+        scenes.forEachIndexed { i, scene ->
+            val videoFile = File(workspace, "raw_$i.mp4")
+            val audioFile = File(workspace, "audio_$i.mp3")
+            val clipFile = File(workspace, "clip_$i.mp4")
+
+            if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: ${scene.sentence}", videoFile)) {
+                return@forEachIndexed
+            }
+
+            val duration = try {
+                 audioService.generateAudio(scene.sentence, audioFile)
+            } catch (e: Exception) {
+                5.0
+            }
+
+            editSceneWithoutSubtitle(videoFile, audioFile, duration, clipFile)
+            
+            clipFiles.add(clipFile)
+            durations.add(duration)
+            subtitles.add(scene.sentence)
+        }
+        
+        // Return absolute paths
+        return AssetsResult(
+            mood = "neutral", // TODO: Pass mood from script
+            clipPaths = clipFiles.map { it.absolutePath },
+            durations = durations,
+            subtitles = subtitles
+        )
+    }
+
+    fun finalizeVideo(videoId: String, title: String, clipPaths: List<String>, durations: List<Double>, subtitles: List<String>, mood: String): String {
+        val workspace = File("shared-data/workspace_$videoId")
+        if (!workspace.exists()) workspace.mkdirs()
+        
+        val clipFiles = clipPaths.map { File(it) }
+        
+        // Phase 2: SRT
+        val srtFile = File(workspace, "subtitles.srt")
+        generateSrtFile(subtitles, durations, srtFile)
+        
+        // Phase 3: Merge & Burn
+        val mergedFile = File(workspace, "merged_no_subs.mp4")
+        mergeClipsWithoutSubtitles(clipFiles, mergedFile, workspace)
+        
+        val sanitizedTitle = title.take(20).replace(Regex("[^a-zA-Z0-9가-힣]"), "_").lowercase()
+        val outcomeDir = File("shared-data/videos").apply { mkdirs() }
+        val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_${System.currentTimeMillis()}.mp4")
+        
+        burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
+        
+        // Cleanup workspace
+        // workspace.deleteRecursively() // Keep for debug in SAGA for now?
+        
+        return finalOutput.absolutePath
+    }
+
+    // Entry point for Batch Job (Legacy - Deprecated)
     fun produceVideo(news: NewsItem): ProductionResult {
         println("🎬 Producing video for: ${news.title}")
         

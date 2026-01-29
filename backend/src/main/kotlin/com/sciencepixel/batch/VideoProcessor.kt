@@ -13,85 +13,69 @@ import org.springframework.data.domain.Sort
 
 @Component
 class VideoProcessor(
-    private val productionService: ProductionService,
     private val videoHistoryRepository: VideoHistoryRepository,
     private val systemSettingRepository: SystemSettingRepository,
-    private val geminiService: GeminiService
+    private val geminiService: GeminiService,
+    private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher
 ) : ItemProcessor<NewsItem, VideoHistory> {
 
     override fun process(item: NewsItem): VideoHistory? {
-        // 0. Final Buffer Check: Ensure we don't exceed the limit
+        // 0. Final Buffer Check
         val limit = systemSettingRepository.findById("MAX_GENERATION_LIMIT")
             .map { it.value.toIntOrNull() ?: 10 }
             .orElse(10)
         
-        val currentActive = videoHistoryRepository.findAll().filter { it.status != "UPLOADED" }.size
+        val currentActive = videoHistoryRepository.findAll().filter { it.status != "UPLOADED" && it.status != "FAILED" && it.status != "ERROR" }.size
         if (currentActive >= limit) {
-            println("🛑 Mid-Batch Check: Buffer Full ($currentActive >= $limit). Skipping production for: ${item.title}")
+            println("🛑 Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping: ${item.title}")
             return null
         }
 
-        // 1. 중복 체크 (Link 기준)
+        // 1. Duplicate Check
         if (videoHistoryRepository.findByLink(item.link) != null) {
-            println("⏭️ Skipping duplicate: ${item.title}")
             return null
         }
 
         // 2. Semantic Deduplication (AI)
-        // Fetch last 20 videos to compare context
         val recentVideos = videoHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).take(20)
-        
         if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
-             println("⏭️ Semantic Deduplication: Video skipped due to high similarity with recent content. Title: ${item.title}")
+             println("⏭️ Skipped (High Semantic Similarity): ${item.title}")
              return null
         }
 
-        // 3. Safety & Sensitivity Filter (Politics/Religion/Ideology)
+        // 3. Safety Filter
         if (!geminiService.checkSensitivity(item.title, item.summary)) {
-             println("⛔ Safety Filter: Skipped sensitive topic. Title: ${item.title}")
+             println("⛔ Skipped (Sensitive Content): ${item.title}")
              return null
         }
 
-        return try {
-            // 4. Create Initial Record (PROCESSING) to reflect buffer count immediately
+        try {
+            // 4. Create Record (QUEUED) -> Reserves the slot immediately
             val initialVideo = VideoHistory(
                 title = item.title,
                 summary = item.summary,
                 link = item.link,
-                status = "PROCESSING"
+                status = "QUEUED",
+                createdAt = java.time.LocalDateTime.now()
             )
-            val savedVideo = videoHistoryRepository.save(initialVideo)
-            println("▶️ Starting processing for: ${item.title} (ID: ${savedVideo.id})")
-
-            val result = try {
-                productionService.produceVideo(item)
-            } catch (e: Exception) {
-                println("⚠️ Production failed for: ${item.title} - ${e.message}")
-                ProductionResult("", emptyList())
-            }
-
-            val videoPath = result.filePath
+            videoHistoryRepository.save(initialVideo)
             
-            if (videoPath.isNotBlank() && result.title.isNotBlank()) {
-                savedVideo.copy(
-                    title = result.title,
-                    description = result.description,
-                    filePath = videoPath,
-                    status = "COMPLETED",
-                    tags = result.tags,
-                    sources = result.sources,
-                    updatedAt = java.time.LocalDateTime.now()
-                )
-            } else {
-                println("⚠️ Incomplete production for: ${item.title} (Path: $videoPath, Title: ${result.title})")
-                savedVideo.copy(
-                    status = "ERROR",
-                    updatedAt = java.time.LocalDateTime.now()
-                )
-            }
+            // 5. Fire & Forget (SAGA Start)
+            kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
+                url = item.link,
+                title = item.title,
+                category = "general"
+            ))
+            
+            println("🚀 [Batch] Event Published: ${item.title} (Status: QUEUED)")
+            
+            // Return null because we handled persistence and event publishing manually.
+            // This prevents the ItemWriter from trying to save it again or doing duplicate work.
+            return null
+
         } catch (e: Exception) {
-            println("⚠️ Failed to process: ${item.title} - ${e.message}")
-            null // Let Batch handle it or it's already in DB as PROCESSING (will be cleaned by scheduler later)
+            println("⚠️ Failed to trigger process: ${item.title} - ${e.message}")
+            return null
         }
     }
 }

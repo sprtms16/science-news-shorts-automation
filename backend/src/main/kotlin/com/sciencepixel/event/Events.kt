@@ -45,3 +45,42 @@ data class RegenerationRequestedEvent(
     val regenCount: Int,
     val timestamp: Long = Instant.now().toEpochMilli()
 )
+
+// === SAGA Pipeline Events ===
+
+data class RssNewItemEvent(
+    val url: String,
+    val title: String,
+    val category: String? = null,
+    val timestamp: Long = Instant.now().toEpochMilli()
+)
+
+data class ScriptCreatedEvent(
+    val videoId: String,
+    val title: String,
+    val script: String,
+    val summary: String,
+    val sourceLink: String,
+    val keywords: List<String> = emptyList(),
+    val timestamp: Long = Instant.now().toEpochMilli()
+)
+
+data class AudioCreatedEvent(
+    val videoId: String,
+    val audioPath: String,
+    val bgmPath: String? = null,
+    val scriptEvent: ScriptCreatedEvent, // Carry over previous context
+    val timestamp: Long = Instant.now().toEpochMilli()
+)
+
+data class VideoAssetsReadyEvent(
+    val videoId: String,
+    val title: String,
+    val mood: String,
+    val clipPaths: List<String>,
+    val durations: List<Double>,
+    val subtitles: List<String>,
+    val keywords: List<String>,
+    val scriptEvent: ScriptCreatedEvent?, 
+    val timestamp: Long = Instant.now().toEpochMilli()
+)

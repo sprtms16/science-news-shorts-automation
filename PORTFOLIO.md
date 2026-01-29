@@ -113,6 +113,7 @@ graph TD
 - [x] **Phase 3**: 안정성 강화 (Quota Guard, Self-Healing)
 - [x] **Phase 4**: Admin Dashboard 구축 (React, Glassmorphism)
 - [x] **Phase 5**: 글로벌 & 보안 (i18n, Tailscale VPN)
+- [x] **Phase 6**: 백엔드 안정화 및 리팩토링 (v2.2.0) - 데이터 모델 구조 개선 및 컴파일 최적화
 
 ---
 
