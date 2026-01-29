@@ -26,6 +26,8 @@
   --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
   --card-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
   --sidebar-bg: rgba(15, 23, 42, 0.8);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --input-border: rgba(255, 255, 255, 0.1);
 }
 
 .light-theme {
@@ -36,12 +38,14 @@
 
   --bg-color: #f8fafc;
   --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(99, 102, 141, 0.1);
+  --text-secondary: #475569;
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(203, 213, 225, 0.6);
   --accent-gradient: linear-gradient(135deg, #4f46e5 0%, #9333ea 100%);
-  --card-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-  --sidebar-bg: rgba(255, 255, 255, 0.8);
+  --card-shadow: 0 8px 32px 0 rgba(71, 85, 105, 0.1);
+  --sidebar-bg: rgba(255, 255, 255, 0.9);
+  --input-bg: rgba(0, 0, 0, 0.03);
+  --input-border: rgba(0, 0, 0, 0.1);
 }
 
 body {

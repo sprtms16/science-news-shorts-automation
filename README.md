@@ -123,6 +123,20 @@ graph TD
 - 서버 디스크 공간 관리를 위해 업로드 완료된 건과 1시간 이상 정체된 실패 작업을 매시 30분마다 자동으로 청소합니다.
 - **Safety Filter**: Gemini AI를 통해 정치/종교 등 민감한 주제의 뉴스를 생성 단계에서 1차로, 완료 후 2차로 교차 검열하여 채널 안정성을 확보합니다.
 
+## 📂 Project Structure
+```
+root/
+├── backend/                # Spring Boot App & Python Service
+│   ├── src/                # Kotlin Source Code
+│   ├── ai-media-service/   # Python AI Service
+│   ├── Dockerfile.kotlin
+│   └── build.gradle.kts
+├── frontend/               # React Web App
+├── shared-data/            # Mounted Volume (Videos, Assets)
+├── docker-compose.yml
+└── README.md
+```
+
 ## 📝 Usage (Manual Trigger)
 자동 스케줄러 외에도 API를 통해 수동으로 제어할 수 있습니다.
 ```bash

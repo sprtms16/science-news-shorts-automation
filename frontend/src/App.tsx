@@ -186,7 +186,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-[#e2e8f0] font-sans selection:bg-purple-500 selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[var(--bg-color)] text-[var(--text-primary)] font-sans selection:bg-purple-500 selection:text-white overflow-x-hidden transition-colors duration-300">
       {/* Background Decorative Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
@@ -194,7 +194,8 @@ function App() {
       </div>
 
       {/* Mobile Header */}
-      <header className="md:hidden sticky top-0 z-50 glass-morphism px-4 py-3 flex justify-between items-center border-b border-white/5">
+      {/* Mobile Header */}
+      <header className="md:hidden sticky top-0 z-50 glass-morphism px-4 py-3 flex justify-between items-center border-b border-[var(--glass-border)]">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
             <Youtube size={18} className="text-white" />
@@ -219,7 +220,7 @@ function App() {
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed left-0 top-0 h-full w-72 z-50 glass-morphism border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0",
+        "fixed left-0 top-0 h-full w-72 z-50 glass-morphism border-r border-[var(--glass-border)] flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0",
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="p-8">
@@ -231,7 +232,7 @@ function App() {
               <h1 className="text-xl font-bold tracking-tight accent-text">
                 SciencePixels
               </h1>
-              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-widest">Shorts Automation</p>
+              <p className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-widest">Shorts Automation</p>
             </div>
           </div>
         </div>
@@ -347,12 +348,12 @@ function App() {
       <main className="md:ml-72 min-h-screen p-4 md:p-10 transition-all duration-300">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
           <div>
-            <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-var(--text-primary) mb-1">
+            <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] mb-1">
               {activeTab === 'videos' ? t.videos :
                 activeTab === 'prompts' ? t.prompts :
                   activeTab === 'settings' ? t.settings : t.tools}
             </h2>
-            <p className="text-sm text-gray-500 font-medium italic">
+            <p className="text-sm text-[var(--text-secondary)] font-medium italic">
               {activeTab === 'videos' ? (language === 'ko' ? 'AI 영상 생성 파이프라인 실시간 관리' : 'Manage your AI video pipeline.') :
                 activeTab === 'prompts' ? (language === 'ko' ? '콘텐츠 품질 향상을 위한 LLM 지침 설정' : 'Configure LLM instructions.') :
                   activeTab === 'settings' ? (language === 'ko' ? '전역 시스템 파라미터 및 제한값 설정' : 'Global params and limits.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
@@ -361,7 +362,7 @@ function App() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className="group flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 text-sm font-semibold rounded-xl border border-white/10 transition-all active:scale-95 disabled:opacity-50"
+            className="group flex items-center gap-2 px-5 py-2.5 bg-[var(--input-bg)] hover:bg-white/10 text-sm font-semibold rounded-xl border border-[var(--input-border)] transition-all active:scale-95 disabled:opacity-50"
           >
             <RefreshCw size={16} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
             {t.syncData}
@@ -371,17 +372,17 @@ function App() {
         {activeTab === 'videos' && (
           <div className="grid gap-6">
             {/* Filter Bar */}
-            <div className="glass-morphism p-5 rounded-2xl border border-white/5 flex flex-col lg:flex-row items-stretch lg:items-end gap-5">
+            <div className="glass-morphism p-5 rounded-2xl border border-[var(--glass-border)] flex flex-col lg:flex-row items-stretch lg:items-end gap-5">
               <div className="flex-1">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Search Pipeline</label>
+                <label className="block text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest mb-2 ml-1">Search Pipeline</label>
                 <div className="relative group">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-400 transition-colors">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] group-focus-within:text-purple-400 transition-colors">
                     <Search size={16} />
                   </span>
                   <input
                     type="text"
                     placeholder={t.searchPlaceholder}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-var(--text-primary) focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all placeholder:text-gray-600"
+                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all placeholder-[var(--text-secondary)]"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -400,24 +401,24 @@ function App() {
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Status Intelligence</label>
                 <div className="relative">
                   <select
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-var(--text-primary) focus:border-purple-500/50 outline-none cursor-pointer appearance-none transition-all"
+                    className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-purple-500/50 outline-none cursor-pointer appearance-none transition-all"
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
                     style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2364748b\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
                   >
-                    <option value="ALL" className="bg-gray-900">{t.statusAll}</option>
-                    <option value="UPLOADED" className="bg-gray-900">✅ {t.statusUploaded}</option>
-                    <option value="NOT_UPLOADED" className="bg-gray-900">⏳ {t.statusNotUploaded}</option>
-                    <option value="PROCESSING" className="bg-gray-900">⚙️ AI Processing</option>
-                    <option value="COMPLETED" className="bg-gray-900">📦 Asset Ready</option>
-                    <option value="ERROR" className="bg-gray-900">❌ Fatal Error</option>
-                    <option value="REGENERATING" className="bg-gray-900">🔄 Healing/Regen</option>
+                    <option value="ALL" className="bg-slate-900 text-white dark:bg-slate-900">{t.statusAll}</option>
+                    <option value="UPLOADED" className="bg-slate-900 text-white dark:bg-slate-900">✅ {t.statusUploaded}</option>
+                    <option value="NOT_UPLOADED" className="bg-slate-900 text-white dark:bg-slate-900">⏳ {t.statusNotUploaded}</option>
+                    <option value="PROCESSING" className="bg-slate-900 text-white dark:bg-slate-900">⚙️ AI Processing</option>
+                    <option value="COMPLETED" className="bg-slate-900 text-white dark:bg-slate-900">📦 Asset Ready</option>
+                    <option value="ERROR" className="bg-slate-900 text-white dark:bg-slate-900">❌ Fatal Error</option>
+                    <option value="REGENERATING" className="bg-slate-900 text-white dark:bg-slate-900">🔄 Healing/Regen</option>
                   </select>
                 </div>
               </div>
 
               <div className="flex items-center justify-between lg:justify-end gap-3 lg:pb-0.5">
-                <div className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] font-bold text-gray-500">
+                <div className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--input-border)] text-[11px] font-bold text-[var(--text-secondary)]">
                   {t.totalFiltered}: <span className="text-purple-400 font-mono text-xs">{videos.filter(v => {
                     const matchesSearch = v.title.toLowerCase().includes(searchTerm.toLowerCase());
                     const matchesStatus = statusFilter === 'ALL' ? true :
@@ -461,7 +462,7 @@ function App() {
         {activeTab === 'prompts' && (
           <div className="grid gap-8 max-w-5xl">
             {prompts.map(prompt => (
-              <div key={prompt.id} className="glass-morphism p-8 rounded-3xl border border-white/5 space-y-6 text-var(--text-primary)">
+              <div key={prompt.id} className="glass-morphism p-8 rounded-3xl border border-[var(--glass-border)] space-y-6 text-[var(--text-primary)]">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 border border-purple-500/20">
@@ -474,7 +475,7 @@ function App() {
                   </div>
                   <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/5">
                     <Clock size={12} className="text-gray-500" />
-                    <span className="text-[10px] font-bold text-gray-400">{new Date(prompt.updatedAt).toLocaleString()}</span>
+                    <span className="text-[10px] font-bold text-[var(--text-secondary)]">{new Date(prompt.updatedAt).toLocaleString()}</span>
                   </div>
                 </div>
                 <textarea
@@ -493,19 +494,19 @@ function App() {
 
         {activeTab === 'tools' && (
           <div className="grid gap-8 max-w-5xl">
-            <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-white/5">
+            <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-[var(--glass-border)]">
               <div className="mb-10">
-                <h3 className="text-2xl font-bold text-white mb-2">{t.systemMaintenance}</h3>
-                <p className="text-sm text-gray-500 font-medium">{t.maintenanceDescription}</p>
+                <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">{t.systemMaintenance}</h3>
+                <p className="text-sm text-[var(--text-secondary)] font-medium">{t.maintenanceDescription}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all group">
+                <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-blue-500/30 transition-all group">
                   <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4 group-hover:scale-110 transition-transform">
                     <RefreshCw size={24} />
                   </div>
                   <h4 className="text-lg font-bold text-blue-400 mb-2">{t.rematchFiles}</h4>
-                  <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-6">
                     {t.rematchDescription}
                   </p>
                   <button
@@ -517,12 +518,12 @@ function App() {
                   </button>
                 </div>
 
-                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all group">
+                <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-emerald-500/30 transition-all group">
                   <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
                     <PlayCircle size={24} />
                   </div>
                   <h4 className="text-lg font-bold text-emerald-400 mb-2">{t.localizationBatch}</h4>
-                  <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                  <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-6">
                     {t.localizationDescription}
                   </p>
                   <button
@@ -534,14 +535,14 @@ function App() {
                   </button>
                 </div>
 
-                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-orange-500/30 transition-all group md:col-span-2">
+                <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-orange-500/30 transition-all group md:col-span-2">
                   <div className="flex items-start gap-6">
                     <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-400 shrink-0 group-hover:scale-105 transition-transform">
                       <AlertCircle size={28} />
                     </div>
                     <div className="flex-1">
                       <h4 className="text-lg font-bold text-orange-400 mb-1">{t.deepArchiveRepair}</h4>
-                      <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
                         {t.repairDescription}
                       </p>
                       <button
@@ -555,14 +556,14 @@ function App() {
                   </div>
                 </div>
 
-                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-rose-500/30 transition-all group md:col-span-2">
+                <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-rose-500/30 transition-all group md:col-span-2">
                   <div className="flex items-start gap-6">
                     <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0 group-hover:scale-105 transition-transform">
                       <ShieldCheck size={28} />
                     </div>
                     <div className="flex-1">
                       <h4 className="text-lg font-bold text-rose-500 mb-1">{t.safetyPurge}</h4>
-                      <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                      <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
                         {t.purgeDescription}
                       </p>
                       <button
@@ -594,22 +595,22 @@ function App() {
 
         {activeTab === 'settings' && (
           <div className="max-w-4xl grid gap-8">
-            <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-white/5">
+            <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-[var(--glass-border)]">
               <div className="mb-10">
-                <h3 className="text-2xl font-bold text-white mb-2">{t.engineConstraints}</h3>
-                <p className="text-sm text-gray-500 font-medium">{t.settingsDescription}</p>
+                <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-2">{t.engineConstraints}</h3>
+                <p className="text-sm text-[var(--text-secondary)] font-medium">{t.settingsDescription}</p>
               </div>
 
               <div className="space-y-10">
-                <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 bg-white/5 rounded-2xl border border-white/5">
+                <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)]">
                   <div className="flex-1">
-                    <h4 className="text-base font-bold text-var(--text-primary) mb-1">{t.queueBufferSize}</h4>
-                    <p className="text-xs text-gray-500">{t.bufferDescription}</p>
+                    <h4 className="text-base font-bold text-[var(--text-primary)] mb-1">{t.queueBufferSize}</h4>
+                    <p className="text-xs text-[var(--text-secondary)]">{t.bufferDescription}</p>
                   </div>
                   <div className="flex gap-3 shrink-0">
                     <input
                       type="number"
-                      className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white w-24 focus:border-purple-500/50 outline-none font-mono font-bold transition-all text-center"
+                      className="bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2 text-[var(--text-primary)] w-24 focus:border-purple-500/50 outline-none font-mono font-bold transition-all text-center"
                       defaultValue={settings.find(s => s.key === 'MAX_GENERATION_LIMIT')?.value || '10'}
                       id="maxGenInput"
                     />
@@ -625,8 +626,8 @@ function App() {
                   </div>
                 </div>
 
-                <div className="pt-10 border-t border-white/5">
-                  <h4 className="text-base font-bold text-var(--text-primary) mb-4">{t.youtubeQuotaShield}</h4>
+                <div className="pt-10 border-t border-[var(--glass-border)]">
+                  <h4 className="text-base font-bold text-[var(--text-primary)] mb-4">{t.youtubeQuotaShield}</h4>
                   {settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL') ? (
                     <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
@@ -674,11 +675,11 @@ function NavItem({ icon, label, active, onClick }: { icon: any, label: string, a
         "w-full flex items-center justify-between px-5 py-3.5 rounded-2xl text-sm font-bold transition-all duration-300 group",
         active
           ? "bg-gradient-to-r from-purple-600/20 to-indigo-600/20 text-purple-400 border border-purple-500/20 shadow-lg shadow-purple-500/10"
-          : "text-gray-500 hover:bg-white/5 hover:text-gray-200 border border-transparent"
+          : "text-[var(--text-secondary)] hover:bg-[var(--input-bg)] hover:text-[var(--text-primary)] border border-transparent"
       )}
     >
       <div className="flex items-center gap-4">
-        <span className={cn("transition-colors duration-300", active ? "text-purple-400" : "text-gray-600 group-hover:text-gray-400")}>
+        <span className={cn("transition-colors duration-300", active ? "text-purple-400" : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]")}>
           {icon}
         </span>
         {label}
@@ -727,7 +728,7 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
   };
 
   return (
-    <div className="glass-morphism rounded-3xl border border-white/5 overflow-hidden group hover:border-purple-500/30 transition-all duration-500 shadow-2xl">
+    <div className="glass-morphism rounded-3xl border border-[var(--glass-border)] overflow-hidden group hover:border-purple-500/30 transition-all duration-500 shadow-2xl">
       <div className="p-5 md:p-8">
         <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
           <div className="flex-1 space-y-4 max-w-full overflow-hidden">
@@ -746,10 +747,10 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
 
             <div className="space-y-2">
               <div className="flex items-center gap-3">
-                <h3 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-tight group-hover:text-purple-300 transition-colors">
+                <h3 className="text-xl md:text-2xl font-bold text-[var(--text-primary)] tracking-tight leading-tight group-hover:text-purple-400 transition-colors">
                   {video.title}
                 </h3>
-                <button onClick={copyTitle} className="p-2 hover:bg-white/10 rounded-xl transition-all text-gray-500 hover:text-white" title={t.copyTitle}>
+                <button onClick={copyTitle} className="p-2 hover:bg-[var(--input-bg)] rounded-xl transition-all text-[var(--text-secondary)] hover:text-[var(--text-primary)]" title={t.copyTitle}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                 </button>
               </div>
@@ -787,42 +788,42 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
 
         {/* Dynamic Content */}
         {video.description && (
-          <div className="mt-8 bg-black/20 rounded-2xl p-5 border border-white/5">
+          <div className="mt-8 bg-[var(--input-bg)] rounded-2xl p-5 border border-[var(--input-border)]">
             <div className="flex justify-between items-center mb-3">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{t.masterScript}</span>
+              <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest">{t.masterScript}</span>
               <button onClick={copyDescription} className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg text-[10px] font-bold transition-all border border-emerald-500/20">
                 <ShieldCheck size={12} /> {t.copyFullMeta}
               </button>
             </div>
-            <p className="text-sm text-gray-300 leading-relaxed font-normal">{video.description}</p>
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed font-normal">{video.description}</p>
           </div>
         )}
 
         {/* Intelligence Grid */}
         <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-3">{t.aiContextTags}</span>
+          <div className="bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--input-border)]">
+            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest block mb-3">{t.aiContextTags}</span>
             <div className="flex flex-wrap gap-2">
               {video.tags?.slice(0, 10).map(tag => (
-                <span key={tag} className="px-2.5 py-1 bg-white/5 text-gray-400 text-[10px] font-medium rounded-lg border border-white/5 hover:border-purple-500/30 transition-colors cursor-default">#{tag}</span>
+                <span key={tag} className="px-2.5 py-1 bg-[var(--input-bg)] text-[var(--text-secondary)] text-[10px] font-medium rounded-lg border border-[var(--glass-border)] hover:border-purple-500/30 transition-colors cursor-default">#{tag}</span>
               ))}
-              {(!video.tags || video.tags.length === 0) && <span className="text-xs text-gray-600 italic">No tags detected</span>}
+              {(!video.tags || video.tags.length === 0) && <span className="text-xs text-[var(--text-secondary)] italic">No tags detected</span>}
             </div>
           </div>
-          <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-3">{t.verificationSources}</span>
+          <div className="bg-[var(--input-bg)] p-4 rounded-2xl border border-[var(--input-border)]">
+            <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-widest block mb-3">{t.verificationSources}</span>
             <div className="grid grid-cols-1 gap-2">
               {video.sources?.map((source, idx) => (
                 <a key={idx} href={getSourceUrl(source)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[11px] text-sky-400 hover:text-sky-300 transition-colors truncate">
                   <ExternalLink size={12} /> {source}
                 </a>
               ))}
-              {(!video.sources || video.sources.length === 0) && <span className="text-xs text-gray-600 italic">No sources linked</span>}
+              {(!video.sources || video.sources.length === 0) && <span className="text-xs text-[var(--text-secondary)] italic">No sources linked</span>}
             </div>
           </div>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+        <div className="mt-8 pt-6 border-t border-[var(--input-border)] flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
           <div className="flex flex-wrap items-center justify-center gap-6">
             <span className="flex items-center gap-2"><Clock size={12} className="text-purple-500" /> {new Date(video.createdAt).toLocaleString()}</span>
             {video.youtubeUrl && (
@@ -832,11 +833,11 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
             )}
             {!video.youtubeUrl && video.status !== 'UPLOADED' && (
               <div className="flex items-center gap-3">
-                <span className="text-gray-600">{t.syncLink}:</span>
+                <span className="text-[var(--text-secondary)]">{t.syncLink}:</span>
                 <input
                   type="text"
                   placeholder={t.pasteYoutubeUrl}
-                  className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] w-48 focus:border-purple-500/50 outline-none transition-all lowercase"
+                  className="bg-[var(--input-bg)] border border-[var(--input-border)] rounded-lg px-3 py-1.5 text-[10px] w-48 focus:border-purple-500/50 outline-none transition-all lowercase"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const url = (e.target as HTMLInputElement).value;

@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
 
   ai-media-service:
-    build: ./ai-media-service
+    build: ./backend/ai-media-service
     container_name: shorts-ai-service
     ports:
       - "8000:8000"
@@ -58,7 +58,7 @@ services:
 
   shorts-controller:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile.kotlin
     container_name: shorts-controller
     ports:
@@ -70,8 +70,8 @@ services:
       - kafka
     volumes:
       - ./shared-data:/app/shared-data
-      - ./client_secret.json:/app/client_secret.json
-      - ./tokens:/app/tokens
+      - ./backend/client_secret.json:/app/client_secret.json
+      - ./backend/tokens:/app/tokens
     env_file:
       - .env
     environment:
@@ -100,8 +100,10 @@ services:
     environment:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
+    ports:
+      - "3000:80"
     volumes:
-      - ./tailscale_state:/var/lib/tailscale
+      - ./vpn-state:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
