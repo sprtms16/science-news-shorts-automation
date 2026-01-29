@@ -20,6 +20,9 @@
   - **Monitoring**: 영상 제작 및 업로드 상태 실시간 모니터링 및 필터링/검색 지원.
   - **Maintenance**: 유튜브 링크 동기화, 메타데이터 재생성, 누락 파일 복구 등 매뉴얼 도구 제공.
   - **Settings**: 동적 버퍼 제한(최대 생성 개수) 및 업로드 차단 해제 시간 설정.
+  - **Global & Adaptive UI**:
+    - **Internationalization (i18n)**: 한글/영어(KO/EN) 실시간 전환 및 자동 감지 지원.
+    - **Dynamic Theming**: Light/Dark/System 테마 모드 지원 및 Glassmorphism 디자인 최적화.
 - **Robust Architecture**:
   - **Dual-Lock Quota Guard**: Gemini API 및 YouTube API의 쿼터를 실시간으로 추적하며 최적의 생성 속도 유지.
   - **Self-Healing**: 파일 손상이나 누락 시 자동으로 감지하여 재생성(Regeneration).

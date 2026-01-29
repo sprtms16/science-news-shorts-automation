@@ -12,10 +12,21 @@ import {
   Clock,
   PlayCircle,
   Settings,
-  Trash2
+  Trash2,
+  Menu,
+  X,
+  Search,
+  Youtube,
+  ChevronRight,
+  ShieldCheck,
+  Languages,
+  Sun,
+  Moon,
+  Monitor
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { translations, type Language } from './i18n';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -23,6 +34,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 function App() {
   const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings'>('videos');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [videos, setVideos] = useState<VideoHistory[]>([]);
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
   const [settings, setSettings] = useState<any[]>([]);
@@ -30,6 +42,36 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+
+  // i18n & Theme states
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = localStorage.getItem('app-lang') as Language;
+    if (saved) return saved;
+    return navigator.language.startsWith('ko') ? 'ko' : 'en';
+  });
+
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('app-theme') as any) || 'system';
+  });
+
+  const t = translations[language];
+
+  useEffect(() => {
+    localStorage.setItem('app-lang', language);
+    document.documentElement.lang = language;
+  }, [language]);
+
+  useEffect(() => {
+    localStorage.setItem('app-theme', theme);
+    const root = document.documentElement;
+    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    if (isDark) {
+      root.classList.remove('light-theme');
+    } else {
+      root.classList.add('light-theme');
+    }
+  }, [theme]);
 
   useEffect(() => {
     fetchData();
@@ -144,119 +186,249 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a1a1a] text-white font-sans selection:bg-purple-500 selection:text-white">
+    <div className="min-h-screen bg-[#0f172a] text-[#e2e8f0] font-sans selection:bg-purple-500 selection:text-white overflow-x-hidden">
+      {/* Background Decorative Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[20%] -right-[10%] w-[35%] h-[35%] bg-indigo-600/10 blur-[120px] rounded-full" />
+      </div>
+
+      {/* Mobile Header */}
+      <header className="md:hidden sticky top-0 z-50 glass-morphism px-4 py-3 flex justify-between items-center border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <Youtube size={18} className="text-white" />
+          </div>
+          <h1 className="text-lg font-bold accent-text">SciencePixels</h1>
+        </div>
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+        >
+          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+      </header>
+
+      {/* Sidebar Overlay (Mobile) */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 bg-[#242424] border-r border-[#333] flex flex-col">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-600 bg-clip-text text-transparent">
-            SciencePixels
-          </h1>
-          <p className="text-xs text-gray-500 mt-1">Shorts Automation Admin</p>
+      <aside className={cn(
+        "fixed left-0 top-0 h-full w-72 z-50 glass-morphism border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out md:translate-x-0",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <Youtube size={24} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight accent-text">
+                SciencePixels
+              </h1>
+              <p className="text-[10px] text-gray-500 font-medium uppercase tracking-widest">Shorts Automation</p>
+            </div>
+          </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto custom-scrollbar">
           <NavItem
-            icon={<LayoutDashboard size={20} />}
-            label="Videos"
+            icon={<LayoutDashboard size={18} />}
+            label={t.dashboard}
             active={activeTab === 'videos'}
-            onClick={() => setActiveTab('videos')}
+            onClick={() => { setActiveTab('videos'); setIsMobileMenuOpen(false); }}
           />
           <NavItem
-            icon={<FileText size={20} />}
-            label="Prompts"
+            icon={<FileText size={18} />}
+            label={t.prompts}
             active={activeTab === 'prompts'}
-            onClick={() => setActiveTab('prompts')}
+            onClick={() => { setActiveTab('prompts'); setIsMobileMenuOpen(false); }}
           />
           <NavItem
-            icon={<RefreshCw size={20} />}
-            label="Batch Tools"
+            icon={<RefreshCw size={18} />}
+            label={t.tools}
             active={activeTab === 'tools'}
-            onClick={() => setActiveTab('tools')}
+            onClick={() => { setActiveTab('tools'); setIsMobileMenuOpen(false); }}
           />
           <NavItem
-            icon={<Settings size={20} />}
-            label="Settings"
+            icon={<Settings size={18} />}
+            label={t.settings}
             active={activeTab === 'settings'}
-            onClick={() => setActiveTab('settings')}
+            onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
           />
         </nav>
 
-        <div className="p-4 border-t border-[#333]">
-          <div className="text-xs text-gray-600 text-center">v2.1.0 (React)</div>
+        {/* Language & Theme Selectors */}
+        <div className="px-4 py-6 space-y-4 border-t border-white/5">
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">
+              <Languages size={12} /> {t.language}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setLanguage('ko')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                  language === 'ko' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                )}
+              >
+                KO
+              </button>
+              <button
+                onClick={() => setLanguage('en')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
+                  language === 'en' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                )}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-widest ml-1">
+              <Monitor size={12} /> {t.theme}
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setTheme('light')}
+                className={cn(
+                  "p-2 rounded-lg transition-all border flex justify-center",
+                  theme === 'light' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                )}
+                title={t.light}
+              >
+                <Sun size={14} />
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={cn(
+                  "p-2 rounded-lg transition-all border flex justify-center",
+                  theme === 'dark' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                )}
+                title={t.dark}
+              >
+                <Moon size={14} />
+              </button>
+              <button
+                onClick={() => setTheme('system')}
+                className={cn(
+                  "p-2 rounded-lg transition-all border flex justify-center",
+                  theme === 'system' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                )}
+                title={t.system}
+              >
+                <Monitor size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-white/5">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
+              <ShieldCheck size={16} className="text-purple-400" />
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <p className="text-xs font-semibold truncate">Admin Console</p>
+              <p className="text-[10px] text-gray-500 truncate">v2.1.0-Modern</p>
+            </div>
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="ml-64 p-8">
-        <header className="flex justify-between items-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-100">
-            {activeTab === 'videos' ? 'Video Management' :
-              activeTab === 'prompts' ? 'System Prompts' :
-                activeTab === 'settings' ? 'System Configuration' : 'Maintenance Tools'}
-          </h2>
+      <main className="md:ml-72 min-h-screen p-4 md:p-10 transition-all duration-300">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+          <div>
+            <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-var(--text-primary) mb-1">
+              {activeTab === 'videos' ? t.videos :
+                activeTab === 'prompts' ? t.prompts :
+                  activeTab === 'settings' ? t.settings : t.tools}
+            </h2>
+            <p className="text-sm text-gray-500 font-medium italic">
+              {activeTab === 'videos' ? (language === 'ko' ? 'AI 영상 생성 파이프라인 실시간 관리' : 'Manage your AI video pipeline.') :
+                activeTab === 'prompts' ? (language === 'ko' ? '콘텐츠 품질 향상을 위한 LLM 지침 설정' : 'Configure LLM instructions.') :
+                  activeTab === 'settings' ? (language === 'ko' ? '전역 시스템 파라미터 및 제한값 설정' : 'Global params and limits.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
+            </p>
+          </div>
           <button
             onClick={fetchData}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-[#333] hover:bg-[#444] rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="group flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 text-sm font-semibold rounded-xl border border-white/10 transition-all active:scale-95 disabled:opacity-50"
           >
-            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
-            Refresh
+            <RefreshCw size={16} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
+            {t.syncData}
           </button>
         </header>
 
         {activeTab === 'videos' && (
           <div className="grid gap-6">
             {/* Filter Bar */}
-            <div className="flex flex-wrap gap-4 bg-[#2a2a2a] p-4 rounded-xl border border-[#333] shadow-md">
-              <div className="flex-1 min-w-[200px]">
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Search Title</label>
-                <div className="relative">
+            <div className="glass-morphism p-5 rounded-2xl border border-white/5 flex flex-col lg:flex-row items-stretch lg:items-end gap-5">
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Search Pipeline</label>
+                <div className="relative group">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-400 transition-colors">
+                    <Search size={16} />
+                  </span>
                   <input
                     type="text"
-                    placeholder="영상 제목으로 검색..."
-                    className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-4 py-2 text-sm text-gray-100 focus:border-purple-500 outline-none transition-all"
+                    placeholder={t.searchPlaceholder}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-var(--text-primary) focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/10 outline-none transition-all placeholder:text-gray-600"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
                   {searchTerm && (
                     <button
                       onClick={() => setSearchTerm('')}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
                     >
-                      <Trash2 size={14} />
+                      <X size={14} />
                     </button>
                   )}
                 </div>
               </div>
 
-              <div className="w-48">
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Status / Upload</label>
-                <select
-                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-gray-100 focus:border-purple-500 outline-none cursor-pointer appearance-none"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1rem' }}
-                >
-                  <option value="ALL">전체 보기</option>
-                  <option value="UPLOADED">✅ 유튜브 업로드 완료</option>
-                  <option value="NOT_UPLOADED">⏳ 미업로드 영상</option>
-                  <option value="PROCESSING">⚙️ 제작 중 (Processing)</option>
-                  <option value="COMPLETED">📦 제작 완료 (대기 중)</option>
-                  <option value="ERROR">❌ 에러 발생</option>
-                  <option value="REGENERATING">🔄 재생성 중</option>
-                </select>
+              <div className="lg:w-64">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Status Intelligence</label>
+                <div className="relative">
+                  <select
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-var(--text-primary) focus:border-purple-500/50 outline-none cursor-pointer appearance-none transition-all"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2364748b\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
+                  >
+                    <option value="ALL" className="bg-gray-900">{t.statusAll}</option>
+                    <option value="UPLOADED" className="bg-gray-900">✅ {t.statusUploaded}</option>
+                    <option value="NOT_UPLOADED" className="bg-gray-900">⏳ {t.statusNotUploaded}</option>
+                    <option value="PROCESSING" className="bg-gray-900">⚙️ AI Processing</option>
+                    <option value="COMPLETED" className="bg-gray-900">📦 Asset Ready</option>
+                    <option value="ERROR" className="bg-gray-900">❌ Fatal Error</option>
+                    <option value="REGENERATING" className="bg-gray-900">🔄 Healing/Regen</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="flex items-end pb-1">
-                <div className="text-xs text-gray-500 bg-[#333] px-3 py-2 rounded-lg border border-[#444]">
-                  Total: <span className="text-purple-400 font-bold">{videos.filter(v => {
+              <div className="flex items-center justify-between lg:justify-end gap-3 lg:pb-0.5">
+                <div className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] font-bold text-gray-500">
+                  {t.totalFiltered}: <span className="text-purple-400 font-mono text-xs">{videos.filter(v => {
                     const matchesSearch = v.title.toLowerCase().includes(searchTerm.toLowerCase());
                     const matchesStatus = statusFilter === 'ALL' ? true :
                       statusFilter === 'UPLOADED' ? v.status === 'UPLOADED' :
                         statusFilter === 'NOT_UPLOADED' ? v.status !== 'UPLOADED' :
                           v.status === statusFilter;
                     return matchesSearch && matchesStatus;
-                  }).length}</span> / {videos.length}
+                  }).length}</span>
+                </div>
+                <div className="px-4 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] font-bold text-purple-400">
+                  {t.totalSystem}: <span className="font-mono text-xs">{videos.length}</span>
                 </div>
               </div>
             </div>
@@ -276,6 +448,7 @@ function App() {
                 onRegenerateMetadata={onRegenerateMetadata}
                 onUpdateStatus={updateVideoStatus}
                 onDelete={onDeleteVideo}
+                t={t}
               />
             ))}
             {videos.length === 0 && !loading && (
@@ -284,24 +457,33 @@ function App() {
           </div>
         )}
 
-        {/* Prompt editor placeholder for now */}
+        {/* Prompt editor */}
         {activeTab === 'prompts' && (
-          <div className="grid gap-6">
+          <div className="grid gap-8 max-w-5xl">
             {prompts.map(prompt => (
-              <div key={prompt.id} className="bg-[#2a2a2a] p-6 rounded-xl border border-[#333]">
-                <div className="flex justify-between mb-4">
-                  <h3 className="text-xl font-bold text-purple-400">{prompt.id}</h3>
-                  <span className="text-xs text-gray-500 flex items-center gap-1">
-                    <Clock size={12} /> {new Date(prompt.updatedAt).toLocaleString()}
-                  </span>
+              <div key={prompt.id} className="glass-morphism p-8 rounded-3xl border border-white/5 space-y-6 text-var(--text-primary)">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 border border-purple-500/20">
+                      <FileText size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white tracking-tight">{prompt.id}</h3>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{t.instructionEngine}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+                    <Clock size={12} className="text-gray-500" />
+                    <span className="text-[10px] font-bold text-gray-400">{new Date(prompt.updatedAt).toLocaleString()}</span>
+                  </div>
                 </div>
                 <textarea
-                  className="w-full h-64 bg-[#1a1a1a] border border-[#333] rounded-lg p-4 font-mono text-sm text-gray-300 focus:border-purple-500 outline-none resize-y"
+                  className="w-full h-80 bg-black/40 border border-white/10 rounded-2xl p-6 font-mono text-sm text-gray-300 focus:border-purple-500/50 focus:ring-4 focus:ring-purple-500/10 outline-none resize-y transition-all"
                   defaultValue={prompt.content}
                 />
-                <div className="mt-4 flex justify-end">
-                  <button className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                    Save Changes
+                <div className="flex justify-end">
+                  <button className="px-8 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all active:scale-95">
+                    {t.updateProcessor}
                   </button>
                 </div>
               </div>
@@ -310,93 +492,98 @@ function App() {
         )}
 
         {activeTab === 'tools' && (
-          <div className="grid gap-8 max-w-4xl">
-            <div className="bg-[#2a2a2a] p-8 rounded-2xl border border-[#333] shadow-xl">
-              <h3 className="text-xl font-bold mb-6 text-purple-400">데이터 정화 및 배치 작업</h3>
+          <div className="grid gap-8 max-w-5xl">
+            <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-white/5">
+              <div className="mb-10">
+                <h3 className="text-2xl font-bold text-white mb-2">{t.systemMaintenance}</h3>
+                <p className="text-sm text-gray-500 font-medium">{t.maintenanceDescription}</p>
+              </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-blue-500/30 transition-all">
-                  <p className="text-sm text-gray-400 mb-4">
-                    DB에는 있지만 filePath가 끊긴 항목들을 `/app/shared-data` 디렉토리의 파일들과 다시 대조하여 매핑합니다.
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-blue-500/30 transition-all group">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4 group-hover:scale-110 transition-transform">
+                    <RefreshCw size={24} />
+                  </div>
+                  <h4 className="text-lg font-bold text-blue-400 mb-2">{t.rematchFiles}</h4>
+                  <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                    {t.rematchDescription}
                   </p>
                   <button
                     onClick={() => runBatchAction('rematch-files')}
                     disabled={loading}
-                    className="w-full py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
+                    className="w-full py-3 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-blue-600/20"
                   >
-                    매핑 시작
+                    {t.flashSync}
                   </button>
                 </div>
 
-                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-green-500/30 transition-all">
-                  <h4 className="font-bold text-green-400 mb-2 flex items-center gap-2">
-                    <PlayCircle size={18} /> 일괄 한글화 (10개)
-                  </h4>
-                  <p className="text-sm text-gray-400 mb-4">
-                    제목이 영어인 영상들을 찾아 최대 10개까지 한글 메타데이터로 일괄 전환합니다.
+                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-emerald-500/30 transition-all group">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-4 group-hover:scale-110 transition-transform">
+                    <PlayCircle size={24} />
+                  </div>
+                  <h4 className="text-lg font-bold text-emerald-400 mb-2">{t.localizationBatch}</h4>
+                  <p className="text-xs text-gray-500 leading-relaxed mb-6">
+                    {t.localizationDescription}
                   </p>
                   <button
                     onClick={() => runBatchAction('regenerate-all-metadata')}
                     disabled={loading}
-                    className="w-full py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
+                    className="w-full py-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-emerald-600/20"
                   >
-                    한글화 시작
+                    {t.translateAll}
                   </button>
                 </div>
 
-                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-orange-500/30 transition-all col-span-2">
-                  <h4 className="font-bold text-orange-400 mb-2 flex items-center gap-2">
-                    <AlertCircle size={18} /> 누락 파일 일괄 재생성
-                  </h4>
-                  <p className="text-sm text-gray-400 mb-4">
-                    파일이 삭제되거나 유실된 영상(UPLOADED 제외)들을 찾아 비디오 파일 생성을 다시 실행합니다.
-                  </p>
-                  <button
-                    onClick={() => runBatchAction('regenerate-missing-files')}
-                    disabled={loading}
-                    className="w-full py-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
-                  >
-                    재생성 시작
-                  </button>
+                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-orange-500/30 transition-all group md:col-span-2">
+                  <div className="flex items-start gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center text-orange-400 shrink-0 group-hover:scale-105 transition-transform">
+                      <AlertCircle size={28} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-orange-400 mb-1">{t.deepArchiveRepair}</h4>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                        {t.repairDescription}
+                      </p>
+                      <button
+                        onClick={() => runBatchAction('regenerate-missing-files')}
+                        disabled={loading}
+                        className="px-8 py-3 bg-orange-600/10 hover:bg-orange-600 text-orange-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-orange-500/20"
+                      >
+                        {t.launchRepair}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-red-500/30 transition-all col-span-2">
-                  <h4 className="font-bold text-red-500 mb-2 flex items-center gap-2">
-                    <AlertCircle size={18} /> 민감 영상 소급 정리 (Safety Cleanup)
-                  </h4>
-                  <p className="text-sm text-gray-400 mb-4">
-                    모든 영상을 스캔하여 정치/종교/사회 갈등 유발 가능성이 있는 영상을 즉시 삭제합니다. (30분 주기 자동 실행됨)
-                  </p>
-                  <button
-                    onClick={() => runBatchAction('cleanup-sensitive')}
-                    disabled={loading}
-                    className="w-full py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
-                  >
-                    소급 정리 시작
-                  </button>
-                </div>
-
-                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-blue-400/30 transition-all col-span-2">
-                  <h4 className="font-bold text-blue-400 mb-2 flex items-center gap-2">
-                    <RefreshCw size={18} /> 유튜브 업로드 상태 동기화
-                  </h4>
-                  <p className="text-sm text-gray-400 mb-4">
-                    유튜브 링크가 입력되어 있는 영상들의 상태를 일괄적으로 `UPLOADED`로 변경하고 용량을 차지하는 로컬 비디오 파일을 삭제합니다.
-                  </p>
-                  <button
-                    onClick={() => runBatchAction('sync-uploaded')}
-                    disabled={loading}
-                    className="w-full py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
-                  >
-                    동기화 실행
-                  </button>
+                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 hover:border-rose-500/30 transition-all group md:col-span-2">
+                  <div className="flex items-start gap-6">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 shrink-0 group-hover:scale-105 transition-transform">
+                      <ShieldCheck size={28} />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-lg font-bold text-rose-500 mb-1">{t.safetyPurge}</h4>
+                      <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                        {t.purgeDescription}
+                      </p>
+                      <button
+                        onClick={() => runBatchAction('cleanup-sensitive')}
+                        disabled={loading}
+                        className="px-8 py-3 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-rose-500/20"
+                      >
+                        {t.executePurge}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {toolsResult && (
-                <div className="mt-8 p-6 bg-[#1a1a1a] rounded-xl border border-purple-500/20">
-                  <h4 className="font-bold text-purple-400 mb-4">실행 결과</h4>
-                  <pre className="text-xs text-gray-400 overflow-auto max-h-96 font-mono bg-black/30 p-4 rounded-lg">
+                <div className="mt-12 p-8 bg-black/40 rounded-3xl border border-purple-500/20 shadow-inner">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                    <h4 className="text-xs font-bold text-purple-400 uppercase tracking-widest">{t.executionLog}</h4>
+                  </div>
+                  <pre className="text-[11px] text-gray-500 overflow-auto max-h-80 font-mono scrollbar-hide">
                     {JSON.stringify(toolsResult, null, 2)}
                   </pre>
                 </div>
@@ -406,17 +593,23 @@ function App() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="max-w-2xl grid gap-6">
-            <div className="bg-[#2a2a2a] p-8 rounded-2xl border border-[#333]">
-              <h3 className="text-xl font-bold mb-6 text-purple-400">영상 생성 설정</h3>
+          <div className="max-w-4xl grid gap-8">
+            <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-white/5">
+              <div className="mb-10">
+                <h3 className="text-2xl font-bold text-white mb-2">{t.engineConstraints}</h3>
+                <p className="text-sm text-gray-500 font-medium">{t.settingsDescription}</p>
+              </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">최대 생성 유지 개수 (Buffer Size)</label>
-                  <div className="flex gap-4">
+              <div className="space-y-10">
+                <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 bg-white/5 rounded-2xl border border-white/5">
+                  <div className="flex-1">
+                    <h4 className="text-base font-bold text-var(--text-primary) mb-1">{t.queueBufferSize}</h4>
+                    <p className="text-xs text-gray-500">{t.bufferDescription}</p>
+                  </div>
+                  <div className="flex gap-3 shrink-0">
                     <input
                       type="number"
-                      className="bg-[#1a1a1a] border border-[#333] rounded px-4 py-2 text-white w-32 focus:border-purple-500 outline-none"
+                      className="bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-white w-24 focus:border-purple-500/50 outline-none font-mono font-bold transition-all text-center"
                       defaultValue={settings.find(s => s.key === 'MAX_GENERATION_LIMIT')?.value || '10'}
                       id="maxGenInput"
                     />
@@ -425,35 +618,42 @@ function App() {
                         const val = (document.getElementById('maxGenInput') as HTMLInputElement).value;
                         saveSetting('MAX_GENERATION_LIMIT', val, 'Max unuploaded videos to keep buffered');
                       }}
-                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold"
+                      className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all active:scale-95"
                     >
-                      저장
+                      {t.commit}
                     </button>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    * 업로드 되지 않은(COMPLETED) 영상이 이 개수보다 적으면 자동으로 생성을 시작합니다.<br />
-                    * 이 개수에 도달하면 생성을 멈추고 대기합니다.
-                  </p>
                 </div>
 
-                <div className="pt-6 border-t border-[#333]">
-                  <label className="block text-sm font-medium text-gray-400 mb-2">현재 업로드 차단 (Quota Limit)</label>
+                <div className="pt-10 border-t border-white/5">
+                  <h4 className="text-base font-bold text-var(--text-primary) mb-4">{t.youtubeQuotaShield}</h4>
                   {settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL') ? (
-                    <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-                      <p className="text-red-400 font-bold mb-1">⛔ 업로드가 차단됨</p>
-                      <p className="text-sm text-gray-400">
-                        해제 예정 시간: {new Date(settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL')?.value).toLocaleString()}
-                      </p>
+                    <div className="p-6 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <div className="flex items-center gap-2 text-rose-400 font-bold mb-1">
+                          <AlertCircle size={18} />
+                          <span>{t.uploadBlockActive}</span>
+                        </div>
+                        <p className="text-xs text-rose-400/70">
+                          {t.autoResumeScheduled}: <span className="font-mono">{new Date(settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL')?.value).toLocaleString()}</span>
+                        </p>
+                      </div>
                       <button
                         onClick={() => saveSetting('UPLOAD_BLOCKED_UNTIL', '', 'Force Unblock')}
-                        className="mt-3 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                        className="px-5 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-rose-500/20 transition-all active:scale-95"
                       >
-                        강제 해제 (Force Unblock)
+                        {t.forceBypass}
                       </button>
                     </div>
                   ) : (
-                    <div className="p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
-                      <p className="text-green-400 font-bold">✅ 정상 (업로드 가능)</p>
+                    <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                        <CheckCircle2 size={24} />
+                      </div>
+                      <div>
+                        <p className="text-emerald-400 font-bold">{t.systemsOperational}</p>
+                        <p className="text-[10px] text-emerald-400/60 uppercase tracking-widest font-bold">{t.quotaAvailable}</p>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -471,37 +671,41 @@ function NavItem({ icon, label, active, onClick }: { icon: any, label: string, a
     <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+        "w-full flex items-center justify-between px-5 py-3.5 rounded-2xl text-sm font-bold transition-all duration-300 group",
         active
-          ? "bg-purple-500/10 text-purple-400 border border-purple-500/20 shadow-[0_0_15px_rgba(168,85,247,0.1)]"
-          : "text-gray-400 hover:bg-[#2a2a2a] hover:text-gray-200 border border-transparent"
+          ? "bg-gradient-to-r from-purple-600/20 to-indigo-600/20 text-purple-400 border border-purple-500/20 shadow-lg shadow-purple-500/10"
+          : "text-gray-500 hover:bg-white/5 hover:text-gray-200 border border-transparent"
       )}
     >
-      {icon}
-      {label}
+      <div className="flex items-center gap-4">
+        <span className={cn("transition-colors duration-300", active ? "text-purple-400" : "text-gray-600 group-hover:text-gray-400")}>
+          {icon}
+        </span>
+        {label}
+      </div>
+      {active && <ChevronRight size={14} className="text-purple-500/50" />}
     </button>
   );
 }
 
-function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete }: { video: VideoHistory, onDownload: () => void, onRegenerateMetadata: (id: string) => void, onUpdateStatus: (id: string, status: string, url?: string) => void, onDelete: (id: string) => void }) {
-  const statusColors: Record<string, string> = {
-    'COMPLETED': 'text-green-400 bg-green-400/10 border-green-400/20',
-    'PENDING_PROCESSING': 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-    'PROCESSING': 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
-    'REGENERATING': 'text-purple-400 bg-purple-400/10 border-purple-400/20',
-    'ERROR': 'text-red-400 bg-red-400/10 border-red-400/20',
-    'UPLOADED': 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-    'QUOTA_EXCEEDED': 'text-orange-400 bg-orange-400/10 border-orange-400/20',
-    'RETRY_PENDING': 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20',
-    'FILE_NOT_FOUND': 'text-pink-400 bg-pink-400/10 border-pink-400/20',
+function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete, t }: { video: VideoHistory, onDownload: () => void, onRegenerateMetadata: (id: string) => void, onUpdateStatus: (id: string, status: string, url?: string) => void, onDelete: (id: string) => void, t: any }) {
+  const statusColors: Record<string, { bg: string, text: string, border: string, icon: any }> = {
+    'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} /> },
+    'PROCESSING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" /> },
+    'REGENERATING': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', icon: <RefreshCw size={12} className="animate-spin" /> },
+    'ERROR': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} /> },
+    'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} /> },
+    'QUOTA_EXCEEDED': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', icon: <AlertCircle size={12} /> },
+    'RETRY_PENDING': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', icon: <Clock size={12} /> },
+    'FILE_NOT_FOUND': { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', icon: <AlertCircle size={12} /> },
   };
 
-  // Check if title contains Korean characters (if not, it needs regeneration)
+  const currentStatus = statusColors[video.status] || { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: <AlertCircle size={12} /> };
   const isKoreanTitle = /[가-힣]/.test(video.title);
 
   const copyTitle = () => {
     navigator.clipboard.writeText(video.title);
-    alert('제목이 복사되었습니다!');
+    alert(t.copyTitle);
   };
 
   const copyDescription = () => {
@@ -512,7 +716,6 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
     alert('설명+출처+태그가 복사되었습니다!');
   };
 
-  // Source URL guess (for clickable links)
   const getSourceUrl = (source: string) => {
     const lowerSource = source.toLowerCase();
     if (lowerSource.includes('nature')) return 'https://www.nature.com';
@@ -524,119 +727,116 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
   };
 
   return (
-    <div className="bg-[#2a2a2a] rounded-xl border border-[#333] overflow-hidden hover:border-purple-500/30 transition-all duration-300 shadow-lg">
-      <div className="p-6">
-        <div className="flex justify-between items-start mb-4">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-3">
-              <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border", statusColors[video.status] || 'text-gray-400')}>
-                {video.status === 'COMPLETED' || video.status === 'UPLOADED' ? <CheckCircle2 size={12} /> :
-                  video.status === 'REGENERATING' || video.status.includes('PENDING') ? <RefreshCw size={12} className="animate-spin-slow" /> :
-                    <AlertCircle size={12} />}
+    <div className="glass-morphism rounded-3xl border border-white/5 overflow-hidden group hover:border-purple-500/30 transition-all duration-500 shadow-2xl">
+      <div className="p-5 md:p-8">
+        <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
+          <div className="flex-1 space-y-4 max-w-full overflow-hidden">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold border tracking-wider uppercase",
+                currentStatus.bg, currentStatus.text, currentStatus.border
+              )}>
+                {currentStatus.icon}
                 {video.status}
-              </div>
+              </span>
               {!isKoreanTitle && (
-                <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 text-xs rounded border border-orange-500/30">영어 제목</span>
+                <span className="px-3 py-1 bg-orange-500/10 text-orange-400 text-[10px] font-bold rounded-full border border-orange-500/20 tracking-wider uppercase">{t.needsLocalization}</span>
               )}
             </div>
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-xl font-bold text-gray-100 leading-tight">{video.title}</h3>
-              <button onClick={copyTitle} className="p-1 hover:bg-[#444] rounded transition-colors" title="제목 복사">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 hover:text-white"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-              </button>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-tight group-hover:text-purple-300 transition-colors">
+                  {video.title}
+                </h3>
+                <button onClick={copyTitle} className="p-2 hover:bg-white/10 rounded-xl transition-all text-gray-500 hover:text-white" title={t.copyTitle}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                </button>
+              </div>
+              <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: video.summary }} />
             </div>
-            <div
-              className="text-sm text-gray-400 line-clamp-2"
-              dangerouslySetInnerHTML={{ __html: video.summary }}
-            />
           </div>
-          <div className="flex gap-2 ml-4">
-            {/* Meta button shows if NOT Korean title OR always for regeneration */}
+
+          <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-32 shrink-0">
             <button
               onClick={() => onRegenerateMetadata(video.id || '')}
-              className="group flex items-center gap-2 px-3 py-2 bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white rounded-lg border border-blue-600/20 transition-all"
-              title="메타데이터 재생성 (한글)"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl border border-blue-500/20 transition-all text-xs font-bold"
             >
-              <RefreshCw size={16} className="group-hover:rotate-180 transition-transform duration-500" />
-              <span className="font-semibold text-xs">Meta</span>
+              <RefreshCw size={14} /> {t.meta}
             </button>
             <button
               onClick={onDownload}
               disabled={!video.filePath}
               className={cn(
-                "group flex items-center gap-2 px-3 py-2 rounded-lg border transition-all",
+                "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-xs font-bold",
                 video.filePath
-                  ? "bg-purple-600/10 hover:bg-purple-600 text-purple-400 hover:text-white border-purple-600/20"
-                  : "bg-gray-700 text-gray-400 border-gray-600 cursor-not-allowed opacity-75 hover:opacity-100"
+                  ? "bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white border-purple-500/20"
+                  : "bg-gray-800/50 text-gray-600 border-white/5 cursor-not-allowed"
               )}
-              title={video.filePath ? "Download MP4" : "File not found (Generating...)"}
             >
-              <Download size={16} className={video.filePath ? "group-hover:scale-110 transition-transform" : ""} />
-              <span className="font-semibold text-xs">Download</span>
+              <Download size={14} /> {t.getMp4}
             </button>
             <button
               onClick={() => onDelete(video.id || '')}
-              className="flex items-center gap-2 px-3 py-2 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-lg border border-red-500/20 transition-all"
-              title="영상 삭제"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl border border-rose-500/20 transition-all text-xs font-bold"
             >
-              <Trash2 size={16} />
-              <span className="font-semibold text-xs">Delete</span>
+              <Trash2 size={14} /> {t.kill}
             </button>
           </div>
         </div>
 
-        {/* Description with Copy Button */}
+        {/* Dynamic Content */}
         {video.description && (
-          <div className="bg-[#222] p-4 rounded-lg mb-4">
-            <div className="flex justify-between items-start mb-2">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">설명</span>
-              <button onClick={copyDescription} className="flex items-center gap-1 px-2 py-1 bg-green-600/10 hover:bg-green-600 text-green-400 hover:text-white rounded text-xs transition-all" title="설명+출처+태그 복사">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
-                복사
+          <div className="mt-8 bg-black/20 rounded-2xl p-5 border border-white/5">
+            <div className="flex justify-between items-center mb-3">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{t.masterScript}</span>
+              <button onClick={copyDescription} className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg text-[10px] font-bold transition-all border border-emerald-500/20">
+                <ShieldCheck size={12} /> {t.copyFullMeta}
               </button>
             </div>
-            <p className="text-sm text-gray-300 leading-relaxed">{video.description}</p>
+            <p className="text-sm text-gray-300 leading-relaxed font-normal">{video.description}</p>
           </div>
         )}
 
-        {/* Metadata Grid */}
-        <div className="grid grid-cols-2 gap-4 bg-[#222] p-4 rounded-lg">
-          <div>
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Tags</span>
-            <div className="flex flex-wrap gap-1.5">
-              {video.tags?.slice(0, 8).map(tag => (
-                <span key={tag} className="px-2 py-0.5 bg-[#333] text-gray-300 text-xs rounded">#{tag}</span>
+        {/* Intelligence Grid */}
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-3">{t.aiContextTags}</span>
+            <div className="flex flex-wrap gap-2">
+              {video.tags?.slice(0, 10).map(tag => (
+                <span key={tag} className="px-2.5 py-1 bg-white/5 text-gray-400 text-[10px] font-medium rounded-lg border border-white/5 hover:border-purple-500/30 transition-colors cursor-default">#{tag}</span>
               ))}
-              {(!video.tags || video.tags.length === 0) && <span className="text-xs text-gray-600">-</span>}
+              {(!video.tags || video.tags.length === 0) && <span className="text-xs text-gray-600 italic">No tags detected</span>}
             </div>
           </div>
-          <div>
-            <span className="text-xs font-medium text-gray-500 uppercase tracking-wider block mb-1">Sources</span>
-            <div className="space-y-1">
+          <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-3">{t.verificationSources}</span>
+            <div className="grid grid-cols-1 gap-2">
               {video.sources?.map((source, idx) => (
-                <a key={idx} href={getSourceUrl(source)} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 hover:underline cursor-pointer truncate">
-                  <ExternalLink size={10} /> {source}
+                <a key={idx} href={getSourceUrl(source)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[11px] text-sky-400 hover:text-sky-300 transition-colors truncate">
+                  <ExternalLink size={12} /> {source}
                 </a>
               ))}
-              {(!video.sources || video.sources.length === 0) && <span className="text-xs text-gray-600">-</span>}
+              {(!video.sources || video.sources.length === 0) && <span className="text-xs text-gray-600 italic">No sources linked</span>}
             </div>
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-[#333] flex justify-between items-center text-xs text-gray-500">
-          <div className="flex items-center gap-4">
-            <span>Created: {new Date(video.createdAt).toLocaleString()}</span>
+        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <span className="flex items-center gap-2"><Clock size={12} className="text-purple-500" /> {new Date(video.createdAt).toLocaleString()}</span>
             {video.youtubeUrl && (
-              <a href={video.youtubeUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-red-400 hover:text-red-300 hover:underline">
-                <PlayCircle size={14} /> Watch on YouTube
+              <a href={video.youtubeUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-rose-500 hover:text-rose-400 transition-colors">
+                <Youtube size={14} /> {t.watchOnYoutube}
               </a>
             )}
             {!video.youtubeUrl && video.status !== 'UPLOADED' && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <span className="text-gray-600">{t.syncLink}:</span>
                 <input
                   type="text"
-                  placeholder="Paste YouTube URL"
-                  className="bg-[#333] border border-[#444] rounded px-2 py-1 text-xs w-40 focus:border-purple-500 outline-none"
+                  placeholder={t.pasteYoutubeUrl}
+                  className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] w-48 focus:border-purple-500/50 outline-none transition-all lowercase"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       const url = (e.target as HTMLInputElement).value;
@@ -647,7 +847,7 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, on
               </div>
             )}
           </div>
-          <div>ID: {video.id}</div>
+          <div className="font-mono opacity-40">{t.nodeId}: {video.id}</div>
         </div>
       </div>
     </div>

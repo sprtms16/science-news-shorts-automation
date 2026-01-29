@@ -87,10 +87,25 @@ services:
   frontend-server:
     build: ./frontend
     container_name: shorts-frontend
-    ports:
-      - "3000:80"
+    network_mode: "service:tailscale"
     depends_on:
+      - tailscale
       - shorts-controller
+    restart: unless-stopped
+
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: tailscale
+    hostname: shorts-admin
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+    volumes:
+      - ./tailscale_state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
     restart: unless-stopped
 
 volumes:
