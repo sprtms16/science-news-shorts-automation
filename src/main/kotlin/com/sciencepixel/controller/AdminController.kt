@@ -1,7 +1,7 @@
 package com.sciencepixel.controller
 
 import com.sciencepixel.domain.SystemPrompt
-import com.sciencepixel.domain.SystemPromptRepository
+import com.sciencepixel.repository.SystemPromptRepository
 import com.sciencepixel.domain.VideoHistory
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.GeminiService
@@ -16,6 +16,11 @@ import java.io.File
 import java.nio.file.Paths
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+import com.sciencepixel.service.ProductionService
+import com.sciencepixel.repository.SystemSettingRepository
+import com.sciencepixel.domain.SystemSetting
 
 @RestController
 @RequestMapping("/admin")
@@ -24,7 +29,10 @@ class AdminController(
     private val videoRepository: VideoHistoryRepository,
     private val promptRepository: SystemPromptRepository,
     private val geminiService: GeminiService,
-    private val eventPublisher: com.sciencepixel.event.KafkaEventPublisher
+    private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher, // Renamed to avoid conflict
+    private val productionService: ProductionService,
+    private val systemSettingRepository: SystemSettingRepository,
+    private val cleanupService: com.sciencepixel.service.CleanupService
 ) {
 
     @PostMapping("/videos/{id}/metadata/regenerate")
@@ -115,7 +123,7 @@ class AdminController(
             val nextStatus = if (video.status == "UPLOADED") "UPLOADED" else "REGENERATING"
             videoRepository.save(video.copy(status = nextStatus, updatedAt = LocalDateTime.now()))
             
-            eventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
+            kafkaEventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
                 videoId = video.id ?: "",
                 title = video.title,
                 summary = video.summary,
@@ -174,6 +182,27 @@ class AdminController(
         return videoRepository.findById(id).map { ResponseEntity.ok(it) }.orElse(ResponseEntity.notFound().build())
     }
 
+    @DeleteMapping("/videos/{id}")
+    fun deleteVideo(@PathVariable id: String): ResponseEntity<Map<String, Any>> {
+        val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
+        
+        try {
+            // 1. Delete physical file if exists
+            if (video.filePath.isNotBlank()) {
+                cleanupService.deleteVideoFile(video.filePath)
+            }
+            
+            // 2. Delete DB record
+            videoRepository.deleteById(id)
+            
+            println("🗑️ Manually deleted video record and file: ${video.id}")
+            return ResponseEntity.ok(mapOf("status" to "success", "message" to "Video deleted successfully"))
+        } catch (e: Exception) {
+            println("❌ Error deleting video ${video.id}: ${e.message}")
+            return ResponseEntity.internalServerError().body(mapOf("status" to "error", "message" to (e.message ?: "Unknown error")))
+        }
+    }
+
     @PutMapping("/videos/{id}/status")
     fun updateVideoStatus(@PathVariable id: String, @RequestBody request: UpdateStatusRequest): ResponseEntity<VideoHistory> {
         val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
@@ -213,7 +242,7 @@ class AdminController(
             if (resource.exists() && resource.isReadable) {
                 ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("video/mp4"))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${video.id}.mp4\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${URLEncoder.encode(video.title, StandardCharsets.UTF_8.toString()).replace("+", "%20")}.mp4\"")
                     .body(resource)
             } else ResponseEntity.notFound().build()
         } catch (e: Exception) {
@@ -231,6 +260,187 @@ class AdminController(
 
     @PostMapping("/prompts")
     fun savePrompt(@RequestBody prompt: SystemPrompt): SystemPrompt = promptRepository.save(prompt.copy(updatedAt = LocalDateTime.now()))
+
+    @PostMapping("/videos/cleanup-sensitive")
+    fun cleanupSensitiveVideos(): ResponseEntity<Map<String, Any>> {
+        val videos = videoRepository.findAll()
+            .filter { it.status != "UPLOADED" } // 이미 업로드된 영상은 스킵
+            .sortedByDescending { it.createdAt }
+            .take(20) // 최신 20개만 집중 검사 (API 429 방지)
+            
+        var deletedCount = 0
+        videos.forEach { video ->
+            if (!geminiService.checkSensitivity(video.title, video.summary)) {
+                if (video.filePath.isNotBlank()) {
+                    cleanupService.deleteVideoFile(video.filePath)
+                }
+                videoRepository.delete(video)
+                deletedCount++
+                println("⛔ Safety Cleanup: Deleted sensitive video '${video.title}'")
+            }
+        }
+        return ResponseEntity.ok(mapOf(
+            "deletedCount" to deletedCount,
+            "message" to "Safety cleanup finished for latest 20 items."
+        ))
+    }
+
+    @PostMapping("/videos/cleanup-failed")
+    fun cleanupFailedVideos(): ResponseEntity<Map<String, Any>> {
+        try {
+            cleanupService.cleanupFailedVideos()
+            return ResponseEntity.ok(mapOf("message" to "Failed videos cleanup triggered successfully"))
+        } catch (e: Exception) {
+            return ResponseEntity.internalServerError().body(mapOf("error" to (e.message ?: "Unknown error")))
+        }
+    }
+
+    @PostMapping("/maintenance/deep-cleanup")
+    fun deepCleanup(): ResponseEntity<Map<String, Any>> {
+        val allVideos = videoRepository.findAll()
+        var deletedCount = 0
+        
+        allVideos.forEach { video ->
+            val fileExists = if (video.filePath.isNotBlank()) File(video.filePath).exists() else false
+            val isUploaded = video.status == "UPLOADED"
+            
+            // "유튜브에 올라간 것(UPLOADED)과 영상파일이 만들어진 것(fileExists)을 제외한 나머지" 삭제
+            if (!isUploaded && !fileExists) {
+                videoRepository.delete(video)
+                deletedCount++
+                println("🗑️ Deep Cleanup: Deleted inconsistent record '${video.title}' (Status: ${video.status})")
+            }
+        }
+        
+        return ResponseEntity.ok(mapOf(
+            "deletedCount" to deletedCount,
+            "remainingCount" to videoRepository.count(),
+            "message" to "Deep cleanup completed. Only UPLOADED or records with existing files preserved."
+        ))
+    }
+
+    // System Settings API
+    @GetMapping("/settings")
+    fun getAllSettings(): List<SystemSetting> = systemSettingRepository.findAll()
+
+    @GetMapping("/settings/{key}")
+    fun getSetting(@PathVariable key: String): ResponseEntity<SystemSetting> {
+        return systemSettingRepository.findById(key)
+            .map { ResponseEntity.ok(it) }
+            .orElse(ResponseEntity.notFound().build())
+    }
+
+    @PostMapping("/maintenance/sync-uploaded")
+    fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
+        val videos = videoRepository.findAll().filter { 
+            it.youtubeUrl.isNotBlank() && it.status != "UPLOADED" 
+        }
+        var updatedCount = 0
+
+        videos.forEach { video ->
+            try {
+                // Delete file if exists
+                if (video.filePath.isNotBlank()) {
+                    val file = File(video.filePath)
+                    if (file.exists()) {
+                        file.delete()
+                    }
+                }
+                
+                videoRepository.save(video.copy(
+                    status = "UPLOADED",
+                    filePath = "",
+                    updatedAt = LocalDateTime.now()
+                ))
+                updatedCount++
+            } catch (e: Exception) {
+                println("❌ Sync Error for ${video.id}: ${e.message}")
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "syncedCount" to updatedCount,
+            "message" to "$updatedCount videos synced to UPLOADED status."
+        ))
+    }
+
+    @PostMapping("/settings")
+    fun saveSetting(@RequestBody setting: SystemSetting): SystemSetting {
+        return systemSettingRepository.save(setting.copy(updatedAt = LocalDateTime.now()))
+    }
+
+    @PostMapping("/maintenance/repair-all")
+    fun repairSystem(): ResponseEntity<Map<String, Any>> {
+        val videos = videoRepository.findAll()
+        var localizedCount = 0
+        var regenTriggeredCount = 0
+        var fileCleanedCount = 0
+
+        val englishPattern = Regex("^[\\x00-\\x7F]*$") // ASCII check (rough English check)
+
+        videos.forEach { video ->
+            try {
+                var currentVideo = video
+                var needsSave = false
+                var needsRegen = false
+
+                // 1. Localization Check (If title is purely English or Tags empty)
+                if (englishPattern.matches(video.title) || video.tags.isEmpty()) {
+                    val newMeta = geminiService.regenerateMetadataOnly(video.title, video.summary)
+                    currentVideo = currentVideo.copy(
+                        title = newMeta.title,
+                        description = newMeta.description,
+                        tags = newMeta.tags,
+                        sources = newMeta.sources
+                    )
+                    needsSave = true
+                    localizedCount++
+                    // User requested regen after localization
+                    needsRegen = true
+                }
+
+                // 2. File Sync Check
+                val file = File(video.filePath)
+                if (video.status == "COMPLETED" || video.status == "UPLOADED") {
+                    if (!file.exists()) {
+                         // File missing -> Trigger Regeneration
+                         needsRegen = true
+                    }
+                }
+
+                if (needsRegen && video.status != "PROCESSING" && video.status != "REGENERATING") {
+                    currentVideo = currentVideo.copy(status = "REGENERATING", regenCount = video.regenCount + 1)
+                    needsSave = true
+                    
+                    // Trigger Regeneration Event
+                    kafkaEventPublisher.publishRegenerationRequested(
+                        com.sciencepixel.event.RegenerationRequestedEvent(
+                            videoId = currentVideo.id!!,
+                            title = currentVideo.title,
+                            summary = currentVideo.summary,
+                            link = currentVideo.link,
+                            regenCount = currentVideo.regenCount
+                        )
+                    )
+                    regenTriggeredCount++
+                }
+
+                if (needsSave) {
+                    videoRepository.save(currentVideo)
+                }
+
+            } catch (e: Exception) {
+                println("❌ Repair Error for ${video.id}: ${e.message}")
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "totalChecked" to videos.size,
+            "localized" to localizedCount,
+            "regenerationTriggered" to regenTriggeredCount,
+            "message" to "Deep repair complete. Monitoring logic will pick up regenerations."
+        ))
+    }
 }
 
 data class UpdateStatusRequest(val status: String, val youtubeUrl: String? = null)

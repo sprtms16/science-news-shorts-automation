@@ -10,7 +10,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  PlayCircle
+  PlayCircle,
+  Settings,
+  Trash2
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -20,11 +22,14 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings'>('videos');
   const [videos, setVideos] = useState<VideoHistory[]>([]);
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
+  const [settings, setSettings] = useState<any[]>([]);
   const [toolsResult, setToolsResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   useEffect(() => {
     fetchData();
@@ -36,9 +41,14 @@ function App() {
       if (activeTab === 'videos') {
         const res = await axios.get('/admin/videos');
         setVideos(res.data);
-      } else {
+      } else if (activeTab === 'prompts') {
         const res = await axios.get('/admin/prompts');
         setPrompts(res.data);
+      } else if (activeTab === 'settings') {
+        try {
+          const res = await axios.get('/admin/settings');
+          setSettings(res.data);
+        } catch (e) { console.error(e); }
       }
     } catch (error) {
       console.error("Failed to fetch data", error);
@@ -77,14 +87,18 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files') => {
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
     try {
-      const res = await axios.post(`/admin/videos/${action}`);
+      const endpoint = action === 'sync-uploaded' ? `/admin/maintenance/sync-uploaded` :
+        action === 'cleanup-sensitive' ? `/admin/videos/cleanup-sensitive` :
+          `/admin/videos/${action}`;
+      const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");
+      await fetchData();
     } catch (e) {
       alert("Action failed");
       console.error(e);
@@ -101,6 +115,31 @@ function App() {
     } catch (e) {
       alert("Failed to update status");
       console.error(e);
+    }
+  };
+
+  const onDeleteVideo = async (id: string) => {
+    if (!confirm("이 영상을 정말 삭제하시겠습니까? (파일과 데이터가 영구 삭제됩니다)")) return;
+    setLoading(true);
+    try {
+      await axios.delete(`/admin/videos/${id}`);
+      await fetchData();
+      alert("영상 삭제 성공");
+    } catch (e) {
+      alert("영상 삭제 실패");
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveSetting = async (key: string, value: string, desc: string) => {
+    try {
+      await axios.post('/admin/settings', { key, value, description: desc });
+      alert("Setting saved!");
+      fetchData();
+    } catch (e) {
+      alert("Failed to save setting");
     }
   };
 
@@ -134,6 +173,12 @@ function App() {
             active={activeTab === 'tools'}
             onClick={() => setActiveTab('tools')}
           />
+          <NavItem
+            icon={<Settings size={20} />}
+            label="Settings"
+            active={activeTab === 'settings'}
+            onClick={() => setActiveTab('settings')}
+          />
         </nav>
 
         <div className="p-4 border-t border-[#333]">
@@ -145,7 +190,9 @@ function App() {
       <main className="ml-64 p-8">
         <header className="flex justify-between items-center mb-8">
           <h2 className="text-3xl font-bold text-gray-100">
-            {activeTab === 'videos' ? 'Video Management' : activeTab === 'prompts' ? 'System Prompts' : 'Maintenance Tools'}
+            {activeTab === 'videos' ? 'Video Management' :
+              activeTab === 'prompts' ? 'System Prompts' :
+                activeTab === 'settings' ? 'System Configuration' : 'Maintenance Tools'}
           </h2>
           <button
             onClick={fetchData}
@@ -159,13 +206,76 @@ function App() {
 
         {activeTab === 'videos' && (
           <div className="grid gap-6">
-            {videos.map(video => (
+            {/* Filter Bar */}
+            <div className="flex flex-wrap gap-4 bg-[#2a2a2a] p-4 rounded-xl border border-[#333] shadow-md">
+              <div className="flex-1 min-w-[200px]">
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Search Title</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="영상 제목으로 검색..."
+                    className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-4 py-2 text-sm text-gray-100 focus:border-purple-500 outline-none transition-all"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-48">
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Status / Upload</label>
+                <select
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-2 text-sm text-gray-100 focus:border-purple-500 outline-none cursor-pointer appearance-none"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'white\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.75rem center', backgroundSize: '1rem' }}
+                >
+                  <option value="ALL">전체 보기</option>
+                  <option value="UPLOADED">✅ 유튜브 업로드 완료</option>
+                  <option value="NOT_UPLOADED">⏳ 미업로드 영상</option>
+                  <option value="PROCESSING">⚙️ 제작 중 (Processing)</option>
+                  <option value="COMPLETED">📦 제작 완료 (대기 중)</option>
+                  <option value="ERROR">❌ 에러 발생</option>
+                  <option value="REGENERATING">🔄 재생성 중</option>
+                </select>
+              </div>
+
+              <div className="flex items-end pb-1">
+                <div className="text-xs text-gray-500 bg-[#333] px-3 py-2 rounded-lg border border-[#444]">
+                  Total: <span className="text-purple-400 font-bold">{videos.filter(v => {
+                    const matchesSearch = v.title.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchesStatus = statusFilter === 'ALL' ? true :
+                      statusFilter === 'UPLOADED' ? v.status === 'UPLOADED' :
+                        statusFilter === 'NOT_UPLOADED' ? v.status !== 'UPLOADED' :
+                          v.status === statusFilter;
+                    return matchesSearch && matchesStatus;
+                  }).length}</span> / {videos.length}
+                </div>
+              </div>
+            </div>
+
+            {videos.filter(v => {
+              const matchesSearch = v.title.toLowerCase().includes(searchTerm.toLowerCase());
+              const matchesStatus = statusFilter === 'ALL' ? true :
+                statusFilter === 'UPLOADED' ? v.status === 'UPLOADED' :
+                  statusFilter === 'NOT_UPLOADED' ? v.status !== 'UPLOADED' :
+                    v.status === statusFilter;
+              return matchesSearch && matchesStatus;
+            }).map(video => (
               <VideoCard
                 key={video.id}
                 video={video}
                 onDownload={() => downloadVideo(video.id || '', video.title)}
                 onRegenerateMetadata={onRegenerateMetadata}
                 onUpdateStatus={updateVideoStatus}
+                onDelete={onDeleteVideo}
               />
             ))}
             {videos.length === 0 && !loading && (
@@ -249,6 +359,38 @@ function App() {
                     재생성 시작
                   </button>
                 </div>
+
+                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-red-500/30 transition-all col-span-2">
+                  <h4 className="font-bold text-red-500 mb-2 flex items-center gap-2">
+                    <AlertCircle size={18} /> 민감 영상 소급 정리 (Safety Cleanup)
+                  </h4>
+                  <p className="text-sm text-gray-400 mb-4">
+                    모든 영상을 스캔하여 정치/종교/사회 갈등 유발 가능성이 있는 영상을 즉시 삭제합니다. (30분 주기 자동 실행됨)
+                  </p>
+                  <button
+                    onClick={() => runBatchAction('cleanup-sensitive')}
+                    disabled={loading}
+                    className="w-full py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
+                  >
+                    소급 정리 시작
+                  </button>
+                </div>
+
+                <div className="p-6 bg-[#222] rounded-xl border border-[#333] hover:border-blue-400/30 transition-all col-span-2">
+                  <h4 className="font-bold text-blue-400 mb-2 flex items-center gap-2">
+                    <RefreshCw size={18} /> 유튜브 업로드 상태 동기화
+                  </h4>
+                  <p className="text-sm text-gray-400 mb-4">
+                    유튜브 링크가 입력되어 있는 영상들의 상태를 일괄적으로 `UPLOADED`로 변경하고 용량을 차지하는 로컬 비디오 파일을 삭제합니다.
+                  </p>
+                  <button
+                    onClick={() => runBatchAction('sync-uploaded')}
+                    disabled={loading}
+                    className="w-full py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white rounded-lg font-bold transition-colors"
+                  >
+                    동기화 실행
+                  </button>
+                </div>
               </div>
 
               {toolsResult && (
@@ -259,6 +401,63 @@ function App() {
                   </pre>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl grid gap-6">
+            <div className="bg-[#2a2a2a] p-8 rounded-2xl border border-[#333]">
+              <h3 className="text-xl font-bold mb-6 text-purple-400">영상 생성 설정</h3>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">최대 생성 유지 개수 (Buffer Size)</label>
+                  <div className="flex gap-4">
+                    <input
+                      type="number"
+                      className="bg-[#1a1a1a] border border-[#333] rounded px-4 py-2 text-white w-32 focus:border-purple-500 outline-none"
+                      defaultValue={settings.find(s => s.key === 'MAX_GENERATION_LIMIT')?.value || '10'}
+                      id="maxGenInput"
+                    />
+                    <button
+                      onClick={() => {
+                        const val = (document.getElementById('maxGenInput') as HTMLInputElement).value;
+                        saveSetting('MAX_GENERATION_LIMIT', val, 'Max unuploaded videos to keep buffered');
+                      }}
+                      className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-bold"
+                    >
+                      저장
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    * 업로드 되지 않은(COMPLETED) 영상이 이 개수보다 적으면 자동으로 생성을 시작합니다.<br />
+                    * 이 개수에 도달하면 생성을 멈추고 대기합니다.
+                  </p>
+                </div>
+
+                <div className="pt-6 border-t border-[#333]">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">현재 업로드 차단 (Quota Limit)</label>
+                  {settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL') ? (
+                    <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
+                      <p className="text-red-400 font-bold mb-1">⛔ 업로드가 차단됨</p>
+                      <p className="text-sm text-gray-400">
+                        해제 예정 시간: {new Date(settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL')?.value).toLocaleString()}
+                      </p>
+                      <button
+                        onClick={() => saveSetting('UPLOAD_BLOCKED_UNTIL', '', 'Force Unblock')}
+                        className="mt-3 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                      >
+                        강제 해제 (Force Unblock)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
+                      <p className="text-green-400 font-bold">✅ 정상 (업로드 가능)</p>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -284,7 +483,7 @@ function NavItem({ icon, label, active, onClick }: { icon: any, label: string, a
   );
 }
 
-function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus }: { video: VideoHistory, onDownload: () => void, onRegenerateMetadata: (id: string) => void, onUpdateStatus: (id: string, status: string, url?: string) => void }) {
+function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete }: { video: VideoHistory, onDownload: () => void, onRegenerateMetadata: (id: string) => void, onUpdateStatus: (id: string, status: string, url?: string) => void, onDelete: (id: string) => void }) {
   const statusColors: Record<string, string> = {
     'COMPLETED': 'text-green-400 bg-green-400/10 border-green-400/20',
     'PENDING_PROCESSING': 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20',
@@ -374,6 +573,14 @@ function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus }: 
             >
               <Download size={16} className={video.filePath ? "group-hover:scale-110 transition-transform" : ""} />
               <span className="font-semibold text-xs">Download</span>
+            </button>
+            <button
+              onClick={() => onDelete(video.id || '')}
+              className="flex items-center gap-2 px-3 py-2 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white rounded-lg border border-red-500/20 transition-all"
+              title="영상 삭제"
+            >
+              <Trash2 size={16} />
+              <span className="font-semibold text-xs">Delete</span>
             </button>
           </div>
         </div>

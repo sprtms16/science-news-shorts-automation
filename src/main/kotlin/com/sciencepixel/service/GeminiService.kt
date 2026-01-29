@@ -3,6 +3,7 @@ package com.sciencepixel.service
 import org.springframework.stereotype.Service
 import org.springframework.beans.factory.annotation.Value
 import okhttp3.*
+import com.sciencepixel.domain.SystemPrompt
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import org.json.JSONArray
@@ -25,7 +26,7 @@ data class ScriptResponse(
 @Service
 class GeminiService(
     @Value("\${gemini.api-key}") private val apiKeyString: String,
-    private val promptRepository: com.sciencepixel.domain.SystemPromptRepository
+    private val promptRepository: com.sciencepixel.repository.SystemPromptRepository
 ) {
     private val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).build()
     private val CHANNEL_NAME = "사이언스 픽셀"
@@ -35,67 +36,115 @@ class GeminiService(
         apiKeyString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
     
-    // 각 키별 실패 횟수 추적 (HTTP 429 Rate Limit 에러)
-    private val keyFailureCount = ConcurrentHashMap<String, AtomicInteger>()
-    
-    // 마지막 실패 시간 추적 (쿨다운용)
-    private val keyLastFailureTime = ConcurrentHashMap<String, Long>()
-    
-    // 쿨다운 시간 (10분)
-    private val COOLDOWN_MS = 10 * 60 * 1000L
+    // 할당량 제한 정의
+    companion object {
+        private const val MAX_RPM = 5
+        private const val MAX_TPM = 250_000
+        private const val MAX_RPD = 20
+        private const val COOLDOWN_MS = 10 * 60 * 1000L
+        
+        // 지원 모델 풀 (각 모델별로 별도 할당량이 존재함)
+        private val SUPPORTED_MODELS = listOf("gemini-3-flash-preview", "gemini-2.5-flash")
+    }
+
+    // 각 (키 + 모델) 조합별 할당량 추적 클래스
+    private class QuotaTracker {
+        val requestTimestamps = mutableListOf<Long>()
+        val tokenUsages = mutableListOf<Pair<Long, Int>>()
+        var dailyRequestCount = 0
+        var lastResetDate = java.time.LocalDate.now()
+        var failureCount = AtomicInteger(0)
+        var lastFailureTime = 0L
+
+        @Synchronized
+        fun checkAndResetDaily() {
+            val today = java.time.LocalDate.now()
+            if (today != lastResetDate) {
+                dailyRequestCount = 0
+                lastResetDate = today
+                println("📅 Daily quota reset for a model combination.")
+            }
+        }
+
+        @Synchronized
+        fun getCurrentRPM(): Int {
+            val now = System.currentTimeMillis()
+            requestTimestamps.removeIf { now - it > 60_000 }
+            return requestTimestamps.size
+        }
+
+        @Synchronized
+        fun isAvailable(): Boolean {
+            checkAndResetDaily()
+            val now = System.currentTimeMillis()
+            if (now - lastFailureTime < COOLDOWN_MS) return false
+            if (dailyRequestCount >= MAX_RPD) return false
+            if (getCurrentRPM() >= MAX_RPM) return false
+            return true
+        }
+
+        @Synchronized
+        fun recordAttempt() {
+            requestTimestamps.add(System.currentTimeMillis())
+            dailyRequestCount++
+        }
+
+        @Synchronized
+        fun recordSuccess(tokens: Int) {
+            failureCount.set(0)
+            tokenUsages.add(System.currentTimeMillis() to tokens)
+        }
+
+        @Synchronized
+        fun recordFailure() {
+            failureCount.incrementAndGet()
+            lastFailureTime = System.currentTimeMillis()
+        }
+    }
+
+    // Key format: "API_KEY:MODEL_NAME"
+    private val combinedQuotas = ConcurrentHashMap<String, QuotaTracker>()
 
     init {
-        // 키 초기화
         apiKeys.forEach { key ->
-            keyFailureCount[key] = AtomicInteger(0)
-            keyLastFailureTime[key] = 0L
+            SUPPORTED_MODELS.forEach { model ->
+                combinedQuotas["$key:$model"] = QuotaTracker()
+            }
         }
-        println("🔑 Gemini API Keys Loaded: ${apiKeys.size}개")
+        println("🔑 Gemini API Keys Loaded: ${apiKeys.size}개, Models: ${SUPPORTED_MODELS.size}개")
+        println("🚀 Total Daily Capacity: ${apiKeys.size * SUPPORTED_MODELS.size * MAX_RPD} requests")
     }
 
+    data class KeyModelSelection(val apiKey: String, val modelName: String)
+
     /**
-     * 스마트 키 선택: 실패 횟수가 가장 적고 쿨다운이 끝난 키 선택
+     * 스마트 키/모델 선택: 할당량이 남은 최적의 조합 선택
      */
-    private fun getSmartKey(): String {
-        if (apiKeys.isEmpty()) return ""
+    private fun getSmartKeyAndModel(): KeyModelSelection? {
+        if (apiKeys.isEmpty()) return null
         
-        val now = System.currentTimeMillis()
-        
-        // 쿨다운이 끝난 키들 중에서 실패 횟수가 가장 적은 키 선택
-        val availableKeys = apiKeys.filter { key ->
-            val lastFailure = keyLastFailureTime[key] ?: 0L
-            now - lastFailure > COOLDOWN_MS
+        // 사용 가능한 모든 조합 생성 후 필터링
+        val availablePairs = mutableListOf<KeyModelSelection>()
+        apiKeys.forEach { key ->
+            SUPPORTED_MODELS.forEach { model ->
+                if (combinedQuotas["$key:$model"]?.isAvailable() == true) {
+                    availablePairs.add(KeyModelSelection(key, model))
+                }
+            }
         }
         
-        // 모든 키가 쿨다운 중이면 가장 오래전에 실패한 키 사용
-        val keysToChoose = if (availableKeys.isEmpty()) {
-            println("⚠️ 모든 키가 쿨다운 중... 가장 오래된 키 선택")
-            apiKeys.sortedBy { keyLastFailureTime[it] ?: 0L }
-        } else {
-            availableKeys.sortedBy { keyFailureCount[it]?.get() ?: 0 }
+        if (availablePairs.isEmpty()) {
+            println("⚠️ All Gemini Key/Model combinations are at their limit.")
+            return null
         }
         
-        val selectedKey = keysToChoose.first()
-        val failCount = keyFailureCount[selectedKey]?.get() ?: 0
-        println("🔑 Selected Key: ${selectedKey.take(8)}... (Failures: $failCount)")
-        
-        return selectedKey
-    }
-    
-    /**
-     * 키 실패 기록
-     */
-    private fun recordKeyFailure(key: String) {
-        keyFailureCount[key]?.incrementAndGet()
-        keyLastFailureTime[key] = System.currentTimeMillis()
-        println("❌ Key Failure Recorded: ${key.take(8)}... (Total: ${keyFailureCount[key]?.get()})")
-    }
-    
-    /**
-     * 키 성공 시 실패 카운트 리셋
-     */
-    private fun recordKeySuccess(key: String) {
-        keyFailureCount[key]?.set(0)
+        // 남은 일일 할당량이 가장 많은 것(사용량이 적은 것) 선택, 고성능 모델(gemini-3) 우선
+        return availablePairs.sortedWith(compareBy<KeyModelSelection> { 
+            combinedQuotas["${it.apiKey}:${it.modelName}"]?.dailyRequestCount ?: 0
+        }.thenBy { 
+            // gemini-3를 우선시하도록 인덱스로 가중치
+            SUPPORTED_MODELS.indexOf(it.modelName)
+        }).firstOrNull()
     }
     
     /**
@@ -103,18 +152,30 @@ class GeminiService(
      */
     private fun callGeminiWithRetry(prompt: String, maxRetries: Int = 3): String? {
         var lastError: Exception? = null
-        val triedKeys = mutableSetOf<String>()
+        val triedCombinations = mutableSetOf<String>()
         
         repeat(maxRetries) { attempt ->
-            val apiKey = getSmartKey()
+            val selection = getSmartKeyAndModel()
             
-            // 같은 키를 반복 시도하는 경우 스킵
-            if (apiKey in triedKeys && triedKeys.size < apiKeys.size) {
+            if (selection == null) {
+                println("⏳ No available Key/Model pairs. Waiting 10 seconds... (${attempt + 1}/$maxRetries)")
+                Thread.sleep(10000)
                 return@repeat
             }
-            triedKeys.add(apiKey)
+
+            val apiKey = selection.apiKey
+            val modelName = selection.modelName
+            val combinedKey = "$apiKey:$modelName"
             
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+            if (combinedKey in triedCombinations && triedCombinations.size < combinedQuotas.size) {
+                 return@repeat
+            }
+            triedCombinations.add(combinedKey)
+            
+            val tracker = combinedQuotas[combinedKey]!!
+            tracker.recordAttempt()
+            
+            val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
             
             val jsonBody = JSONObject().apply {
                 put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
@@ -129,24 +190,28 @@ class GeminiService(
                 val text = response.body?.string() ?: ""
                 
                 if (responseCode == 429) {
-                    println("⚠️ Rate Limit (429) for key: ${apiKey.take(8)}... Trying another key...")
-                    recordKeyFailure(apiKey)
+                    println("⚠️ Rate Limit (429) for combination: $combinedKey... (Daily: ${tracker.dailyRequestCount})")
+                    tracker.recordFailure()
                     lastError = Exception("Rate limit exceeded")
                     response.close()
                     return@repeat
                 }
                 
                 if (responseCode == 200) {
-                    recordKeySuccess(apiKey)
+                    val jsonResponse = JSONObject(text)
+                    val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
+                    tracker.recordSuccess(tokens)
                     return text
                 }
                 
-                println("⚠️ Gemini Response Code: $responseCode")
+                println("⚠️ Gemini Response Code: $responseCode - $text")
+                tracker.recordFailure()
                 lastError = Exception("Gemini API error: $responseCode")
                 response.close()
                 
             } catch (e: Exception) {
                 println("❌ Gemini Network Error: ${e.message}")
+                tracker.recordFailure()
                 lastError = e
             }
         }
@@ -265,7 +330,7 @@ class GeminiService(
         } catch (e: Exception) {
             println("❌ Script Parse Error: ${e.message}")
             println("Response: ${responseText.take(500)}")
-            ScriptResponse(emptyList(), "tech")
+            ScriptResponse(emptyList(), "tech", title = title, description = summary, tags = listOf("Science", "Technology", "Shorts"))
         }
     }
 
@@ -285,8 +350,19 @@ class GeminiService(
             - NO: The image is unrelated, shows watermarks, text overlays, or people's faces
         """.trimIndent()
 
-        val apiKey = getSmartKey()
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val selection = getSmartKeyAndModel()
+        if (selection == null) {
+            println("⚠️ Vision Check: No available Key/Model pairs.")
+            return true
+        }
+        
+        val apiKey = selection.apiKey
+        val modelName = selection.modelName
+        val combinedKey = "$apiKey:$modelName"
+        val tracker = combinedQuotas[combinedKey]!!
+        tracker.recordAttempt()
+        
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
 
         return try {
             // Fetch and encode image
@@ -313,21 +389,32 @@ class GeminiService(
             val response = client.newCall(request).execute()
             val text = response.body?.string() ?: ""
 
-            val answer = JSONObject(text)
-                .getJSONArray("candidates")
-                .getJSONObject(0)
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-                .trim()
-                .uppercase()
+            if (response.code == 200) {
+                val jsonResponse = JSONObject(text)
+                val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
+                tracker.recordSuccess(tokens)
+                
+                val answer = jsonResponse
+                    .getJSONArray("candidates")
+                    .getJSONObject(0)
+                    .getJSONObject("content")
+                    .getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text")
+                    .trim()
+                    .uppercase()
 
-            val isRelevant = answer.contains("YES")
-            println("  Vision Check: $keyword -> $answer (Relevant: $isRelevant)")
-            isRelevant
+                val isRelevant = answer.contains("YES")
+                println("  Vision Check: $keyword -> $answer (Relevant: $isRelevant)")
+                isRelevant
+            } else {
+                println("⚠️ Vision API Error: ${response.code} - $text")
+                tracker.recordFailure()
+                true
+            }
         } catch (e: Exception) {
             println("  Vision Error for '$keyword': ${e.message}")
+            tracker.recordFailure()
             true // Default to true on error
         }
     }
@@ -486,6 +573,109 @@ class GeminiService(
                 title = "${topic}에 대한 놀라운 발견!",
                 summary = "$topic 에 대한 새로운 연구 결과가 발표되었습니다. 이 발견은 우리의 자연에 대한 이해를 바꿀 수 있습니다."
             )
+        }
+    }
+
+    /**
+     * 4. Semantic Similarity Check
+     * Check if the new topic is substantively the same as any of the previous videos.
+     */
+    fun checkSimilarity(newTitle: String, newSummary: String, history: List<com.sciencepixel.domain.VideoHistory>): Boolean {
+        if (history.isEmpty()) return false
+
+        val historyText = history.joinToString("\n") { 
+            "- [${it.id}] ${it.title} (${it.summary.take(50)}...)" 
+        }
+
+        val prompt = """
+            [Task]
+            Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos".
+            Ignore minor differences in wording. Focus on the core event or scientific discovery.
+            
+            [New News Item]
+            Title: $newTitle
+            Summary: $newSummary
+            
+            [Recent Videos]
+            $historyText
+            
+            [Output]
+            Answer ONLY "YES" or "NO".
+            - YES: It is a duplicate.
+            - NO: It is a new topic.
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return false
+        
+        return try {
+            val answer = JSONObject(responseText)
+                .getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .uppercase()
+            
+            val isDuplicate = answer.contains("YES")
+            if (isDuplicate) {
+                println("🤖 Gemini Semantic Check: DUPLICATE detected for '$newTitle'")
+            }
+            isDuplicate
+        } catch (e: Exception) {
+            println("❌ Similarity Check Error: ${e.message}")
+            false // Default to not duplicate if error
+        }
+    }
+
+    /**
+     * 5. Safety & Sensitivity Check
+     * Detects Politics, Religion, Ideology, or Social Conflicts.
+     */
+    fun checkSensitivity(title: String, summary: String): Boolean {
+        val prompt = """
+            [Task]
+            Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for a pure science channel.
+            
+            [Sensitive Topics to Avoid]
+            1. Politics (Elections, Parties, Legislation, Diplomatic conflicts)
+            2. Religion (Doctrines, Figures, Conflicts)
+            3. Ideology (Feminism, Anti-feminism, Racism, Nationalism, Social Movements)
+            4. Social Conflict (War, Terrorism, Protests, Abortion, Death Penalty)
+            
+            [Exception]
+            - Purely scientific/technological news (e.g., "New missile technology", "AI bias research") is SAFE unless it focuses on political/social conflict.
+            
+            [Input News]
+            Title: $title
+            Summary: $summary
+            
+            [Output]
+            Answer ONLY "SAFE" or "UNSAFE".
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return true 
+
+        return try {
+            val answer = JSONObject(responseText)
+                .getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .uppercase()
+            
+            val isUnsafe = answer.contains("UNSAFE")
+            if (isUnsafe) {
+                println("⛔ Safety Filter: UNSAFE topic detected for '$title'")
+            }
+            !isUnsafe // Return TRUE if SAFE
+        } catch (e: Exception) {
+            println("❌ Safety Check Error: ${e.message}")
+            true // Default to SAFE
         }
     }
 }

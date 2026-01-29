@@ -1,7 +1,7 @@
 package com.sciencepixel.service
 
 import com.sciencepixel.domain.QuotaUsage
-import com.sciencepixel.domain.QuotaUsageRepository
+import com.sciencepixel.repository.QuotaUsageRepository
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime

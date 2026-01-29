@@ -16,12 +16,14 @@
 - **Dynamic Video Production**:
   - **FFmpeg Pipeline**: 자막(SRT) 생성, 하드코딩(Burning), 오디오 믹싱, 영상 크롭(9:16) 자동화.
   - **Smart Resource Matching**: 대본의 문맥(Context)을 분석하여 Pexels API에서 최적의 영상 클립 매칭.
+- **Advanced Admin Dashboard (React)**:
+  - **Monitoring**: 영상 제작 및 업로드 상태 실시간 모니터링 및 필터링/검색 지원.
+  - **Maintenance**: 유튜브 링크 동기화, 메타데이터 재생성, 누락 파일 복구 등 매뉴얼 도구 제공.
+  - **Settings**: 동적 버퍼 제한(최대 생성 개수) 및 업로드 차단 해제 시간 설정.
 - **Robust Architecture**:
-  - **EDA (Event-Driven Architecture)**: Kafka를 활용한 비동기 메시지 처리로 대량의 트래픽에도 안정적.
-  - **Reliability**:
-    - **Circuit Breaker**: YouTube API Quota 초과 시 즉시 차단 및 자동 복구.
-    - **Self-Healing**: 파일 손상이나 누락 시 자동으로 감지하여 재생성(Regeneration).
-    - **Cleanup**: 업로드 완료된 리소스 및 임시 파일을 주기적으로 정리하여 디스크 효율화.
+  - **Dual-Lock Quota Guard**: Gemini API 및 YouTube API의 쿼터를 실시간으로 추적하며 최적의 생성 속도 유지.
+  - **Self-Healing**: 파일 손상이나 누락 시 자동으로 감지하여 재생성(Regeneration).
+  - **Cleanup**: 업로드 완료된 리소스 및 1시간 이상 정체된 작업을 주기적으로 정리하여 디스크 효율화.
 
 ## 🛠️ System Architecture
 시스템은 크게 **Ingestion(수집) - Processing(가공) - Production(제작) - Delivery(배포)** 의 4단계 파이프라인으로 구성되어 있습니다.
@@ -102,14 +104,21 @@ graph TD
    - **Kafka UI** (Optional): `http://localhost:9000` (if configured).
 
 ## 💡 Smart Logic Highlights
-### 1. Quota-Aware Scheduling
-YouTube API의 일일 할당량(Quota) 제한을 고려하여, **'One-by-One'** 방식의 순차 업로드를 구현했습니다. `403 Forbidden` 에러 발생 시 회로 차단기(Circuit Breaker)가 작동하여 불필요한 API 호출을 막고 다음 주기를 기다립니다.
+### 1. Quota-Aware Scheduling & Gemini Guard
+- YouTube API의 일일 할당량(Quota) 제한을 고려하여, **'One-by-One'** 방식의 순차 업로드를 구현했습니다.
+- **Gemini Guard**: 다중 API 키를 활용하여 RPM/TPM/RPD를 실시간 추적하며, 429 에러 없이 안정적으로 대본을 생성합니다.
 
-### 2. Self-Healing Regeneration
-네트워크 오류나 FFmpeg 렌더링 실패로 인해 결과물이 누락된 경우 (`FILE_NOT_FOUND`), 시스템이 이를 감지하고 스스로 재생성(`REGENERATING`) 프로세스를 트리거하여 데이터 무결성을 유지합니다.
+### 2. Dual-Lock Buffer Management
+- **Strict Limit**: 업로드되지 않은 영상이 10개를 초과하지 않도록 2단계(Scheduler + Processor)에서 정밀하게 체크합니다.
+- **Auto-Sync**: 수동으로 유튜브 링크를 입력하더라도 즉시 카운트에서 제외되어 제작 파이프라인이 유동적으로 재개됩니다.
 
-### 3. Automated Cleanup
-서버 디스크 공간 관리를 위해 업로드가 확인된(`UPLOADED`) 영상과 1시간 이상 경과한 임시 작업 폴더(`workspace_*`)를 매시 30분마다 자동으로 청소합니다.
+### 3. Self-Healing & Deep Repair
+- 네트워크 오류나 FFmpeg 렌더링 실패로 인해 결과물이 누락된 경우 (`FILE_NOT_FOUND`), 시스템이 이를 감지하고 스스로 재생성(`REGENERATING`) 프로세스를 트리거합니다.
+- **Deep Repair**: DB와 파일 시스템 간의 불일치를 일괄적으로 해결하고 영어 제목을 한글로 복원하는 강력한 관리 도구를 제공합니다.
+
+### 4. Automated Cleanup & Safety
+- 서버 디스크 공간 관리를 위해 업로드 완료된 건과 1시간 이상 정체된 실패 작업을 매시 30분마다 자동으로 청소합니다.
+- **Safety Filter**: Gemini AI를 통해 정치/종교 등 민감한 주제의 뉴스를 생성 단계에서 1차로, 완료 후 2차로 교차 검열하여 채널 안정성을 확보합니다.
 
 ## 📝 Usage (Manual Trigger)
 자동 스케줄러 외에도 API를 통해 수동으로 제어할 수 있습니다.

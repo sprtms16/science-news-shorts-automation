@@ -90,8 +90,18 @@ class ProductionService(
         val sanitizedTitle = title.take(20)
             .replace(Regex("[^a-zA-Z0-9가-힣]"), "_")
             .lowercase()
-        val finalOutput = File(workspace.parentFile, "shorts_${sanitizedTitle}_${System.currentTimeMillis()}.mp4")
+        
+        // Ensure outcome directory exists
+        val outcomeDir = File("shared-data/videos").apply { mkdirs() }
+        val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_${System.currentTimeMillis()}.mp4")
+        
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
+        
+        // Clean up workspace after successful production
+        if (finalOutput.exists() && finalOutput.length() > 0) {
+            println("🧹 Cleaning up workspace for: $title")
+            workspace.deleteRecursively()
+        }
         
         println("✅ Final video with synced subtitles: ${finalOutput.absolutePath}")
         return finalOutput.absolutePath

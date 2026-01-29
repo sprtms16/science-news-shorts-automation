@@ -2,7 +2,6 @@ package com.sciencepixel.domain
 
 import org.springframework.data.annotation.Id
 import org.springframework.data.mongodb.core.mapping.Document
-import org.springframework.data.mongodb.repository.MongoRepository
 import java.time.LocalDateTime
 
 @Document(collection = "video_history")
@@ -48,8 +47,6 @@ data class ProductionResult(
     val sources: List<String> = emptyList()
 )
 
-interface QuotaUsageRepository : MongoRepository<QuotaUsage, String>
-
 @Document(collection = "system_prompt")
 data class SystemPrompt(
     @Id
@@ -59,5 +56,11 @@ data class SystemPrompt(
     val updatedAt: LocalDateTime = LocalDateTime.now()
 )
 
-interface SystemPromptRepository : MongoRepository<SystemPrompt, String>
-
+@Document(collection = "system_setting")
+data class SystemSetting(
+    @Id
+    val key: String, // e.g., "MAX_GENERATION_LIMIT", "UPLOAD_BLOCKED_UNTIL"
+    val value: String,
+    val description: String = "",
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+)

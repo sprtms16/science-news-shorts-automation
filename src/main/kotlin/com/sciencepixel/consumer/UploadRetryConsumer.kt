@@ -15,7 +15,8 @@ import org.springframework.stereotype.Service
 class UploadRetryConsumer(
     private val repository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val cleanupService: com.sciencepixel.service.CleanupService
 ) {
 
     companion object {
@@ -76,10 +77,11 @@ class UploadRetryConsumer(
                         regenCount = video.regenCount
                     ))
                 } else {
-                    // 재생성도 실패한 경우 -> DLQ로 전송
-                    println("💀 Regeneration already attempted. Sending to DLQ.")
-                    repository.save(video.copy(status = "REGEN_FAILED"))
-                    eventPublisher.publishToDeadLetterQueue(event, "Max retries and regeneration failed")
+                    // 재생성도 실패한 경우 -> 파일 및 DB 레코드 삭제
+                    println("💀 Regeneration already attempted. Deleting video record and file.")
+                    cleanupService.deleteVideoFile(video.filePath) 
+                    repository.delete(video) // Delete from DB
+                    eventPublisher.publishToDeadLetterQueue(event, "Max retries and regeneration failed (Record Deleted)")
                 }
             }
         }
