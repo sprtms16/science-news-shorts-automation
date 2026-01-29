@@ -201,6 +201,7 @@ function App() {
         setTheme={setTheme}
         t={t}
         installPrompt={installPrompt}
+        setInstallPrompt={setInstallPrompt}
       />
 
       {/* Main Content */}

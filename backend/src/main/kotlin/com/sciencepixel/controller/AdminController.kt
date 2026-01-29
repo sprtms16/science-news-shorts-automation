@@ -38,12 +38,8 @@ class AdminController(
 
     @PostMapping("/videos/upload-pending")
     fun triggerPendingUploads(): ResponseEntity<Map<String, Any>> {
-        // Run asynchronously or strictly? 
-        // For manual trigger, running in background is better to avoid timeout, 
-        // but user wants feedback. Let's run it and return "Triggered".
-        // Since the scheduler method is sync, we can wrap it or just call it if it's not too long.
-        // It processes max 3 videos. Should be fine.
-        Thread { youtubeUploadScheduler.uploadPendingVideos() }.start()
+        // Run asynchronously via @Async on the scheduler method
+        youtubeUploadScheduler.uploadPendingVideos()
         
         return ResponseEntity.ok(mapOf(
             "message" to "Triggered pending video upload check in background."

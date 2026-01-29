@@ -33,6 +33,7 @@ interface SidebarProps {
     setTheme: (theme: 'light' | 'dark' | 'system') => void;
     t: any;
     installPrompt: any;
+    setInstallPrompt: (prompt: any) => void;
 }
 
 export function Sidebar({
@@ -45,7 +46,8 @@ export function Sidebar({
     theme,
     setTheme,
     t,
-    installPrompt
+    installPrompt,
+    setInstallPrompt
 }: SidebarProps) {
 
     return (
@@ -196,7 +198,7 @@ export function Sidebar({
                                     if (choiceResult.outcome === 'accepted') {
                                         console.log('User accepted the A2HS prompt');
                                     }
-                                    installPrompt = null;
+                                    setInstallPrompt(null);
                                 });
                             }}
                             className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold text-sm shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all active:scale-95"
