@@ -84,10 +84,7 @@ class ProductionService(
         return finalOutput.absolutePath
     }
 
-    // AI 품질 검수 로직 활성화
-    fun checkVideoRelevance(thumbnailUrl: String, keyword: String): Boolean {
-        return geminiService.checkVideoRelevance(thumbnailUrl, keyword)
-    }
+
 
     // Entry point for Batch Job (Legacy - Deprecated)
     fun produceVideo(news: NewsItem): ProductionResult {
