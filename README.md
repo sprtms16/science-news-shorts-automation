@@ -92,7 +92,7 @@ graph TD
    ```
 
 2. **API Keys Setup**
-   - `tokens/` 디렉토리에 YouTube OAuth2 자격 증명 파일(`StoredCredential`)이나 `client_secret.json`을 위치시킵니다.
+   - `backend/tokens/` 디렉토리에 YouTube OAuth2 자격 증명 파일(`StoredCredential`)이나 `client_secret.json`을 위치시킵니다.
    - Pexels 및 Gemini API Key는 환경 변수 또는 설정 파일에 입력합니다.
 
 3. **Build & Run (Docker)**
@@ -103,6 +103,7 @@ graph TD
    ```
 
 4. **Verify Services**
+   - **Admin Dashboard**: `http://localhost:3000` (Frontend) or via Tailscale IP.
    - **Controller API**: `http://localhost:8080/swagger-ui.html` (if enabled) or check logs.
    - **Kafka UI** (Optional): `http://localhost:9000` (if configured).
 
@@ -129,9 +130,11 @@ root/
 ├── backend/                # Spring Boot App & Python Service
 │   ├── src/                # Kotlin Source Code
 │   ├── ai-media-service/   # Python AI Service
+│   ├── tokens/             # YouTube OAuth Credentials
 │   ├── Dockerfile.kotlin
 │   └── build.gradle.kts
 ├── frontend/               # React Web App
+├── vpn-state/              # Tailscale State & Logs
 ├── shared-data/            # Mounted Volume (Videos, Assets)
 ├── docker-compose.yml
 └── README.md
