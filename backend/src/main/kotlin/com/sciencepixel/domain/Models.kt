@@ -10,6 +10,7 @@ data class VideoHistory(
     val id: String? = null,
     val title: String,
     val summary: String,
+    @Indexed(unique = true)
     val link: String,
     val filePath: String = "",
     val youtubeUrl: String = "",

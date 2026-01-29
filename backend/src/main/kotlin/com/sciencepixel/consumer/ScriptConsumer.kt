@@ -95,6 +95,16 @@ class ScriptConsumer(
             createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now()
         )
-        return videoHistoryRepository.save(initialVideo)
+        return try {
+            videoHistoryRepository.save(initialVideo)
+        } catch (e: org.springframework.dao.DuplicateKeyException) {
+            println("⚠️ Race condition detected for link: ${event.url}. Returning existing record.")
+            videoHistoryRepository.findByLink(event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url}")
+        } catch (e: Exception) {
+             // Fallback for other potential race conditions or DB errors
+             val checkAgain = videoHistoryRepository.findByLink(event.url)
+             if (checkAgain != null) return checkAgain
+             throw e
+        }
     }
 }
