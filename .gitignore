@@ -45,3 +45,6 @@ vpn-state/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# --- Documentation ---
+과학 뉴스 자동 생성 시스템 확장.md

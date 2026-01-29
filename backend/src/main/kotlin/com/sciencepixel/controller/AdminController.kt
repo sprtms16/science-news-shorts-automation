@@ -49,7 +49,7 @@ class AdminController(
 
     @PostMapping("/maintenance/reset-quota-status")
     fun resetQuotaStatus(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findAll().filter { it.status == VideoStatus.QUOTA_EXCEEDED }
+        val videos = videoRepository.findByStatus(VideoStatus.QUOTA_EXCEEDED)
         videos.forEach {
             videoRepository.save(it.copy(
                 status = VideoStatus.RETRY_PENDING,
@@ -90,8 +90,8 @@ class AdminController(
         var matchedCount = 0
         val matchedVideos = mutableListOf<String>()
 
-        val videosToMatch = videoRepository.findAll().filter { 
-            (it.filePath.isBlank() || !File(it.filePath).exists()) && it.status != VideoStatus.UPLOADED
+        val videosToMatch = videoRepository.findByStatusNot(VideoStatus.UPLOADED).filter { 
+            it.filePath.isBlank() || !File(it.filePath).exists()
         }
 
         for (video in videosToMatch) {
@@ -140,8 +140,8 @@ class AdminController(
 
     @PostMapping("/videos/regenerate-missing-files")
     fun regenerateMissingFiles(): ResponseEntity<Map<String, Any>> {
-        val targetVideos = videoRepository.findAll().filter {
-            (it.filePath.isBlank() || !File(it.filePath).exists()) && it.status != VideoStatus.UPLOADED
+        val targetVideos = videoRepository.findByStatusNot(VideoStatus.UPLOADED).filter {
+            it.filePath.isBlank() || !File(it.filePath).exists()
         }
 
         var triggeredCount = 0
@@ -296,8 +296,7 @@ class AdminController(
 
     @PostMapping("/videos/cleanup-sensitive")
     fun cleanupSensitiveVideos(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findAll()
-            .filter { it.status != VideoStatus.UPLOADED } // 이미 업로드된 영상은 스킵
+        val videos = videoRepository.findByStatusNot(VideoStatus.UPLOADED)
             .sortedByDescending { it.createdAt }
             .take(20) // 최신 20개만 집중 검사 (API 429 방지)
             
@@ -365,8 +364,8 @@ class AdminController(
 
     @PostMapping("/maintenance/sync-uploaded")
     fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findAll().filter { 
-            it.youtubeUrl.isNotBlank() && it.status != VideoStatus.UPLOADED 
+        val videos = videoRepository.findByStatusNot(VideoStatus.UPLOADED).filter { 
+            it.youtubeUrl.isNotBlank() 
         }
         var updatedCount = 0
 
