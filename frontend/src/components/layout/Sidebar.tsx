@@ -12,7 +12,8 @@ import {
     Moon,
     Monitor,
     ShieldCheck,
-    ChevronRight
+    ChevronRight,
+    Download
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -31,6 +32,7 @@ interface SidebarProps {
     theme: 'light' | 'dark' | 'system';
     setTheme: (theme: 'light' | 'dark' | 'system') => void;
     t: any;
+    installPrompt: any;
 }
 
 export function Sidebar({
@@ -42,7 +44,8 @@ export function Sidebar({
     setLanguage,
     theme,
     setTheme,
-    t
+    t,
+    installPrompt
 }: SidebarProps) {
 
     return (
@@ -184,7 +187,24 @@ export function Sidebar({
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-white/5">
+                <div className="p-6 border-t border-white/5 space-y-4">
+                    {installPrompt && (
+                        <button
+                            onClick={() => {
+                                installPrompt.prompt();
+                                installPrompt.userChoice.then((choiceResult: any) => {
+                                    if (choiceResult.outcome === 'accepted') {
+                                        console.log('User accepted the A2HS prompt');
+                                    }
+                                    installPrompt = null;
+                                });
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl text-white font-bold text-sm shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-all active:scale-95"
+                        >
+                            <Download size={18} />
+                            {language === 'ko' ? '앱 설치' : 'Install App'}
+                        </button>
+                    )}
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
                         <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
                             <ShieldCheck size={16} className="text-purple-400" />

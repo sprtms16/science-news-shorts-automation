@@ -6,6 +6,8 @@ import com.sciencepixel.domain.VideoHistory
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.repository.SystemSettingRepository
+import org.springframework.context.event.EventListener
+import org.springframework.boot.context.event.ApplicationReadyEvent
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.io.File
@@ -24,7 +26,9 @@ class YoutubeUploadScheduler(
     }
 
     // 매 시간 정각에 실행 ("0 0 * * * *")
+    // 또한 앱 시작 직후(준비 완료 시)에도 실행
     @Scheduled(cron = "0 0 * * * *")
+    @EventListener(ApplicationReadyEvent::class)
     fun uploadPendingVideos() {
         println("⏰ Scheduler Triggered: Checking for pending videos at ${java.time.LocalDateTime.now()}")
 

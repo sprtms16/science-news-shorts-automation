@@ -32,8 +32,23 @@ class AdminController(
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher, // Renamed to avoid conflict
     private val productionService: ProductionService,
     private val systemSettingRepository: SystemSettingRepository,
-    private val cleanupService: com.sciencepixel.service.CleanupService
+    private val cleanupService: com.sciencepixel.service.CleanupService,
+    private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler
 ) {
+
+    @PostMapping("/videos/upload-pending")
+    fun triggerPendingUploads(): ResponseEntity<Map<String, Any>> {
+        // Run asynchronously or strictly? 
+        // For manual trigger, running in background is better to avoid timeout, 
+        // but user wants feedback. Let's run it and return "Triggered".
+        // Since the scheduler method is sync, we can wrap it or just call it if it's not too long.
+        // It processes max 3 videos. Should be fine.
+        Thread { youtubeUploadScheduler.uploadPendingVideos() }.start()
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Triggered pending video upload check in background."
+        ))
+    }
 
     @PostMapping("/videos/{id}/metadata/regenerate")
     fun regenerateMetadata(@PathVariable id: String): ResponseEntity<VideoHistory> {
@@ -240,9 +255,15 @@ class AdminController(
             val path = Paths.get(video.filePath)
             val resource = UrlResource(path.toUri())
             if (resource.exists() && resource.isReadable) {
+                // RFC 5987 compliant content disposition (handles UTF-8 correctly)
+                val contentDisposition = org.springframework.http.ContentDisposition
+                    .builder("attachment")
+                    .filename("${video.title}.mp4", StandardCharsets.UTF_8)
+                    .build()
+
                 ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("video/mp4"))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${URLEncoder.encode(video.title, StandardCharsets.UTF_8.toString()).replace("+", "%20")}.mp4\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                     .body(resource)
             } else ResponseEntity.notFound().build()
         } catch (e: Exception) {
