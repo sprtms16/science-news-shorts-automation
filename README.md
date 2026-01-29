@@ -1,7 +1,7 @@
 # 🧪 Science News Shorts Automation
 > **AI 기반 과학 뉴스 쇼츠 자동 생성 및 업로드 파이프라인 구축 프로젝트**
 
-[![Stack](https://img.shields.io/badge/Kotlin-Spring%20Boot%203.2-purple)]() [![Stack](https://img.shields.io/badge/Architecture-Event%20Driven%20(Kafka)-red)]() [![Stack](https://img.shields.io/badge/AI-Gemini%201.5%20%2B%20MusicGen-blue)]() [![Stack](https://img.shields.io/badge/DevOps-Docker%20Compose-green)]() [![Version](https://img.shields.io/badge/Version-v2.2.0-orange)]()
+[![Stack](https://img.shields.io/badge/Kotlin-Spring%20Boot%203.2-purple)]() [![Stack](https://img.shields.io/badge/Architecture-Event%20Driven%20(Kafka)-red)]() [![Stack](https://img.shields.io/badge/AI-Gemini%203%20Experimental-blue)]() [![Stack](https://img.shields.io/badge/DevOps-Docker%20Compose-green)]() [![Version](https://img.shields.io/badge/Version-v2.2.0-orange)]()
 
 ## 📖 Project Overview
 매일 쏟아지는 최신 과학 뉴스를 1분 내외의 **숏폼(Shorts) 영상**으로 **완전 자동화(Fully Automated)** 하여 제작하고 YouTube에 업로드하는 시스템입니다.
@@ -10,7 +10,7 @@
 ## 🚀 Key Features
 - **Zero-Touch Automation**: RSS 피드 수집부터 유튜브 업로드까지 전 과정 자동화.
 - **AI-Powered Content Creation**:
-  - **Scripting**: Google Gemini 1.5 Pro를 활용하여 뉴스 요약 및 쇼츠 전용 대본/키워드 생성.
+  - **Scripting**: Google Gemini 3 (Experimental Preview)를 활용하여 뉴스 요약 및 쇼츠 전용 대본/키워드 생성.
   - **Voice**: Microsoft Edge-TTS를 사용한 자연스러운 한국어 나레이션.
   - **Audio**: Text-to-Music (MusicGen) 모델을 활용하여 분위기에 맞는 BGM 생성 및 매칭.
 - **Dynamic Video Production**:
@@ -67,7 +67,7 @@ graph TD
 - **Message Broker**: Apache Kafka (Confluent Platform)
 
 ### AI & Media Processing
-- **LLM**: Google Gemini 1.5 (Script & Metadata Generation)
+- **LLM**: Google Gemini 3 (Script & Metadata Generation)
 - **Voice**: Microsoft Edge-TTS (Neural Text-to-Speech)
 - **Audio AI**: Hugging Face `facebook/musicgen-small` (Python Microservice)
 - **Video Engine**: FFmpeg (Clipping, Filtering, Rendering)

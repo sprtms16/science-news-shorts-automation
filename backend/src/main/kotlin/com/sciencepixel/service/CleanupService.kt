@@ -81,8 +81,8 @@ class CleanupService(
                     if (file.exists()) {
                         file.delete()
                     }
-                    repository.delete(video)
-                    println("🗑️ Permanently removed failed video record and file: ${video.title}")
+                    repository.save(video.copy(status = "PERMANENTLY_FAILED"))
+                    println("🚩 Marked video as PERMANENTLY_FAILED (record preserved): ${video.title}")
                     deletedCount++
                 }
             } catch (e: Exception) {
@@ -169,9 +169,9 @@ class CleanupService(
                     }
                 }
                 
-                // Delete DB record
-                repository.delete(video)
-                println("🗑️ Removed stale job: ${video.title} (Created: ${video.createdAt})")
+                // Update status instead of deleting the record
+                repository.save(video.copy(status = "STALE_JOB_ABANDONED"))
+                println("🚩 Marked stale job as ABANDONED: ${video.title} (Created: ${video.createdAt})")
                 deletedCount++
             } catch (e: Exception) {
                 println("❌ Error cleaning up stale job '${video.title}': ${e.message}")

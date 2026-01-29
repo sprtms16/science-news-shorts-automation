@@ -84,6 +84,11 @@ class ProductionService(
         return finalOutput.absolutePath
     }
 
+    // AI 품질 검수 로직 활성화
+    fun checkVideoRelevance(thumbnailUrl: String, keyword: String): Boolean {
+        return pexelsService.checkVideoRelevance(thumbnailUrl, keyword)
+    }
+
     // Entry point for Batch Job (Legacy - Deprecated)
     fun produceVideo(news: NewsItem): ProductionResult {
         println("🎬 Producing video for: ${news.title}")
@@ -315,7 +320,7 @@ class ProductionService(
 
     // Phase 3b: Burn subtitles and Mix BGM into final video
     private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File) {
-        val srtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:")
+        val srtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:").replace("'", "'\\\\''")
         val subtitleFilter = "subtitles='$srtPath':force_style='FontName=NanumGothic,FontSize=10,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=0.8,Shadow=0.5,Alignment=2,MarginV=50'"
         
         // Find BGM file (Random selection from matching mood files)

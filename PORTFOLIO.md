@@ -13,7 +13,7 @@
 ## 2. Tech Stack & Architecture
 
 ### 🛠️ Core Technology
-| Categoy | Stack | Description |
+| Category | Stack | Description |
 | :--- | :--- | :--- |
 | **Backend** | **Kotlin, Spring Boot 3.2** | 핵심 비즈니스 로직 및 오케스트레이션 |
 | **Architecture** | **Event-Driven (Kafka)** | 서비스 간 비동기 통신 및 느슨한 결합 구현 |
