@@ -94,7 +94,14 @@ class AdminController(
         var matchedCount = 0
         val matchedVideos = mutableListOf<String>()
 
-        val videosToMatch = videoRepository.findByStatusNot(VideoStatus.UPLOADED).filter { 
+        val videosToMatchStatuses = listOf(
+            VideoStatus.COMPLETED,
+            VideoStatus.RETRY_PENDING,
+            VideoStatus.FILE_NOT_FOUND,
+            VideoStatus.REGENERATING,
+            VideoStatus.PENDING_PROCESSING
+        )
+        val videosToMatch = videoRepository.findByStatusIn(videosToMatchStatuses).filter { 
             it.filePath.isBlank() || !File(it.filePath).exists()
         }
 
@@ -144,7 +151,11 @@ class AdminController(
 
     @PostMapping("/videos/regenerate-missing-files")
     fun regenerateMissingFiles(): ResponseEntity<Map<String, Any>> {
-        val targetVideos = videoRepository.findByStatusNot(VideoStatus.UPLOADED).filter {
+        val regenerationTargetStatuses = listOf(
+            VideoStatus.COMPLETED,
+            VideoStatus.FILE_NOT_FOUND
+        )
+        val targetVideos = videoRepository.findByStatusIn(regenerationTargetStatuses).filter {
             it.filePath.isBlank() || !File(it.filePath).exists()
         }
 
