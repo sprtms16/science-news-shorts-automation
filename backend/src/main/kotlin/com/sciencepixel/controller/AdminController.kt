@@ -418,34 +418,31 @@ class AdminController(
 
     @PostMapping("/maintenance/deduplicate-links")
     fun deduplicateLinks(): ResponseEntity<Map<String, Any>> {
-        val allVideos = videoRepository.findAll()
-        val groupedByLink = allVideos.groupBy { it.link }
-        
+        val duplicateGroups = videoRepository.findDuplicateLinks()
         var deletedCount = 0
-        val duplicateLinks = groupedByLink.filter { it.value.size > 1 }
         
-        duplicateLinks.forEach { (link, videos) ->
+        duplicateGroups.forEach { group ->
+            val link = group._id
+            val videos = group.docs
+            
             // Keep the most recent one (by createdAt)
             val sorted = videos.sortedByDescending { it.createdAt }
-            val toKeep = sorted.first()
             val toDelete = sorted.drop(1)
             
             toDelete.forEach { video ->
-                // Also cleanup file if it exists for the duplicate we are deleting
                 if (video.filePath.isNotBlank()) {
                     cleanupService.deleteVideoFile(video.filePath)
                 }
                 videoRepository.delete(video)
                 deletedCount++
-                println("🗑️ Deduplication: Deleted duplicate record for '$link' (ID: ${video.id})")
+                println("🗑️ Deduplication (Agg): Deleted duplicate record for '$link' (ID: ${video.id})")
             }
         }
         
         return ResponseEntity.ok(mapOf(
-            "totalLinksChecked" to groupedByLink.size,
-            "duplicateLinksFound" to duplicateLinks.size,
+            "duplicateLinksFound" to duplicateGroups.size,
             "recordsDeleted" to deletedCount,
-            "message" to "Deduplication completed. $deletedCount duplicate records removed."
+            "message" to "Aggregation-based deduplication completed. $deletedCount duplicate records removed."
         ))
     }
 
