@@ -363,9 +363,9 @@ class ProductionService(
             // [0:v] is video from input 0
             // [0:a] is audio from input 0 (TTS)
             // [1:a] is audio from input 1 (BGM)
-            // mix voice(1.0) and bgm(0.30) -> duration=first (matches TTS length)
+            // mix voice(1.2) and bgm(0.20) -> duration=first (matches TTS length)
             cmd.addAll(listOf(
-                "-filter_complex", "[1:a]volume=0.20[bgm];[0:a][bgm]amix=inputs=2:duration=first[aout];[0:v]$subtitleFilter[vout]",
+                "-filter_complex", "[0:a]volume=1.2[v];[1:a]volume=0.20[bgm];[v][bgm]amix=inputs=2:duration=first[aout];[0:v]$subtitleFilter[vout]",
                 "-map", "[vout]", "-map", "[aout]"
             ))
         } else {
