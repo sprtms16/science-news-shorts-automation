@@ -38,7 +38,23 @@ function App() {
     return (localStorage.getItem('app-theme') as any) || 'system';
   });
 
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+
   const t = translations[language];
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+      console.log('Captured beforeinstallprompt event');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('app-lang', language);
@@ -83,20 +99,17 @@ function App() {
     }
   };
 
-  const downloadVideo = async (id: string, title: string) => {
+  const downloadVideo = async (id: string) => {
+    // Direct link download is more reliable for Mobile/PWA and preserves filename from server headers
     try {
-      const response = await axios.get(`/admin/videos/${id}/download`, {
-        responseType: 'blob',
-      });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `${title.replace(/[^a-z0-9]/gi, '_').substring(0, 50)}.mp4`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      // Construct the absolute URL (or relative) to trigger browser download
+      const downloadUrl = `/admin/videos/${id}/download`;
+
+      // Navigate to the URL - since Content-Disposition is attachment, 
+      // the browser will stay on the current page and start the download.
+      window.location.href = downloadUrl;
     } catch (e) {
-      alert("Download failed via API (File might be missing on server)");
+      alert("Download trigger failed");
     }
   };
 
@@ -113,7 +126,7 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive') => {
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
@@ -187,6 +200,8 @@ function App() {
         theme={theme}
         setTheme={setTheme}
         t={t}
+        installPrompt={installPrompt}
+        setInstallPrompt={setInstallPrompt}
       />
 
       {/* Main Content */}
@@ -236,7 +251,7 @@ function App() {
               <VideoCard
                 key={video.id}
                 video={video}
-                onDownload={() => downloadVideo(video.id || '', video.title)}
+                onDownload={() => downloadVideo(video.id || '')}
                 onRegenerateMetadata={onRegenerateMetadata}
                 onUpdateStatus={updateVideoStatus}
                 onDelete={onDeleteVideo}

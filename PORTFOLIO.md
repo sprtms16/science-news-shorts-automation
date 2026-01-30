@@ -13,7 +13,7 @@
 ## 2. Tech Stack & Architecture
 
 ### 🛠️ Core Technology
-| Categoy | Stack | Description |
+| Category | Stack | Description |
 | :--- | :--- | :--- |
 | **Backend** | **Kotlin, Spring Boot 3.2** | 핵심 비즈니스 로직 및 오케스트레이션 |
 | **Architecture** | **Event-Driven (Kafka)** | 서비스 간 비동기 통신 및 느슨한 결합 구현 |
@@ -74,6 +74,19 @@ graph TD
 **해결책**: **Modern Admin Dashboard**
 - **i18n Support**: 프론트엔드 레벨에서 동적 언어팩 로딩 (한국어/영어 즉시 전환).
 - **Dynamic Theming**: CSS Variables 기반의 Glassmorphism UI로 Light/Dark 모드 완벽 지원.
+- **PWA Excellence**: `beforeinstallprompt` 이벤트를 캡처하여 최적의 모바일 설치 경험 제공.
+
+### 🛡️ Challenge 4: PWA Stability in HTTPS Environment
+**문제점**: Tailscale VPN 등 HTTPS 보안 환경에서 서비스 워커 등록 오류 및 브라우저 설치 팝업 미노출 이슈 발생.
+**해결책**: **Network-First Caching Strategy**
+- 서비스 워커의 캐싱 전략을 'Network-First'로 최적화하여 갱신 지연 문제 해결.
+- React 상태 관리를 통한 수동 설치 버튼 연동으로 모든 브라우저 환경에서 동일한 UX 보장.
+
+### ⚡ Challenge 5: Scalable Background Processing
+**문제점**: 영상 업로드와 같은 장시간 소요 작업이 메인 스레드를 점유하여 API 응답 속도가 저하되는 문제.
+**해결책**: **Spring Async Orchestration**
+- `@EnableAsync` 및 `@Async`를 도입하여 비동기 작업 스레드 풀 관리.
+- 업로드 성공 시에만 디스코드 알림을 전송하는 트리거 세분화로 불필요한 알림 노이즈 제거.
 
 ---
 
@@ -114,6 +127,7 @@ graph TD
 - [x] **Phase 4**: Admin Dashboard 구축 (React, Glassmorphism)
 - [x] **Phase 5**: 글로벌 & 보안 (i18n, Tailscale VPN)
 - [x] **Phase 6**: 백엔드 안정화 및 리팩토링 (v2.2.0) - 데이터 모델 구조 개선 및 컴파일 최적화
+- [x] **Phase 7**: 모바일 고도화 및 안정성 강화 (v2.3.0) - PWA 도입, 비동기 처리 최적화, 자동 할당량 복구 로직 구현
 
 ---
 

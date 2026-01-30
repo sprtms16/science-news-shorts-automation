@@ -1,6 +1,7 @@
 package com.sciencepixel.domain
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.LocalDateTime
 
@@ -10,10 +11,11 @@ data class VideoHistory(
     val id: String? = null,
     val title: String,
     val summary: String,
+    @Indexed(unique = true)
     val link: String,
     val filePath: String = "",
     val youtubeUrl: String = "",
-    val status: String = "PENDING_PROCESSING", // PENDING_PROCESSING, COMPLETED, RETRY_PENDING, REGENERATING, UPLOADED, FILE_NOT_FOUND, REGEN_FAILED, ERROR
+    val status: VideoStatus = VideoStatus.PENDING_PROCESSING,
     val description: String = "", // YouTube description (Korean)
     val tags: List<String> = emptyList(), // Hashtags
     val sources: List<String> = emptyList(), // Reference URLs/Sources
@@ -22,6 +24,28 @@ data class VideoHistory(
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now()
 )
+
+enum class VideoStatus {
+    PENDING_PROCESSING,
+    PROCESSING,
+    SCRIPT_READY,
+    COMPLETED,
+    RETRY_PENDING,
+    REGENERATING,
+    UPLOADED,
+    FILE_NOT_FOUND,
+    REGEN_FAILED,
+    ERROR,
+    PERMANENTLY_FAILED,
+    STALE_JOB_ABANDONED,
+    QUOTA_EXCEEDED,
+    QUEUED,
+    ERROR_SCRIPT_EMPTY,
+    RENDERING,
+    ERROR_RENDERING,
+    PROCESSING_ASSETS,
+    ERROR_ASSETS
+}
 
 @Document(collection = "quota_usage")
 data class QuotaUsage(
@@ -37,6 +61,11 @@ data class NewsItem(
     val summary: String,
     val link: String = ""
 )
+
+/**
+ * Data class to hold MongoDB aggregation results for duplicate link detection.
+ */
+data class DuplicateLinkGroup(val _id: String, val docs: List<VideoHistory>)
 
 data class ProductionResult(
     val filePath: String,

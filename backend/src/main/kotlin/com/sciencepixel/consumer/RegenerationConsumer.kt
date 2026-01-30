@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.ProductionResult
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.ProductionService
@@ -37,7 +38,10 @@ class RegenerationConsumer(
         if (event.regenCount >= MAX_REGEN_COUNT) {
             println("🚫 Max regeneration attempts reached: ${event.videoId}")
             repository.findById(event.videoId).ifPresent { video ->
-                repository.save(video.copy(status = "REGEN_FAILED"))
+                repository.save(video.copy(
+                    status = VideoStatus.REGEN_FAILED,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
             eventPublisher.publishToDeadLetterQueue(event, "Max regeneration attempts reached")
             return
@@ -48,9 +52,10 @@ class RegenerationConsumer(
         try {
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = "REGENERATING",
+                    status = VideoStatus.REGENERATING,
                     regenCount = event.regenCount + 1,
-                    retryCount = 0
+                    retryCount = 0,
+                    updatedAt = java.time.LocalDateTime.now()
                 ))
             }
 
@@ -68,10 +73,15 @@ class RegenerationConsumer(
                 
                 repository.findById(event.videoId).ifPresent { video ->
                     repository.save(video.copy(
-                        status = "COMPLETED",
+                        status = VideoStatus.COMPLETED,
                         filePath = newFilePath,
+                        title = result.title.ifBlank { video.title },
+                        description = result.description.ifBlank { video.description },
+                        tags = if (result.tags.isNotEmpty()) result.tags else video.tags,
+                        sources = if (result.sources.isNotEmpty()) result.sources else video.sources,
                         retryCount = 0,
-                        regenCount = event.regenCount + 1
+                        regenCount = event.regenCount + 1,
+                        updatedAt = java.time.LocalDateTime.now()
                     ))
                     
                     // 새로운 VideoCreatedEvent 발행 (키워드 포함)
@@ -87,14 +97,20 @@ class RegenerationConsumer(
             } else {
                 println("❌ Regeneration failed: Empty file path")
                 repository.findById(event.videoId).ifPresent { video ->
-                    repository.save(video.copy(status = "REGEN_FAILED"))
+                    repository.save(video.copy(
+                        status = VideoStatus.REGEN_FAILED,
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
                 }
             }
         } catch (e: Exception) {
             println("❌ Regeneration error: ${e.message}")
             e.printStackTrace()
             repository.findById(event.videoId).ifPresent { video ->
-                repository.save(video.copy(status = "REGEN_FAILED"))
+                repository.save(video.copy(
+                    status = VideoStatus.REGEN_FAILED,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
         }
     }

@@ -1,39 +1,50 @@
-# IntelliJ
+# --- IDE ---
 .idea/
 *.iml
 *.iws
+.vscode/
 
-# Gradle
+# --- Build & Dependency Management ---
 .gradle/
+.next/
 build/
+dist/
 gradle/
 gradlew
 gradlew.bat
+node_modules/
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
+# --- Environment & Credentials ---
 .env
-.venv
-ai-media-service/output/
-
-# Docker & Shared Data
-shared-data/
-*.mp3
-*.mp4
-*.jpg
-
-# OS
-.DS_Store
+.env.development.local
+.env.local
+.env.production.local
+.env.test.local
 client_secret.json
 tokens/
 
-# Logs & State
+# --- Runtime & Storage ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ai-media-service/output/
+shared-data/
+vpn-state/
+
+# --- Media Files ---
+*.jpg
+*.mp3
+*.mp4
+
+# --- Logs & System ---
+.DS_Store
 *.log
 *.txt
-vpn-state/*.log*
-vpn-state/*.txt
-vpn-state/*.conf
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
+# --- Documentation ---
+과학 뉴스 자동 생성 시스템 확장.md

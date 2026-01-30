@@ -15,7 +15,8 @@ ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1536m"
 
 # Build and Run
 # Build
-RUN gradle clean build -x test --stacktrace --no-daemon
+RUN gradle clean build -x test --stacktrace --no-daemon --info
 
 # Run
-CMD ["gradle", "bootRun"]
+RUN find build/libs -name "*.jar" -not -name "*plain.jar" -exec cp {} build/libs/app.jar \;
+ENTRYPOINT ["sh", "-c", "exec java -jar build/libs/app.jar"]

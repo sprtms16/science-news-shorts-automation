@@ -2,6 +2,7 @@ package com.sciencepixel.consumer
 
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.domain.Scene
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.ScriptCreatedEvent
 import com.sciencepixel.event.VideoAssetsReadyEvent
@@ -36,7 +37,10 @@ class SceneConsumer(
             // Update Status
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
-                videoHistoryRepository.save(history.copy(status = "PROCESSING_ASSETS"))
+                videoHistoryRepository.save(history.copy(
+                    status = VideoStatus.PROCESSING_ASSETS,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
 
             // Call Production Service to generate assets (Clips)
@@ -45,7 +49,10 @@ class SceneConsumer(
 
             if (assetResult.clipPaths.isEmpty()) {
                 println("❌ Assets generation failed (empty clips).")
-                videoHistoryRepository.save(history!!.copy(status = "ERROR_ASSETS"))
+                videoHistoryRepository.save(history!!.copy(
+                    status = VideoStatus.ERROR_ASSETS,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
                 return
             }
 

@@ -328,8 +328,8 @@ class GeminiService(
 
     // 2. Vision API - 영상 관련성 체크
     fun checkVideoRelevance(thumbnailUrl: String, keyword: String): Boolean {
-        println("  🔍 Vision Check (Bypassed): $keyword")
-        return true  // Vision check bypassed for speed
+        // AI 품질 검수 로직 활성화
+        return checkVideoRelevanceReal(thumbnailUrl, keyword)
     }
 
     // 3. 영상 관련성 체크 (실제 구현)

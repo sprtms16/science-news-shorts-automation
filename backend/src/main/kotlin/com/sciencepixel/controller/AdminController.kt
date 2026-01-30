@@ -4,6 +4,8 @@ import com.sciencepixel.domain.SystemPrompt
 import com.sciencepixel.repository.SystemPromptRepository
 import com.sciencepixel.domain.VideoHistory
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.domain.VideoStatus
+import com.sciencepixel.domain.DuplicateLinkGroup
 import com.sciencepixel.service.GeminiService
 import org.springframework.core.io.Resource
 import org.springframework.core.io.UrlResource
@@ -32,8 +34,38 @@ class AdminController(
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher, // Renamed to avoid conflict
     private val productionService: ProductionService,
     private val systemSettingRepository: SystemSettingRepository,
-    private val cleanupService: com.sciencepixel.service.CleanupService
+    private val cleanupService: com.sciencepixel.service.CleanupService,
+    private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler
 ) {
+
+    @PostMapping("/videos/upload-pending")
+    fun triggerPendingUploads(): ResponseEntity<Map<String, Any>> {
+        // Run asynchronously via @Async on the scheduler method
+        youtubeUploadScheduler.uploadPendingVideos()
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Triggered pending video upload check in background."
+        ))
+    }
+
+    @PostMapping("/maintenance/reset-quota-status")
+    fun resetQuotaStatus(): ResponseEntity<Map<String, Any>> {
+        val videos = videoRepository.findByStatus(VideoStatus.QUOTA_EXCEEDED)
+        val videosToUpdate = videos.map {
+            it.copy(
+                status = VideoStatus.RETRY_PENDING,
+                updatedAt = java.time.LocalDateTime.now()
+            )
+        }
+        
+        if (videosToUpdate.isNotEmpty()) {
+            videoRepository.saveAll(videosToUpdate)
+        }
+        return ResponseEntity.ok(mapOf(
+            "count" to videos.size,
+            "message" to "Successfully reset ${videos.size} videos from QUOTA_EXCEEDED to RETRY_PENDING."
+        ))
+    }
 
     @PostMapping("/videos/{id}/metadata/regenerate")
     fun regenerateMetadata(@PathVariable id: String): ResponseEntity<VideoHistory> {
@@ -63,8 +95,15 @@ class AdminController(
         var matchedCount = 0
         val matchedVideos = mutableListOf<String>()
 
-        val videosToMatch = videoRepository.findAll().filter { 
-            (it.filePath.isBlank() || !File(it.filePath).exists()) && it.status != "UPLOADED"
+        val videosToMatchStatuses = listOf(
+            VideoStatus.COMPLETED,
+            VideoStatus.RETRY_PENDING,
+            VideoStatus.FILE_NOT_FOUND,
+            VideoStatus.REGENERATING,
+            VideoStatus.PENDING_PROCESSING
+        )
+        val videosToMatch = videoRepository.findByStatusIn(videosToMatchStatuses).filter { 
+            it.filePath.isBlank() || !File(it.filePath).exists()
         }
 
         for (video in videosToMatch) {
@@ -96,7 +135,7 @@ class AdminController(
             if (matchingFile != null) {
                 videoRepository.save(video.copy(
                     filePath = matchingFile.absolutePath,
-                    status = if (video.status == "FILE_NOT_FOUND" || video.status == "PROCESSING") "COMPLETED" else video.status,
+                    status = if (video.status == VideoStatus.FILE_NOT_FOUND || video.status == VideoStatus.PENDING_PROCESSING) VideoStatus.COMPLETED else video.status,
                     updatedAt = LocalDateTime.now()
                 ))
                 matchedCount++
@@ -113,14 +152,18 @@ class AdminController(
 
     @PostMapping("/videos/regenerate-missing-files")
     fun regenerateMissingFiles(): ResponseEntity<Map<String, Any>> {
-        val targetVideos = videoRepository.findAll().filter {
-            (it.filePath.isBlank() || !File(it.filePath).exists()) && it.status != "UPLOADED"
+        val regenerationTargetStatuses = listOf(
+            VideoStatus.COMPLETED,
+            VideoStatus.FILE_NOT_FOUND
+        )
+        val targetVideos = videoRepository.findByStatusIn(regenerationTargetStatuses).filter {
+            it.filePath.isBlank() || !File(it.filePath).exists()
         }
 
         var triggeredCount = 0
         targetVideos.forEach { video ->
             // Update status (Preserve UPLOADED status to avoid re-uploading)
-            val nextStatus = if (video.status == "UPLOADED") "UPLOADED" else "REGENERATING"
+            val nextStatus = if (video.status == VideoStatus.UPLOADED) VideoStatus.UPLOADED else VideoStatus.REGENERATING
             videoRepository.save(video.copy(status = nextStatus, updatedAt = LocalDateTime.now()))
             
             kafkaEventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
@@ -214,7 +257,7 @@ class AdminController(
         )
 
         // If manually setting to UPLOADED, clean up the file
-        if (request.status == "UPLOADED") {
+        if (request.status == VideoStatus.UPLOADED) {
             try {
                 if (video.filePath.isNotBlank()) {
                     val file = File(video.filePath)
@@ -240,9 +283,15 @@ class AdminController(
             val path = Paths.get(video.filePath)
             val resource = UrlResource(path.toUri())
             if (resource.exists() && resource.isReadable) {
+                // RFC 5987 compliant content disposition (handles UTF-8 correctly)
+                val contentDisposition = org.springframework.http.ContentDisposition
+                    .builder("attachment")
+                    .filename("${video.title}.mp4", StandardCharsets.UTF_8)
+                    .build()
+
                 ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("video/mp4"))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"${URLEncoder.encode(video.title, StandardCharsets.UTF_8.toString()).replace("+", "%20")}.mp4\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition.toString())
                     .body(resource)
             } else ResponseEntity.notFound().build()
         } catch (e: Exception) {
@@ -263,8 +312,7 @@ class AdminController(
 
     @PostMapping("/videos/cleanup-sensitive")
     fun cleanupSensitiveVideos(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findAll()
-            .filter { it.status != "UPLOADED" } // 이미 업로드된 영상은 스킵
+        val videos = videoRepository.findByStatusNot(VideoStatus.UPLOADED)
             .sortedByDescending { it.createdAt }
             .take(20) // 최신 20개만 집중 검사 (API 429 방지)
             
@@ -302,7 +350,7 @@ class AdminController(
         
         allVideos.forEach { video ->
             val fileExists = if (video.filePath.isNotBlank()) File(video.filePath).exists() else false
-            val isUploaded = video.status == "UPLOADED"
+            val isUploaded = video.status == VideoStatus.UPLOADED
             
             // "유튜브에 올라간 것(UPLOADED)과 영상파일이 만들어진 것(fileExists)을 제외한 나머지" 삭제
             if (!isUploaded && !fileExists) {
@@ -332,8 +380,13 @@ class AdminController(
 
     @PostMapping("/maintenance/sync-uploaded")
     fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findAll().filter { 
-            it.youtubeUrl.isNotBlank() && it.status != "UPLOADED" 
+        val videos = videoRepository.findByStatusIn(listOf(
+            VideoStatus.COMPLETED,
+            VideoStatus.RETRY_PENDING,
+            VideoStatus.FILE_NOT_FOUND,
+            VideoStatus.REGENERATING
+        )).filter { 
+            it.youtubeUrl.isNotBlank() 
         }
         var updatedCount = 0
 
@@ -348,7 +401,7 @@ class AdminController(
                 }
                 
                 videoRepository.save(video.copy(
-                    status = "UPLOADED",
+                    status = VideoStatus.UPLOADED,
                     filePath = "",
                     updatedAt = LocalDateTime.now()
                 ))
@@ -361,6 +414,36 @@ class AdminController(
         return ResponseEntity.ok(mapOf(
             "syncedCount" to updatedCount,
             "message" to "$updatedCount videos synced to UPLOADED status."
+        ))
+    }
+
+    @PostMapping("/maintenance/deduplicate-links")
+    fun deduplicateLinks(): ResponseEntity<Map<String, Any>> {
+        val duplicateGroups = videoRepository.findDuplicateLinks()
+        var deletedCount = 0
+        
+        duplicateGroups.forEach { group ->
+            val link = group._id
+            val videos = group.docs
+            
+            // Keep the most recent one (by createdAt)
+            val sorted = videos.sortedByDescending { it.createdAt }
+            val toDelete = sorted.drop(1)
+            
+            toDelete.forEach { video ->
+                if (video.filePath.isNotBlank()) {
+                    cleanupService.deleteVideoFile(video.filePath)
+                }
+                videoRepository.delete(video)
+                deletedCount++
+                println("🗑️ Deduplication (Agg): Deleted duplicate record for '$link' (ID: ${video.id})")
+            }
+        }
+        
+        return ResponseEntity.ok(mapOf(
+            "duplicateLinksFound" to duplicateGroups.size,
+            "recordsDeleted" to deletedCount,
+            "message" to "Aggregation-based deduplication completed. $deletedCount duplicate records removed."
         ))
     }
 
@@ -391,7 +474,8 @@ class AdminController(
                         title = newMeta.title,
                         description = newMeta.description,
                         tags = newMeta.tags,
-                        sources = newMeta.sources
+                        sources = newMeta.sources,
+                        updatedAt = LocalDateTime.now()
                     )
                     needsSave = true
                     localizedCount++
@@ -401,15 +485,19 @@ class AdminController(
 
                 // 2. File Sync Check
                 val file = File(video.filePath)
-                if (video.status == "COMPLETED" || video.status == "UPLOADED") {
+                if (video.status == VideoStatus.COMPLETED || video.status == VideoStatus.UPLOADED) {
                     if (!file.exists()) {
                          // File missing -> Trigger Regeneration
                          needsRegen = true
                     }
                 }
 
-                if (needsRegen && video.status != "PROCESSING" && video.status != "REGENERATING") {
-                    currentVideo = currentVideo.copy(status = "REGENERATING", regenCount = video.regenCount + 1)
+                if (needsRegen && video.status != VideoStatus.PROCESSING && video.status != VideoStatus.REGENERATING) {
+                    currentVideo = currentVideo.copy(
+                        status = VideoStatus.REGENERATING, 
+                        regenCount = video.regenCount + 1,
+                        updatedAt = LocalDateTime.now()
+                    )
                     needsSave = true
                     
                     // Trigger Regeneration Event
@@ -443,4 +531,4 @@ class AdminController(
     }
 }
 
-data class UpdateStatusRequest(val status: String, val youtubeUrl: String? = null)
+data class UpdateStatusRequest(val status: VideoStatus, val youtubeUrl: String? = null)

@@ -1,7 +1,7 @@
 # 🧪 Science News Shorts Automation
 > **AI 기반 과학 뉴스 쇼츠 자동 생성 및 업로드 파이프라인 구축 프로젝트**
 
-[![Stack](https://img.shields.io/badge/Kotlin-Spring%20Boot%203.2-purple)]() [![Stack](https://img.shields.io/badge/Architecture-Event%20Driven%20(Kafka)-red)]() [![Stack](https://img.shields.io/badge/AI-Gemini%201.5%20%2B%20MusicGen-blue)]() [![Stack](https://img.shields.io/badge/DevOps-Docker%20Compose-green)]() [![Version](https://img.shields.io/badge/Version-v2.2.0-orange)]()
+[![Stack](https://img.shields.io/badge/Kotlin-Spring%20Boot%203.2-purple)]() [![Stack](https://img.shields.io/badge/Architecture-Event%20Driven%20(Kafka)-red)]() [![Stack](https://img.shields.io/badge/AI-Gemini%203%20Experimental-blue)]() [![Stack](https://img.shields.io/badge/DevOps-Docker%20Compose-green)]() [![PWA](https://img.shields.io/badge/Mobile-PWA%20Ready-ff69b4)]() [![Version](https://img.shields.io/badge/Version-v2.3.0-orange)]()
 
 ## 📖 Project Overview
 매일 쏟아지는 최신 과학 뉴스를 1분 내외의 **숏폼(Shorts) 영상**으로 **완전 자동화(Fully Automated)** 하여 제작하고 YouTube에 업로드하는 시스템입니다.
@@ -10,7 +10,7 @@
 ## 🚀 Key Features
 - **Zero-Touch Automation**: RSS 피드 수집부터 유튜브 업로드까지 전 과정 자동화.
 - **AI-Powered Content Creation**:
-  - **Scripting**: Google Gemini 1.5 Pro를 활용하여 뉴스 요약 및 쇼츠 전용 대본/키워드 생성.
+  - **Scripting**: Google Gemini 3 (Experimental Preview) 및 2.5 Flash를 활용하여 뉴스 요약 및 쇼츠 전용 대본/키워드 생성.
   - **Voice**: Microsoft Edge-TTS를 사용한 자연스러운 한국어 나레이션.
   - **Audio**: Text-to-Music (MusicGen) 모델을 활용하여 분위기에 맞는 BGM 생성 및 매칭.
 - **Dynamic Video Production**:
@@ -23,6 +23,10 @@
   - **Global & Adaptive UI**:
     - **Internationalization (i18n)**: 한글/영어(KO/EN) 실시간 전환 및 자동 감지 지원.
     - **Dynamic Theming**: Light/Dark/System 테마 모드 지원 및 Glassmorphism 디자인 최적화.
+    - **Progressive Web App (PWA)**: 모바일 설치 지원 및 Offline-First 아키텍처로 모바일 사용성 극대화.
+- **Efficient Delivery & UX**:
+  - **RFC-5987 Compliance**: 한글 파일명이 포함된 영상도 모바일/브라우저에서 깨짐 없이 안전하게 다운로드.
+  - **Async Orchestration**: Spring `@Async`를 활용한 논블로킹(Non-blocking) 백그라운드 업로드 및 알림 시스템.
 - **Robust Architecture**:
   - **Dual-Lock Quota Guard**: Gemini API 및 YouTube API의 쿼터를 실시간으로 추적하며 최적의 생성 속도 유지.
   - **Self-Healing**: 파일 손상이나 누락 시 자동으로 감지하여 재생성(Regeneration).
@@ -67,7 +71,7 @@ graph TD
 - **Message Broker**: Apache Kafka (Confluent Platform)
 
 ### AI & Media Processing
-- **LLM**: Google Gemini 1.5 (Script & Metadata Generation)
+- **LLM**: Google Gemini 3 Experimental & 2.5 Flash (Script & Metadata Generation)
 - **Voice**: Microsoft Edge-TTS (Neural Text-to-Speech)
 - **Audio AI**: Hugging Face `facebook/musicgen-small` (Python Microservice)
 - **Video Engine**: FFmpeg (Clipping, Filtering, Rendering)
@@ -119,6 +123,7 @@ graph TD
 ### 3. Self-Healing & Deep Repair
 - 네트워크 오류나 FFmpeg 렌더링 실패로 인해 결과물이 누락된 경우 (`FILE_NOT_FOUND`), 시스템이 이를 감지하고 스스로 재생성(`REGENERATING`) 프로세스를 트리거합니다.
 - **Deep Repair**: DB와 파일 시스템 간의 불일치를 일괄적으로 해결하고 영어 제목을 한글로 복원하는 강력한 관리 도구를 제공합니다.
+- **Quota Recovery**: 할당량 초과(`QUOTA_EXCEEDED`)로 멈춘 영상들을 자동 감지하여 할당량 초기화 시점에 맞춰 스마트하게 재시도합니다.
 
 ### 4. Automated Cleanup & Safety
 - 서버 디스크 공간 관리를 위해 업로드 완료된 건과 1시간 이상 정체된 실패 작업을 매시 30분마다 자동으로 청소합니다.

@@ -63,6 +63,9 @@ export const translations = {
         system: '시스템',
         korean: '한국어',
         english: 'English',
+        forceUploadTitle: '업로드 강제 실행',
+        forceUploadDesc: '대기 중인 영상을 즉시 업로드합니다 (최대 3개). 스케줄러가 놓친 영상을 수동으로 처리할 때 유용합니다.',
+        triggerUpload: '업로드 실행',
     },
     en: {
         dashboard: 'Dashboard',
@@ -126,5 +129,8 @@ export const translations = {
         system: 'System',
         korean: 'Korean',
         english: 'English',
+        forceUploadTitle: 'Force Upload Pending',
+        forceUploadDesc: 'Manually trigger the YouTube upload scheduler for pending videos (Max 3 at a time). Useful if the auto-scheduler missed them.',
+        triggerUpload: 'Trigger Upload',
     }
 };

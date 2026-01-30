@@ -1,5 +1,6 @@
 package com.sciencepixel.service
 
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.repository.SystemSettingRepository
 import com.sciencepixel.repository.VideoHistoryRepository
 import org.springframework.batch.core.Job
@@ -35,10 +36,14 @@ class BatchScheduler(
             .map { it.value.toIntOrNull() ?: 10 }
             .orElse(10)
 
-        // 3. Count Active/Pending videos (Exclude UPLOADED)
-        val activeVideos = videoHistoryRepository.findAll().filter { 
-            it.status != "UPLOADED" 
-        }
+        // 3. Count Active/Pending videos (Exclude UPLOADED and those waiting for upload)
+        val excludedStatuses = listOf(
+            VideoStatus.UPLOADED, 
+            VideoStatus.COMPLETED, 
+            VideoStatus.QUOTA_EXCEEDED, 
+            VideoStatus.RETRY_PENDING
+        )
+        val activeVideos = videoHistoryRepository.findByStatusNotIn(excludedStatuses)
         val activeCount = activeVideos.size
 
         println("📊 Active/Pending Video Buffer: $activeCount / $limit")

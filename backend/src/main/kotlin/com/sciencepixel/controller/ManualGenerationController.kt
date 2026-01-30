@@ -3,6 +3,7 @@ package com.sciencepixel.controller
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.VideoCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
@@ -84,7 +85,8 @@ class ManualGenerationController(
                 val history = VideoHistory(
                     title = scienceNews.title,
                     summary = scienceNews.summary,
-                    link = "manual_batch_topic"
+                    link = "manual-batch-${topic.hashCode()}-${System.currentTimeMillis()}",
+                    updatedAt = java.time.LocalDateTime.now()
                 )
                 val saved = videoHistoryRepository.save(history)
                 val videoId = saved.id ?: ""
@@ -95,7 +97,7 @@ class ManualGenerationController(
                 val news = NewsItem(
                     title = scienceNews.title,
                     summary = scienceNews.summary,
-                    link = "manual_batch_topic"
+                    link = history.link
                 )
                 
                 // 비동기 처리 시작 (인자 순서: news, videoId)
@@ -183,7 +185,8 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = "PROCESSING"
+            status = VideoStatus.PROCESSING,
+            updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
         
@@ -193,7 +196,7 @@ class ManualGenerationController(
         return JobStatus(
             id = savedHistory.id!!,
             title = news.title,
-            status = "PROCESSING",
+            status = VideoStatus.PROCESSING.name,
             filePath = null,
             youtubeUrl = null,
             message = "✅ 작업이 시작되었습니다. 완료 시 Discord/Telegram으로 알림됩니다. GET /manual/status/${savedHistory.id}로 상태 확인 가능"
@@ -217,18 +220,18 @@ class ManualGenerationController(
             )
 
         val statusMessage = when (history.status) {
-            "PROCESSING" -> "⏳ 비디오 생성 중..."
-            "COMPLETED" -> "✅ 비디오 생성 완료! YouTube 업로드 대기 중..."
-            "UPLOADED" -> "🎉 YouTube 업로드 완료!"
-            "FAILED" -> "❌ 비디오 생성 실패"
-            "ERROR" -> "⚠️ 에러 발생"
+            VideoStatus.PROCESSING -> "⏳ 비디오 생성 중..."
+            VideoStatus.COMPLETED -> "✅ 비디오 생성 완료! YouTube 업로드 대기 중..."
+            VideoStatus.UPLOADED -> "🎉 YouTube 업로드 완료!"
+            VideoStatus.PERMANENTLY_FAILED, VideoStatus.REGEN_FAILED -> "❌ 비디오 생성 실패"
+            VideoStatus.ERROR -> "⚠️ 에러 발생"
             else -> "상태: ${history.status}"
         }
 
         return JobStatus(
             id = id,
             title = history.title,
-            status = history.status,
+            status = history.status.name,
             filePath = history.filePath.takeIf { it.isNotBlank() },
             youtubeUrl = history.youtubeUrl.takeIf { it.isNotBlank() },
             message = statusMessage
@@ -243,7 +246,8 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = "PROCESSING"
+            status = VideoStatus.PROCESSING,
+            updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
         
@@ -253,8 +257,13 @@ class ManualGenerationController(
             
             return if (filePath.isNotEmpty()) {
                 val completedVideo = videoHistoryRepository.save(savedHistory.copy(
-                    status = "COMPLETED",
-                    filePath = filePath
+                    status = VideoStatus.COMPLETED,
+                    filePath = filePath,
+                    title = result.title.ifBlank { savedHistory.title },
+                    description = result.description.ifBlank { savedHistory.description },
+                    tags = if (result.tags.isNotEmpty()) result.tags else savedHistory.tags,
+                    sources = if (result.sources.isNotEmpty()) result.sources else savedHistory.sources,
+                    updatedAt = java.time.LocalDateTime.now()
                 ))
                 
                 if (completedVideo.id != null) {
@@ -270,11 +279,17 @@ class ManualGenerationController(
                 
                 "✅ Video created successfully: $filePath (Queued for Upload via Kafka)"
             } else {
-                videoHistoryRepository.save(savedHistory.copy(status = "FAILED"))
+                videoHistoryRepository.save(savedHistory.copy(
+                    status = VideoStatus.PERMANENTLY_FAILED,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
                 "❌ Failed to create video."
             }
         } catch (e: Exception) {
-            videoHistoryRepository.save(savedHistory.copy(status = "ERROR"))
+            videoHistoryRepository.save(savedHistory.copy(
+                status = VideoStatus.ERROR,
+                updatedAt = java.time.LocalDateTime.now()
+            ))
             e.printStackTrace()
             return "❌ Error: ${e.message}"
         }

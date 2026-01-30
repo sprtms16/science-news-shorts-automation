@@ -2,6 +2,7 @@ package com.sciencepixel.consumer
 
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.RssNewItemEvent
 import com.sciencepixel.event.ScriptCreatedEvent
@@ -33,7 +34,7 @@ class ScriptConsumer(
             // 1. Create or Get History (Idempotency)
             val history = getOrCreateHistory(event)
             
-            if (history.status == "COMPLETED" || history.status == "UPLOADED") {
+            if (history.status == VideoStatus.COMPLETED || history.status == VideoStatus.UPLOADED) {
                 println("⚠️ Video already completed for: ${event.title}. Skipping.")
                 return
             }
@@ -44,15 +45,21 @@ class ScriptConsumer(
 
             if (scriptResponse.scenes.isEmpty()) {
                 println("⚠️ Empty script generated. Marking as ERROR.")
-                videoHistoryRepository.save(history.copy(status = "ERROR_SCRIPT_EMPTY"))
+                videoHistoryRepository.save(history.copy(
+                    status = VideoStatus.ERROR_SCRIPT_EMPTY,
+                    updatedAt = LocalDateTime.now()
+                ))
                 return
             }
 
             // 3. Update History with Script Data
             val updatedHistory = videoHistoryRepository.save(history.copy(
-                status = "SCRIPT_READY",
-                summary = scriptResponse.description, // Use AI description
-                tags = scriptResponse.tags
+                status = VideoStatus.SCRIPT_READY,
+                title = scriptResponse.title, // Update title with the generated Korean title
+                description = scriptResponse.description, // Correctly use description field
+                tags = scriptResponse.tags,
+                sources = scriptResponse.sources,
+                updatedAt = LocalDateTime.now()
             ))
 
             // 4. Publish next event
@@ -76,16 +83,28 @@ class ScriptConsumer(
 
     private fun getOrCreateHistory(event: RssNewItemEvent): VideoHistory {
         // Simple check by link (assuming unique per news)
-        val existing = videoHistoryRepository.findAll().find { it.link == event.url }
+        val existing = videoHistoryRepository.findByLink(event.url)
         if (existing != null) return existing
 
-        return videoHistoryRepository.save(VideoHistory(
+        val initialVideo = VideoHistory(
             id = UUID.randomUUID().toString(),
             title = event.title,
+            summary = "", // Initial summary
             link = event.url,
-            status = "PROCESSING_SCRIPT",
-            summary = "",
-            createdAt = LocalDateTime.now()
-        ))
+            status = VideoStatus.QUEUED,
+            createdAt = LocalDateTime.now(),
+            updatedAt = LocalDateTime.now()
+        )
+        return try {
+            videoHistoryRepository.save(initialVideo)
+        } catch (e: org.springframework.dao.DuplicateKeyException) {
+            println("⚠️ Race condition detected for link: ${event.url}. Returning existing record.")
+            videoHistoryRepository.findByLink(event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url}")
+        } catch (e: Exception) {
+             // Fallback for other potential race conditions or DB errors
+             val checkAgain = videoHistoryRepository.findByLink(event.url)
+             if (checkAgain != null) return checkAgain
+             throw e
+        }
     }
 }

@@ -6,6 +6,8 @@ import com.sciencepixel.event.VideoAssetsReadyEvent
 import com.sciencepixel.event.VideoCreatedEvent
 import com.sciencepixel.event.ScriptCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.domain.ProductionResult
+import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.service.ProductionService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.kafka.annotation.KafkaListener
@@ -30,7 +32,10 @@ class RenderConsumer(
 
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
-                videoHistoryRepository.save(history.copy(status = "RENDERING"))
+                videoHistoryRepository.save(history.copy(
+                    status = VideoStatus.RENDERING,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
 
             // Call Production Service to finalize video (Merge & Burn)
@@ -45,14 +50,18 @@ class RenderConsumer(
 
             if (finalPath.isEmpty()) {
                 println("❌ Rendering failed (empty path).")
-                videoHistoryRepository.save(history!!.copy(status = "ERROR_RENDERING"))
+                videoHistoryRepository.save(history!!.copy(
+                    status = VideoStatus.ERROR_RENDERING,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
                 return
             }
 
             // Update History to COMPLETED (Ready for Upload)
             val completedHistory = videoHistoryRepository.save(history!!.copy(
-                status = "COMPLETED",
-                filePath = finalPath
+                status = VideoStatus.COMPLETED,
+                filePath = finalPath,
+                updatedAt = java.time.LocalDateTime.now()
             ))
 
             // Publish 'video.created' -> This triggers the existing VideoUploadConsumer!

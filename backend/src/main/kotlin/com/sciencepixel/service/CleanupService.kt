@@ -1,6 +1,7 @@
 package com.sciencepixel.service
 
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.domain.VideoStatus
 import org.springframework.stereotype.Service
 import java.io.File
 import java.time.LocalDateTime
@@ -14,7 +15,7 @@ class CleanupService(
 
     fun cleanupUploadedVideos() {
         println("🧹 Starting cleanup of UPLOADED videos...")
-        val uploadedVideos = repository.findAll().filter { it.status == "UPLOADED" && !it.filePath.isNullOrBlank() }
+        val uploadedVideos = repository.findAll().filter { it.status == VideoStatus.UPLOADED && !it.filePath.isNullOrBlank() }
 
         if (uploadedVideos.isEmpty()) {
             println("✅ No uploaded videos to clean up.")
@@ -37,7 +38,8 @@ class CleanupService(
                             // Update DB to reflect cleanup (preserve other metadata)
                             repository.save(video.copy(
                                 filePath = "", // Clear path to indicate deletion
-                                summary = video.summary + "\n[System] Resource cleaned up at ${LocalDateTime.now()}"
+                                description = video.description + "\n[System] Resource cleaned up at ${LocalDateTime.now()}",
+                                updatedAt = LocalDateTime.now()
                             ))
                         } else {
                             println("⚠️ Failed to delete file: ${file.path}")
@@ -48,7 +50,10 @@ class CleanupService(
                 } else {
                     println("⚠️ File not found (already deleted?): ${video.filePath}")
                     // Clean up DB entry even if file is missing if marked as UPLOADED but path is set
-                    repository.save(video.copy(filePath = ""))
+                    repository.save(video.copy(
+                        filePath = "",
+                        updatedAt = LocalDateTime.now()
+                    ))
                 }
             } catch (e: Exception) {
                 println("❌ Error cleaning up video '${video.title}': ${e.message}")
@@ -60,7 +65,7 @@ class CleanupService(
     fun cleanupFailedVideos() {
         println("🧹 Starting cleanup of FAILED videos (ERROR, REGEN_FAILED)...")
         val failedVideos = repository.findAll().filter { 
-            (it.status == "ERROR" || it.status == "REGEN_FAILED") && !it.filePath.isNullOrBlank() 
+            (it.status == VideoStatus.ERROR || it.status == VideoStatus.REGEN_FAILED) && !it.filePath.isNullOrBlank() 
         }
 
         if (failedVideos.isEmpty()) {
@@ -81,8 +86,11 @@ class CleanupService(
                     if (file.exists()) {
                         file.delete()
                     }
-                    repository.delete(video)
-                    println("🗑️ Permanently removed failed video record and file: ${video.title}")
+                    repository.save(video.copy(
+                        status = VideoStatus.PERMANENTLY_FAILED,
+                        updatedAt = LocalDateTime.now()
+                    ))
+                    println("🚩 Marked video as PERMANENTLY_FAILED (record preserved): ${video.title}")
                     deletedCount++
                 }
             } catch (e: Exception) {
@@ -147,7 +155,7 @@ class CleanupService(
         val threshold = LocalDateTime.now().minusHours(1)
         
         val staleVideos = repository.findAll().filter { 
-            (it.status == "PROCESSING" || it.status == "REGENERATING" || it.status == "ERROR") && 
+            (it.status == VideoStatus.PROCESSING || it.status == VideoStatus.REGENERATING || it.status == VideoStatus.ERROR) && 
             it.createdAt.isBefore(threshold) 
         }
 
@@ -169,9 +177,12 @@ class CleanupService(
                     }
                 }
                 
-                // Delete DB record
-                repository.delete(video)
-                println("🗑️ Removed stale job: ${video.title} (Created: ${video.createdAt})")
+                // Update status instead of deleting the record
+                repository.save(video.copy(
+                    status = VideoStatus.STALE_JOB_ABANDONED,
+                    updatedAt = LocalDateTime.now()
+                ))
+                println("🚩 Marked stale job as ABANDONED: ${video.title} (Created: ${video.createdAt})")
                 deletedCount++
             } catch (e: Exception) {
                 println("❌ Error cleaning up stale job '${video.title}': ${e.message}")
