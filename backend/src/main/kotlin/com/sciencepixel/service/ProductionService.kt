@@ -317,7 +317,7 @@ class ProductionService(
 
     // Phase 3b: Burn subtitles and Mix BGM into final video
     private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File) {
-        val srtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:").replace("'", "'\\\\''")
+        val srtPath = srtFile.absolutePath.replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
         val subtitleFilter = "subtitles='$srtPath':force_style='FontName=NanumGothic,FontSize=10,PrimaryColour=&HFFFFFF,OutlineColour=&H000000,Outline=0.8,Shadow=0.5,Alignment=2,MarginV=50'"
         
         // Find BGM file (Random selection from matching mood files)
