@@ -41,9 +41,7 @@ class CleanupScheduler(
 
     private fun runSafetyCheck() {
         // Check COMPLETED and PENDING videos (not UPLOADED)
-        val targetVideos = videoRepository.findAll().filter { 
-            it.status == VideoStatus.COMPLETED || it.status == VideoStatus.PENDING_PROCESSING || it.status == VideoStatus.RETRY_PENDING 
-        }
+        val targetVideos = videoRepository.findByStatusIn(listOf(VideoStatus.COMPLETED, VideoStatus.PENDING_PROCESSING, VideoStatus.RETRY_PENDING))
 
         if (targetVideos.isEmpty()) return
 
