@@ -379,7 +379,12 @@ class AdminController(
 
     @PostMapping("/maintenance/sync-uploaded")
     fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findByStatusNot(VideoStatus.UPLOADED).filter { 
+        val videos = videoRepository.findByStatusIn(listOf(
+            VideoStatus.COMPLETED,
+            VideoStatus.RETRY_PENDING,
+            VideoStatus.FILE_NOT_FOUND,
+            VideoStatus.REGENERATING
+        )).filter { 
             it.youtubeUrl.isNotBlank() 
         }
         var updatedCount = 0
@@ -408,6 +413,39 @@ class AdminController(
         return ResponseEntity.ok(mapOf(
             "syncedCount" to updatedCount,
             "message" to "$updatedCount videos synced to UPLOADED status."
+        ))
+    }
+
+    @PostMapping("/maintenance/deduplicate-links")
+    fun deduplicateLinks(): ResponseEntity<Map<String, Any>> {
+        val allVideos = videoRepository.findAll()
+        val groupedByLink = allVideos.groupBy { it.link }
+        
+        var deletedCount = 0
+        val duplicateLinks = groupedByLink.filter { it.value.size > 1 }
+        
+        duplicateLinks.forEach { (link, videos) ->
+            // Keep the most recent one (by createdAt)
+            val sorted = videos.sortedByDescending { it.createdAt }
+            val toKeep = sorted.first()
+            val toDelete = sorted.drop(1)
+            
+            toDelete.forEach { video ->
+                // Also cleanup file if it exists for the duplicate we are deleting
+                if (video.filePath.isNotBlank()) {
+                    cleanupService.deleteVideoFile(video.filePath)
+                }
+                videoRepository.delete(video)
+                deletedCount++
+                println("🗑️ Deduplication: Deleted duplicate record for '$link' (ID: ${video.id})")
+            }
+        }
+        
+        return ResponseEntity.ok(mapOf(
+            "totalLinksChecked" to groupedByLink.size,
+            "duplicateLinksFound" to duplicateLinks.size,
+            "recordsDeleted" to deletedCount,
+            "message" to "Deduplication completed. $deletedCount duplicate records removed."
         ))
     }
 
