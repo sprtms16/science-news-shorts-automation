@@ -1,6 +1,7 @@
 package com.sciencepixel.domain
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.LocalDateTime
 
@@ -60,6 +61,11 @@ data class NewsItem(
     val summary: String,
     val link: String = ""
 )
+
+/**
+ * Data class to hold MongoDB aggregation results for duplicate link detection.
+ */
+data class DuplicateLinkGroup(val _id: String, val docs: List<VideoHistory>)
 
 data class ProductionResult(
     val filePath: String,

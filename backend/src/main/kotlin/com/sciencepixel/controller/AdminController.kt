@@ -5,6 +5,7 @@ import com.sciencepixel.repository.SystemPromptRepository
 import com.sciencepixel.domain.VideoHistory
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.domain.VideoStatus
+import com.sciencepixel.domain.DuplicateLinkGroup
 import com.sciencepixel.service.GeminiService
 import org.springframework.core.io.Resource
 import org.springframework.core.io.UrlResource

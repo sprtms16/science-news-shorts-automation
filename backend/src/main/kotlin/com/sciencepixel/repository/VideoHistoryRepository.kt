@@ -1,6 +1,7 @@
 package com.sciencepixel.repository
 
 import com.sciencepixel.domain.VideoHistory
+import com.sciencepixel.domain.DuplicateLinkGroup
 import com.sciencepixel.domain.VideoStatus
 import org.springframework.data.mongodb.repository.Aggregation
 import org.springframework.data.mongodb.repository.MongoRepository
@@ -19,5 +20,3 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
     ])
     fun findDuplicateLinks(): List<DuplicateLinkGroup>
 }
-
-data class DuplicateLinkGroup(val _id: String, val docs: List<VideoHistory>)
