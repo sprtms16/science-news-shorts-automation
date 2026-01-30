@@ -49,10 +49,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache First for static resources
+  // Stale-While-Revalidate for static resources
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.match(event.request).then((cachedResponse) => {
+        const fetchedResponsePromise = fetch(event.request).then(
+          (networkResponse) => {
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          }
+        ).catch(() => {
+          // Fallback if network fails and no cache
+          return cachedResponse;
+        });
+        return cachedResponse || fetchedResponsePromise;
+      });
     })
   );
 });
