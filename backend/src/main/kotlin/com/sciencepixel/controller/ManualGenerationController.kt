@@ -85,7 +85,7 @@ class ManualGenerationController(
                 val history = VideoHistory(
                     title = scienceNews.title,
                     summary = scienceNews.summary,
-                    link = "manual_batch_topic",
+                    link = "manual-batch-${topic.hashCode()}-${System.currentTimeMillis()}",
                     updatedAt = java.time.LocalDateTime.now()
                 )
                 val saved = videoHistoryRepository.save(history)
@@ -97,7 +97,7 @@ class ManualGenerationController(
                 val news = NewsItem(
                     title = scienceNews.title,
                     summary = scienceNews.summary,
-                    link = "manual_batch_topic"
+                    link = history.link
                 )
                 
                 // 비동기 처리 시작 (인자 순서: news, videoId)
