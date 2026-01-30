@@ -1,3 +1,5 @@
+package com.sciencepixel.repository
+
 import com.sciencepixel.domain.VideoHistory
 import com.sciencepixel.domain.VideoStatus
 import org.springframework.data.mongodb.repository.Aggregation
