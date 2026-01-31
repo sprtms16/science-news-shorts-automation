@@ -11,3 +11,4 @@ opencv-python-headless
 pillow
 mutagen
 scipy
+kafka-python

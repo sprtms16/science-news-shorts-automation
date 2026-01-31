@@ -9,6 +9,9 @@ from transformers import pipeline
 import scipy.io.wavfile
 import torch
 import numpy as np
+import json
+from kafka import KafkaProducer
+import datetime
 
 app = FastAPI(title="Shorts AI Media Service (TTS + MusicGen)")
 
@@ -19,6 +22,38 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 # --Global Models--
 synthesiser = None
 
+class KafkaLogPublisher:
+    def __init__(self):
+        self.producer = None
+        self.bootstrap_servers = os.getenv("KAFKA_SERVERS", "kafka:29092")
+        self.topic = "system-logs"
+        try:
+            self.producer = KafkaProducer(
+                bootstrap_servers=self.bootstrap_servers,
+                value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            )
+            print(f"📡 Kafka Logger connected to {self.bootstrap_servers}")
+        except Exception as e:
+            print(f"⚠️ Kafka Logger failed to connect: {e}")
+
+    def log(self, level, message, details=None, trace_id=None):
+        if not self.producer:
+            return
+        log_entry = {
+            "serviceName": "ai-media-service",
+            "level": level,
+            "message": message,
+            "details": details,
+            "traceId": trace_id,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z"
+        }
+        try:
+            self.producer.send(self.topic, log_entry)
+        except Exception as e:
+            print(f"❌ Failed to send log to Kafka: {e}")
+
+logger = KafkaLogPublisher()
+
 @app.on_event("startup")
 async def startup_event():
     global synthesiser
@@ -28,8 +63,10 @@ async def startup_event():
         # Using pipeline for simplicity
         synthesiser = pipeline("text-to-audio", "facebook/musicgen-small", device=device)
         print("✅ MusicGen loaded successfully.")
+        logger.log("INFO", "AI Media Service Started", f"MusicGen loaded on {device}")
     except Exception as e:
         print(f"❌ Failed to load MusicGen: {e}")
+        logger.log("ERROR", "AI Media Service Start Failed", f"Error: {str(e)}")
 
 # --Models --
 class TTSRequest(BaseModel):
@@ -63,8 +100,11 @@ async def generate_audio(request: TTSRequest):
         except Exception:
             duration = 5.0  # fallback
         
+        
+        logger.log("INFO", f"TTS Generated: {request.text[:30]}...", f"File: {filename}, Dur: {duration:.2f}s")
         return {"status": "success", "filename": filename, "duration": duration} 
     except Exception as e:
+        logger.log("ERROR", "TTS Generation Failed", f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/generate-bgm")
@@ -122,9 +162,11 @@ async def generate_bgm(request: BGMRequest):
              
         scipy.io.wavfile.write(output_path, rate=sampling_rate, data=audio_data)
         
+        logger.log("INFO", f"BGM Generated: {request.prompt}", f"File: {filename}")
         return {"status": "success", "filename": filename}
     except Exception as e:
         print(f"Error generating BGM: {e}")
+        logger.log("ERROR", "BGM Generation Failed", f"Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
