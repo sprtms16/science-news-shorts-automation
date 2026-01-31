@@ -17,7 +17,8 @@ class UploadRetryConsumer(
     private val repository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
     private val objectMapper: ObjectMapper,
-    private val cleanupService: com.sciencepixel.service.CleanupService
+    private val cleanupService: com.sciencepixel.service.CleanupService,
+    private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository
 ) {
 
     companion object {
@@ -33,9 +34,19 @@ class UploadRetryConsumer(
         println("📥 Received UploadFailedEvent: ${event.videoId} (Retry: ${event.retryCount})")
 
         // ⚠️ Quota Exceeded Check - Do NOT retry if quota exceeded
-        if (event.reason.lowercase().contains("quota")) {
-            println("🛑 YouTube quota exceeded. Stopping retry loop. Video: ${event.videoId}")
+        if (event.reason.lowercase().contains("quota") || event.reason.contains("403")) {
+            println("🛑 YouTube quota exceeded. Blocking and stopping retry loop. Video: ${event.videoId}")
+            
+            // Set System-wide Block
+            markQuotaExceeded()
+
             repository.findById(event.videoId).ifPresent { video ->
+                // Idempotency check: Don't revert if already uploaded
+                if (video.status == VideoStatus.UPLOADED) {
+                    println("⏭️ Video ${event.videoId} already marked as UPLOADED. Ignoring quota failure update.")
+                    return@ifPresent
+                }
+                
                 repository.save(video.copy(
                     status = VideoStatus.QUOTA_EXCEEDED,
                     retryCount = event.retryCount,
@@ -88,5 +99,21 @@ class UploadRetryConsumer(
                 }
             }
         }
+    }
+
+    private fun markQuotaExceeded() {
+        println("⛔ Quota Exceeded. Blocking uploads until next reset (Tomorrow 17:00 KST).")
+        val now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
+        val nextReset = if (now.hour >= 17) {
+            now.plusDays(1).withHour(17).withMinute(0).withSecond(0)
+        } else {
+            now.withHour(17).withMinute(0).withSecond(0)
+        }
+        
+        systemSettingRepository.save(com.sciencepixel.domain.SystemSetting(
+            key = "UPLOAD_BLOCKED_UNTIL",
+            value = nextReset.toString(),
+            description = "Blocked due to YouTube Quota Exceeded"
+        ))
     }
 }

@@ -39,16 +39,22 @@ class VideoUploadConsumer(
 
         try {
             val videoOpt = repository.findById(event.videoId)
-            if (videoOpt.isPresent && videoOpt.get().status == VideoStatus.UPLOADED && videoOpt.get().youtubeUrl.isNotBlank()) {
-                println("⏭️ Video ${event.videoId} already uploaded to YouTube. Skipping duplicate upload.")
-                // Update filePath if it was missing but now we have it from event
+            if (videoOpt.isPresent) {
                 val video = videoOpt.get()
-                if (video.filePath.isBlank()) {
-                    repository.save(video.copy(
-                        filePath = event.filePath,
-                        updatedAt = java.time.LocalDateTime.now()
-                    ))
+                // Idempotency check: Already uploaded?
+                if (video.status == VideoStatus.UPLOADED && video.youtubeUrl.isNotBlank()) {
+                    println("⏭️ Video ${event.videoId} already uploaded to YouTube. Skipping duplicate upload.")
+                    return
                 }
+                
+                // Status check: Is it ready? (Avoid race with rendering/etc)
+                if (video.status != VideoStatus.COMPLETED && video.status != VideoStatus.RETRY_PENDING && video.status != VideoStatus.QUOTA_EXCEEDED) {
+                    println("⏳ Video ${event.videoId} is in status ${video.status}. Waiting for it to reach a triggerable state.")
+                    // Optional: You could republish with delay if needed, but the scheduler will eventually pick it up
+                    return
+                }
+            } else {
+                println("⚠️ Video record ${event.videoId} not found in DB. Skipping.")
                 return
             }
 
