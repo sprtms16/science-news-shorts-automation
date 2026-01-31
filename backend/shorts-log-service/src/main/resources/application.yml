@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: shorts-log-service
+  data:
+    mongodb:
+      uri: mongodb://mongo:27017/shorts-logs
+  kafka:
+    bootstrap-servers: kafka:29092
+    consumer:
+      group-id: log-service-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+server:
+  port: 8082
