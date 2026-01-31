@@ -32,13 +32,21 @@ class VideoProcessor(
             return null
         }
 
-        // 1. Duplicate Check
+        // 1. Duplicate Check (Link & Title)
         if (videoHistoryRepository.findByLink(item.link) != null) {
+            println("⏭️ Skipped (Link Duplicate): ${item.link}")
+            return null
+        }
+
+        // Exact Title Match (within last 24h as rough heuristic, though repository.findByTitle is global)
+        val existingByTitle = videoHistoryRepository.findByTitle(item.title)
+        if (existingByTitle.isNotEmpty()) {
+            println("⏭️ Skipped (Title Duplicate): ${item.title}")
             return null
         }
 
         // 2. Semantic Deduplication (AI)
-        val recentVideos = videoHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).take(20)
+        val recentVideos = videoHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).take(15) // Slightly reduced from 20 for efficiency
         if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
              println("⏭️ Skipped (High Semantic Similarity): ${item.title}")
              return null

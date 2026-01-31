@@ -14,6 +14,7 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
     fun findByStatusIn(statuses: Collection<VideoStatus>): List<VideoHistory>
     fun findByStatusNot(status: VideoStatus): List<VideoHistory>
     fun findByStatusNotIn(statuses: Collection<VideoStatus>): List<VideoHistory>
+    fun findByTitle(title: String): List<VideoHistory>
 
     @Aggregation(pipeline = [
         "{ \$group: { _id: '\$link', count: { \$sum: 1 }, docs: { \$push: '\$\$ROOT' } } }",
