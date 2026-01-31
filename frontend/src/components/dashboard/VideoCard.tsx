@@ -1,4 +1,5 @@
 
+import React from 'react';
 import {
     CheckCircle2,
     RefreshCw,
@@ -26,7 +27,7 @@ interface VideoCardProps {
     t: any;
 }
 
-export function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete, t }: VideoCardProps) {
+export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete, t }, ref) => {
     const statusColors: Record<string, { bg: string, text: string, border: string, icon: any }> = {
         'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} /> },
         'PROCESSING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" /> },
@@ -68,7 +69,7 @@ export function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateSta
     };
 
     return (
-        <div className="glass-morphism rounded-3xl border border-[var(--glass-border)] overflow-hidden group hover:border-purple-500/30 transition-all duration-500 shadow-2xl">
+        <div ref={ref} className="glass-morphism rounded-3xl border border-[var(--glass-border)] overflow-hidden group hover:border-purple-500/30 transition-all duration-500 shadow-2xl">
             <div className="p-5 md:p-8">
                 <div className="flex flex-col lg:flex-row justify-between items-start gap-6">
                     <div className="flex-1 space-y-4 max-w-full overflow-hidden">
@@ -155,7 +156,7 @@ export function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateSta
                         <div className="grid grid-cols-1 gap-2">
                             {video.sources?.map((source, idx) => (
                                 <a key={idx} href={getSourceUrl(source)} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-[11px] text-sky-400 hover:text-sky-300 transition-colors truncate">
-                                    <Clock size={12} className="hidden" /> {/* Dummy to keep import, actually ExternalLink was used but not imported in VideoCard. Let's reuse Clock or just text? Ah, ExternalLink needed. */}
+                                    <Clock size={12} className="hidden" />
                                     {source}
                                 </a>
                             ))}
@@ -194,4 +195,6 @@ export function VideoCard({ video, onDownload, onRegenerateMetadata, onUpdateSta
             </div>
         </div>
     );
-}
+});
+
+VideoCard.displayName = 'VideoCard';

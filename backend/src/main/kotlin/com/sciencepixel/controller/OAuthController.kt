@@ -10,6 +10,11 @@ class OAuthController(
     private val youtubeService: YoutubeService
 ) {
 
+    @GetMapping("/api/youtube/auth-url")
+    fun getAuthUrl(): Map<String, String> {
+        return mapOf("url" to youtubeService.getAuthorizationUrl())
+    }
+
     @GetMapping("/callback")
     fun handleCallback(@RequestParam("code") code: String?): String {
         return if (!code.isNullOrEmpty()) {

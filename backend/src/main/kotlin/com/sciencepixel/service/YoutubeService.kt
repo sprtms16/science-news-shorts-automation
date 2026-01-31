@@ -11,6 +11,8 @@ import com.google.api.services.youtube.model.Video
 import com.google.api.services.youtube.model.VideoSnippet
 import com.google.api.services.youtube.model.VideoStatus
 import com.google.api.client.http.InputStreamContent
+import com.sciencepixel.domain.YoutubeVideoStat
+import com.sciencepixel.domain.YoutubeVideoResponse
 import org.springframework.stereotype.Service
 import java.io.File
 import java.io.FileInputStream
@@ -19,13 +21,94 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 
 @Service
-class YoutubeService(private val quotaTracker: QuotaTracker) {
+class YoutubeService(
+    private val quotaTracker: QuotaTracker,
+    private val youtubeVideoRepository: com.sciencepixel.repository.YoutubeVideoRepository
+) {
 
     private val JSON_FACTORY = JacksonFactory.getDefaultInstance()
     private val TOKENS_DIRECTORY_PATH = "tokens"
     private val CREDENTIALS_FILE_PATH = "/client_secret.json"
-    private val SCOPES = Collections.singletonList("https://www.googleapis.com/auth/youtube.upload")
+    private val SCOPES = listOf(
+        "https://www.googleapis.com/auth/youtube.upload",
+        "https://www.googleapis.com/auth/youtube.readonly"
+    )
     private val APPLICATION_NAME = "Science News Shorts Automation"
+
+    private var cachedUploadsPlaylistId: String? = null
+
+    private fun getYoutubeClient(): YouTube {
+        val credential = getCredentials()
+        return YouTube.Builder(
+            GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential
+        ).setApplicationName(APPLICATION_NAME).build()
+    }
+
+    private fun getUploadsPlaylistId(youtube: YouTube): String {
+        cachedUploadsPlaylistId?.let { return it }
+        val channelResponse = youtube.channels().list(listOf("contentDetails")).setMine(true).execute()
+        val uploadsId = channelResponse.items.first().contentDetails.relatedPlaylists.uploads
+        cachedUploadsPlaylistId = uploadsId
+        return uploadsId
+    }
+
+    fun getMyVideosStats(limit: Long = 20, pageToken: String? = null): YoutubeVideoResponse {
+        val youtube = getYoutubeClient()
+        val uploadsId = getUploadsPlaylistId(youtube)
+
+        // 1. Get PlaylistItems (latest videos)
+        val playlistItemsRequest = youtube.playlistItems()
+            .list(listOf("snippet", "contentDetails"))
+            .setPlaylistId(uploadsId)
+            .setMaxResults(limit)
+        
+        if (!pageToken.isNullOrEmpty()) {
+            playlistItemsRequest.pageToken = pageToken
+        }
+
+        val playlistItemsResponse = playlistItemsRequest.execute()
+        val nextPageToken = playlistItemsResponse.nextPageToken
+
+        val videoIds = playlistItemsResponse.items?.map { it.contentDetails.videoId } ?: emptyList()
+        if (videoIds.isEmpty()) return YoutubeVideoResponse(emptyList(), null)
+
+        // 2. Get Video Statistics
+        val videosResponse = youtube.videos()
+            .list(listOf("snippet", "statistics"))
+            .setId(videoIds)
+            .execute()
+
+        val videos = videosResponse.items.map { video ->
+            YoutubeVideoStat(
+                videoId = video.id,
+                title = video.snippet.title,
+                viewCount = video.statistics.viewCount?.toLong() ?: 0L,
+                likeCount = video.statistics.likeCount?.toLong() ?: 0L,
+                publishedAt = video.snippet.publishedAt.toString(),
+                thumbnailUrl = video.snippet.thumbnails.default.url
+            )
+        }.sortedByDescending { it.publishedAt }
+
+        return YoutubeVideoResponse(videos, nextPageToken)
+    }
+
+    fun isTitleDuplicateOnChannel(title: String): Boolean {
+        try {
+            // Normalized comparison with local DB
+            val normalizedTarget = title.replace(Regex("\\s+"), "").lowercase()
+            
+            // Search by title containing (fuzzy-ish)
+            val potentialDuplicates = youtubeVideoRepository.findByTitleContainingIgnoreCase(title.take(10)) 
+            
+            return potentialDuplicates.any { 
+                val normalizedExisting = it.title.replace(Regex("\\s+"), "").lowercase()
+                normalizedExisting.contains(normalizedTarget) || normalizedTarget.contains(normalizedExisting)
+            }
+        } catch (e: Exception) {
+            println("⚠️ Error checking channel duplicates from local DB: ${e.message}")
+            return false // Fallback
+        }
+    }
 
     private fun getFlow(): GoogleAuthorizationCodeFlow {
         val httpTransport = GoogleNetHttpTransport.newTrustedTransport()
@@ -80,18 +163,23 @@ class YoutubeService(private val quotaTracker: QuotaTracker) {
         return credential
     }
     
+    fun getAuthorizationUrl(): String {
+        val flow = getFlow()
+        val redirectUri = "http://localhost:8080/callback"
+        return flow.newAuthorizationUrl().setRedirectUri(redirectUri).setAccessType("offline").build()
+    }
+
     // Explicitly public so Controller can call it
     fun triggerAuthFlow(flow: GoogleAuthorizationCodeFlow) {
-        val redirectUri = "http://localhost:8080/callback"
-        val authUrl = flow.newAuthorizationUrl().setRedirectUri(redirectUri).setAccessType("offline").build()
+        val authUrl = getAuthorizationUrl()
         
         println("👉 Please open the following URL to authorize:")
         println(authUrl)
-        println("Waiting for callback on $redirectUri ...")
+        println("Waiting for callback on http://localhost:8080/callback ...")
         
         // We throw here to indicate strict intervention needed. 
         // The batch job will fail, but the user can click the link, Auth, and then retry.
-        throw RuntimeException("YouTube Auth Required. Visit URL in logs (Docker Console) and retry.")
+        throw RuntimeException("YouTube Auth Required. Visit URL in logs or call /api/youtube/auth-url and retry.")
     }
 
     // Called by OAuthController

@@ -104,3 +104,30 @@ data class ScriptResponse(
     val tags: List<String> = emptyList(),
     val sources: List<String> = emptyList()
 )
+
+data class YoutubeVideoStat(
+    val videoId: String,
+    val title: String,
+    val viewCount: Long,
+    val likeCount: Long,
+    val publishedAt: String,
+    val thumbnailUrl: String
+)
+
+@Document(collection = "youtube_videos")
+data class YoutubeVideoEntity(
+    @Id
+    val videoId: String,
+    @Indexed
+    val title: String,
+    val viewCount: Long,
+    val likeCount: Long,
+    val publishedAt: String,
+    val thumbnailUrl: String,
+    val updatedAt: LocalDateTime = LocalDateTime.now()
+)
+
+data class YoutubeVideoResponse(
+    val videos: List<YoutubeVideoStat>,
+    val nextPageToken: String?
+)

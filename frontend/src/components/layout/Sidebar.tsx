@@ -24,8 +24,8 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 interface SidebarProps {
-    activeTab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs';
-    setActiveTab: (tab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs') => void;
+    activeTab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube';
+    setActiveTab: (tab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube') => void;
     isMobileMenuOpen: boolean;
     setIsMobileMenuOpen: (isOpen: boolean) => void;
     language: 'ko' | 'en';
@@ -114,6 +114,12 @@ export function Sidebar({
                         label={t.tools}
                         active={activeTab === 'tools'}
                         onClick={() => { setActiveTab('tools'); setIsMobileMenuOpen(false); }}
+                    />
+                    <NavItem
+                        icon={<Youtube size={18} />}
+                        label={t.youtubeVideos}
+                        active={activeTab === 'youtube'}
+                        onClick={() => { setActiveTab('youtube'); setIsMobileMenuOpen(false); }}
                     />
                     <NavItem
                         icon={<Settings size={18} />}

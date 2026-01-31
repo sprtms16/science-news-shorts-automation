@@ -17,6 +17,7 @@ class VideoProcessor(
     private val videoHistoryRepository: VideoHistoryRepository,
     private val systemSettingRepository: SystemSettingRepository,
     private val geminiService: GeminiService,
+    private val youtubeService: com.sciencepixel.service.YoutubeService,
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher
 ) : ItemProcessor<NewsItem, VideoHistory> {
 
@@ -26,7 +27,7 @@ class VideoProcessor(
             .map { it.value.toIntOrNull() ?: 10 }
             .orElse(10)
         
-        val currentActive = videoHistoryRepository.findAll().filter { it.status != VideoStatus.UPLOADED && it.status != VideoStatus.REGEN_FAILED && it.status != VideoStatus.ERROR }.size
+        val currentActive = videoHistoryRepository.findByStatusNotIn(listOf(VideoStatus.UPLOADED, VideoStatus.REGEN_FAILED, VideoStatus.ERROR)).size
         if (currentActive >= limit) {
             println("🛑 Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping: ${item.title}")
             return null
@@ -38,10 +39,9 @@ class VideoProcessor(
             return null
         }
 
-        // Exact Title Match (within last 24h as rough heuristic, though repository.findByTitle is global)
-        val existingByTitle = videoHistoryRepository.findByTitle(item.title)
-        if (existingByTitle.isNotEmpty()) {
-            println("⏭️ Skipped (Title Duplicate): ${item.title}")
+        // Exact Title Match on YouTube Channel
+        if (youtubeService.isTitleDuplicateOnChannel(item.title)) {
+            println("⏭️ Skipped (YouTube Channel Title Duplicate): ${item.title}")
             return null
         }
 

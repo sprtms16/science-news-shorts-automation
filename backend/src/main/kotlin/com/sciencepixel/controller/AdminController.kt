@@ -23,6 +23,9 @@ import java.nio.charset.StandardCharsets
 import com.sciencepixel.service.ProductionService
 import com.sciencepixel.repository.SystemSettingRepository
 import com.sciencepixel.domain.SystemSetting
+import com.sciencepixel.service.YoutubeSyncService
+import com.sciencepixel.repository.YoutubeVideoRepository
+import org.springframework.data.domain.PageRequest
 
 @RestController
 @RequestMapping("/admin")
@@ -35,7 +38,10 @@ class AdminController(
     private val productionService: ProductionService,
     private val systemSettingRepository: SystemSettingRepository,
     private val cleanupService: com.sciencepixel.service.CleanupService,
-    private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler
+    private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler,
+    private val youtubeService: com.sciencepixel.service.YoutubeService,
+    private val youtubeVideoRepository: YoutubeVideoRepository,
+    private val youtubeSyncService: YoutubeSyncService
 ) {
 
     @PostMapping("/videos/upload-pending")
@@ -45,6 +51,51 @@ class AdminController(
         
         return ResponseEntity.ok(mapOf(
             "message" to "Triggered pending video upload check in background."
+        ))
+    }
+
+    @GetMapping("/youtube/my-videos")
+    fun getMyVideos(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "20") size: Int
+    ): ResponseEntity<com.sciencepixel.domain.YoutubeVideoResponse> {
+        val pageable = PageRequest.of(page, size, Sort.by("publishedAt").descending())
+        val videoPage = youtubeVideoRepository.findAllByOrderByPublishedAtDesc(pageable)
+        
+        val stats = videoPage.content.map { entity ->
+            com.sciencepixel.domain.YoutubeVideoStat(
+                videoId = entity.videoId,
+                title = entity.title,
+                viewCount = entity.viewCount,
+                likeCount = entity.likeCount,
+                publishedAt = entity.publishedAt.toString(),
+                thumbnailUrl = entity.thumbnailUrl
+            )
+        }
+        
+        val nextPage = if (videoPage.hasNext()) (page + 1).toString() else null
+        
+        return ResponseEntity.ok(com.sciencepixel.domain.YoutubeVideoResponse(stats, nextPage))
+    }
+
+    @PostMapping("/youtube/sync")
+    fun triggerYoutubeSync(): ResponseEntity<Map<String, Any>> {
+        youtubeSyncService.syncVideos()
+        return ResponseEntity.ok(mapOf(
+            "message" to "YouTube synchronization triggered successfully."
+        ))
+    }
+
+    @DeleteMapping("/videos/history/uploaded")
+    fun deleteUploadedHistory(): ResponseEntity<Map<String, Any>> {
+        val uploadedOnes = videoRepository.findByStatus(VideoStatus.UPLOADED)
+        val count = uploadedOnes.size
+        if (uploadedOnes.isNotEmpty()) {
+            videoRepository.deleteAll(uploadedOnes)
+        }
+        return ResponseEntity.ok(mapOf(
+            "deletedCount" to count,
+            "message" to "Successfully deleted $count uploaded records from local database."
         ))
     }
 
@@ -218,7 +269,19 @@ class AdminController(
     }
 
     @GetMapping("/videos")
-    fun getAllVideos(): List<VideoHistory> = videoRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"))
+    fun getAllVideos(
+        @RequestParam(defaultValue = "0") page: Int,
+        @RequestParam(defaultValue = "15") size: Int
+    ): ResponseEntity<Map<String, Any>> {
+        val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
+        val videoPage = videoRepository.findAll(pageable)
+        
+        return ResponseEntity.ok(mapOf(
+            "videos" to videoPage.content,
+            "nextPage" to if (videoPage.hasNext()) page + 1 else null,
+            "totalCount" to videoPage.totalElements
+        ))
+    }
 
     @GetMapping("/videos/{id}")
     fun getVideo(@PathVariable id: String): ResponseEntity<VideoHistory> {

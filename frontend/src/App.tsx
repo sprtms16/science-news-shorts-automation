@@ -12,13 +12,14 @@ import { PromptEditor } from './components/dashboard/PromptEditor';
 import { ToolsPanel } from './components/dashboard/ToolsPanel';
 import { SettingsPanel } from './components/dashboard/SettingsPanel';
 import { LogViewer } from './components/dashboard/LogViewer';
+import YoutubeVideoList from './components/dashboard/YoutubeVideoList';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings' | 'logs'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube'>('videos');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [videos, setVideos] = useState<VideoHistory[]>([]);
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
@@ -27,6 +28,9 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [nextPage, setNextPage] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalCount, setTotalCount] = useState<number>(0);
 
   // i18n & Theme states
   const [language, setLanguage] = useState<Language>(() => {
@@ -78,12 +82,24 @@ function App() {
     fetchData();
   }, [activeTab]);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (page: number = 0) => {
+    const isInitial = page === 0;
+    if (isInitial) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
       if (activeTab === 'videos') {
-        const res = await axios.get('/admin/videos');
-        setVideos(res.data);
+        const res = await axios.get(`/admin/videos?page=${page}&size=15`);
+        if (isInitial) {
+          setVideos(res.data.videos);
+        } else {
+          setVideos(prev => [...prev, ...res.data.videos]);
+        }
+        setNextPage(res.data.nextPage);
+        setTotalCount(res.data.totalCount);
       } else if (activeTab === 'prompts') {
         const res = await axios.get('/admin/prompts');
         setPrompts(res.data);
@@ -97,6 +113,7 @@ function App() {
       console.error("Failed to fetch data", error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -213,17 +230,19 @@ function App() {
               {activeTab === 'videos' ? t.videos :
                 activeTab === 'prompts' ? t.prompts :
                   activeTab === 'settings' ? t.settings :
-                    activeTab === 'logs' ? t.logs : t.tools}
+                    activeTab === 'logs' ? t.logs :
+                      activeTab === 'youtube' ? t.youtubeVideos : t.tools}
             </h2>
             <p className="text-sm text-[var(--text-secondary)] font-medium italic">
-              {activeTab === 'videos' ? (language === 'ko' ? 'AI 영상 생성 파이프라인 실시간 관리' : 'Manage your AI video pipeline.') :
+              {activeTab === 'videos' ? (language === 'ko' ? `AI 영상 생성 파이프라인 실시간 관리 (총 ${totalCount}개)` : `Manage AI video pipeline (Total ${totalCount})`) :
                 activeTab === 'prompts' ? (language === 'ko' ? '콘텐츠 품질 향상을 위한 LLM 지침 설정' : 'Configure LLM instructions.') :
                   activeTab === 'settings' ? (language === 'ko' ? '전역 시스템 파라미터 및 제한값 설정' : 'Global params and limits.') :
-                    activeTab === 'logs' ? (language === 'ko' ? '시스템 전체 이벤트 실시간 모니터링' : 'Real-time system events monitoring.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
+                    activeTab === 'logs' ? (language === 'ko' ? '시스템 전체 이벤트 실시간 모니터링' : 'Real-time system events monitoring.') :
+                      activeTab === 'youtube' ? (language === 'ko' ? '내 유튜브 채널의 실제 업로드 영상 및 실시간 통계' : 'Real-time YouTube channel statistics.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
             </p>
           </div>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData(0)}
             disabled={loading}
             className="group flex items-center gap-2 px-5 py-2.5 bg-[var(--input-bg)] hover:bg-white/10 text-sm font-semibold rounded-xl border border-[var(--input-border)] transition-all active:scale-95 disabled:opacity-50"
           >
@@ -250,17 +269,42 @@ function App() {
                   statusFilter === 'NOT_UPLOADED' ? v.status !== 'UPLOADED' :
                     v.status === statusFilter;
               return matchesSearch && matchesStatus;
-            }).map(video => (
-              <VideoCard
-                key={video.id}
-                video={video}
-                onDownload={() => downloadVideo(video.id || '')}
-                onRegenerateMetadata={onRegenerateMetadata}
-                onUpdateStatus={updateVideoStatus}
-                onDelete={onDeleteVideo}
-                t={t}
-              />
-            ))}
+            }).map((video, index, filteredArray) => {
+              const isLast = index === filteredArray.length - 1;
+              return (
+                <VideoCard
+                  key={video.id}
+                  video={video}
+                  onDownload={() => downloadVideo(video.id || '')}
+                  onRegenerateMetadata={onRegenerateMetadata}
+                  onUpdateStatus={updateVideoStatus}
+                  onDelete={onDeleteVideo}
+                  t={t}
+                  ref={isLast ? (node: any) => {
+                    if (loading || loadingMore) return;
+                    if (!nextPage) return;
+
+                    const observer = new IntersectionObserver(entries => {
+                      if (entries[0].isIntersecting) {
+                        fetchData(nextPage);
+                        observer.disconnect();
+                      }
+                    });
+                    if (node) observer.observe(node);
+                  } : undefined}
+                />
+              );
+            })}
+            {(loadingMore || loading) && videos.length > 0 && (
+              <div className="flex justify-center p-10">
+                <RefreshCw className="w-8 h-8 animate-spin text-purple-400" />
+              </div>
+            )}
+            {!nextPage && videos.length > 0 && (
+              <div className="text-center py-10 text-gray-500 text-sm italic">
+                {language === 'ko' ? '모든 영상을 불러왔습니다.' : 'No more videos.'}
+              </div>
+            )}
             {videos.length === 0 && !loading && (
               <div className="text-center py-20 text-gray-500">No videos found.</div>
             )}
@@ -292,8 +336,12 @@ function App() {
         {activeTab === 'logs' && (
           <LogViewer t={t} />
         )}
+
+        {activeTab === 'youtube' && (
+          <YoutubeVideoList t={t} language={language} />
+        )}
       </main>
-    </div>
+    </div >
   );
 }
 
