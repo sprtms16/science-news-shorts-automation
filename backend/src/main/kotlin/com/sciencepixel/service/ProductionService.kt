@@ -344,7 +344,7 @@ class ProductionService(
         // 1. Check Local File
         if (!bgmFile.exists()) {
             println("⚠️ Local BGM not found for '$mood'. Trying AI Generation...")
-            val aiBgmFile = File(workspace.parentFile, "ai_bgm_${System.currentTimeMillis()}.wav")
+            val aiBgmFile = File(workspace, "ai_bgm_${System.currentTimeMillis()}.wav")
             
             // Generate for 15 seconds (will loop)
             val prompt = "$mood style cinematic background music, high quality"

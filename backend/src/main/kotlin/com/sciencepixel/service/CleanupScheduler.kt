@@ -32,6 +32,8 @@ class CleanupScheduler(
         cleanupService.cleanupUploadedVideos()
         cleanupService.cleanupFailedVideos()
         cleanupService.cleanupOldWorkspaces()
+        cleanupService.cleanupAiBgm()
+        cleanupService.cleanupOrphanedVideos()
         
         // 2. Periodic Safety Check (Pending Videos)
         runSafetyCheck()

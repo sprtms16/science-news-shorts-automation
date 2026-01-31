@@ -22,7 +22,7 @@ class CleanupService(
             return
         }
 
-        val cleanupThreshold = System.currentTimeMillis() - (24 * 60 * 60 * 1000) // 24 hours ago
+        val cleanupThreshold = System.currentTimeMillis() - (6 * 60 * 60 * 1000) // 6 hours ago
         var deletedCount = 0
         
         uploadedVideos.forEach { video ->
@@ -189,5 +189,47 @@ class CleanupService(
             }
         }
         println("✅ Stale job cleanup complete. Removed $deletedCount items.")
+    }
+
+    /**
+     * Delete AI-generated BGM files in the root of shared-data (orphans from previous versions)
+     */
+    fun cleanupAiBgm() {
+        println("🧹 Cleaning up orphaned AI BGM files in shared-data root...")
+        val sharedDir = File(sharedDataPath)
+        if (!sharedDir.exists()) return
+
+        val threshold = System.currentTimeMillis() - (1 * 60 * 60 * 1000) // 1 hour ago
+        var count = 0
+        sharedDir.listFiles { _, name -> name.startsWith("ai_bgm_") && name.endsWith(".wav") }?.forEach { file ->
+            if (file.lastModified() < threshold) {
+                if (file.delete()) count++
+            }
+        }
+        println("✅ AI BGM Cleanup: Deleted $count files.")
+    }
+
+    /**
+     * Identify and delete video files that have no corresponding record in the database
+     */
+    fun cleanupOrphanedVideos() {
+        println("🧹 Scanning for orphaned video files in shared-data/videos...")
+        val videoDir = File(sharedDataPath, "videos")
+        if (!videoDir.exists() || !videoDir.isDirectory) return
+
+        val allVideos = repository.findAll()
+        val registeredPaths = allVideos.mapNotNull { it.filePath }.toSet()
+        
+        var count = 0
+        videoDir.listFiles()?.forEach { file ->
+            if (file.isFile && file.path !in registeredPaths) {
+                // Heuristic: only delete if older than 30 mins to avoid deleting currently being rendered files
+                if (System.currentTimeMillis() - file.lastModified() > 30 * 60 * 1000) {
+                    println("🗑️ Deleting orphaned video (Not in DB): ${file.name}")
+                    if (file.delete()) count++
+                }
+            }
+        }
+        println("✅ Orphaned Video Cleanup: Deleted $count files.")
     }
 }
