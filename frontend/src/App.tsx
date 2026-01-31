@@ -11,13 +11,14 @@ import { VideoCard } from './components/dashboard/VideoCard';
 import { PromptEditor } from './components/dashboard/PromptEditor';
 import { ToolsPanel } from './components/dashboard/ToolsPanel';
 import { SettingsPanel } from './components/dashboard/SettingsPanel';
+import { LogViewer } from './components/dashboard/LogViewer';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings' | 'logs'>('videos');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [videos, setVideos] = useState<VideoHistory[]>([]);
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
@@ -211,12 +212,14 @@ function App() {
             <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] mb-1">
               {activeTab === 'videos' ? t.videos :
                 activeTab === 'prompts' ? t.prompts :
-                  activeTab === 'settings' ? t.settings : t.tools}
+                  activeTab === 'settings' ? t.settings :
+                    activeTab === 'logs' ? t.logs : t.tools}
             </h2>
             <p className="text-sm text-[var(--text-secondary)] font-medium italic">
               {activeTab === 'videos' ? (language === 'ko' ? 'AI 영상 생성 파이프라인 실시간 관리' : 'Manage your AI video pipeline.') :
                 activeTab === 'prompts' ? (language === 'ko' ? '콘텐츠 품질 향상을 위한 LLM 지침 설정' : 'Configure LLM instructions.') :
-                  activeTab === 'settings' ? (language === 'ko' ? '전역 시스템 파라미터 및 제한값 설정' : 'Global params and limits.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
+                  activeTab === 'settings' ? (language === 'ko' ? '전역 시스템 파라미터 및 제한값 설정' : 'Global params and limits.') :
+                    activeTab === 'logs' ? (language === 'ko' ? '시스템 전체 이벤트 실시간 모니터링' : 'Real-time system events monitoring.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
             </p>
           </div>
           <button
@@ -284,6 +287,10 @@ function App() {
             settings={settings}
             saveSetting={saveSetting}
           />
+        )}
+
+        {activeTab === 'logs' && (
+          <LogViewer t={t} />
         )}
       </main>
     </div>

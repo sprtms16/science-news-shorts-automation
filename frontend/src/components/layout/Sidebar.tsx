@@ -13,7 +13,8 @@ import {
     Monitor,
     ShieldCheck,
     ChevronRight,
-    Download
+    Download,
+    Terminal
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,8 +24,8 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 interface SidebarProps {
-    activeTab: 'videos' | 'prompts' | 'tools' | 'settings';
-    setActiveTab: (tab: 'videos' | 'prompts' | 'tools' | 'settings') => void;
+    activeTab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs';
+    setActiveTab: (tab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs') => void;
     isMobileMenuOpen: boolean;
     setIsMobileMenuOpen: (isOpen: boolean) => void;
     language: 'ko' | 'en';
@@ -119,6 +120,12 @@ export function Sidebar({
                         label={t.settings}
                         active={activeTab === 'settings'}
                         onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }}
+                    />
+                    <NavItem
+                        icon={<Terminal size={18} />}
+                        label={t.logs}
+                        active={activeTab === 'logs'}
+                        onClick={() => { setActiveTab('logs'); setIsMobileMenuOpen(false); }}
                     />
                 </nav>
 
