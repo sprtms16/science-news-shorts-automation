@@ -8,6 +8,7 @@ import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.ProductionService
+import com.sciencepixel.service.LogPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 
@@ -20,6 +21,7 @@ class RegenerationConsumer(
     private val repository: VideoHistoryRepository,
     private val productionService: ProductionService,
     private val eventPublisher: KafkaEventPublisher,
+    private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -43,6 +45,7 @@ class RegenerationConsumer(
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
+            logPublisher.warn("shorts-controller", "Max regeneration attempts reached", "Video ID: ${event.videoId}", traceId = event.videoId)
             eventPublisher.publishToDeadLetterQueue(event, "Max regeneration attempts reached")
             return
         }
@@ -69,6 +72,7 @@ class RegenerationConsumer(
             val newFilePath = result.filePath
 
             if (newFilePath.isNotBlank()) {
+                logPublisher.info("shorts-controller", "Regeneration Successful: ${event.title}", "Path: $newFilePath", traceId = event.videoId)
                 println("✅ Regeneration successful: $newFilePath")
                 
                 repository.findById(event.videoId).ifPresent { video ->
@@ -104,6 +108,7 @@ class RegenerationConsumer(
                 }
             }
         } catch (e: Exception) {
+            logPublisher.error("shorts-controller", "Regeneration Error: ${event.title}", "Error: ${e.message}", traceId = event.videoId)
             println("❌ Regeneration error: ${e.message}")
             e.printStackTrace()
             repository.findById(event.videoId).ifPresent { video ->

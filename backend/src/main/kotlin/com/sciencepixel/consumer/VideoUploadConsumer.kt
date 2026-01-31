@@ -8,6 +8,7 @@ import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.YoutubeService
 import com.sciencepixel.service.NotificationService
+import com.sciencepixel.service.LogPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import java.io.File
@@ -22,6 +23,7 @@ class VideoUploadConsumer(
     private val youtubeService: YoutubeService,
     private val eventPublisher: KafkaEventPublisher,
     private val notificationService: NotificationService,
+    private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -111,6 +113,7 @@ class VideoUploadConsumer(
                 // Discord 알림 전송 (업로드 정보 최우선)
                 notificationService.notifyUploadComplete(event.title, youtubeUrl)
 
+                logPublisher.info("shorts-controller", "YouTube Upload Success: ${event.title}", "URL: $youtubeUrl", traceId = event.videoId)
                 println("✅ Upload Success via Kafka: $youtubeUrl")
             } else {
                 println("⚠️ File not found: ${event.filePath}")
@@ -124,8 +127,7 @@ class VideoUploadConsumer(
                 ))
             }
         } catch (e: Exception) {
-            println("❌ Upload failed: ${e.message}")
-            e.printStackTrace()
+            logPublisher.error("shorts-controller", "YouTube Upload Failed: ${event.title}", "Error: ${e.message}", traceId = event.videoId)
             
             eventPublisher.publishUploadFailed(UploadFailedEvent(
                 videoId = event.videoId,

@@ -8,6 +8,7 @@ import com.sciencepixel.event.RssNewItemEvent
 import com.sciencepixel.event.ScriptCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.GeminiService
+import com.sciencepixel.service.LogPublisher
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
@@ -19,6 +20,7 @@ class ScriptConsumer(
     private val geminiService: GeminiService,
     private val videoHistoryRepository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
+    private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper
 ) {
 
@@ -29,6 +31,7 @@ class ScriptConsumer(
     fun consumeRssItem(message: String) {
         try {
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
+            logPublisher.info("shorts-controller", "Process Started: ${event.title}", "URL: ${event.url}")
             println("▶️ [ScriptConsumer] Received RSS item: ${event.title}")
 
             // 1. Create or Get History (Idempotency)
@@ -72,9 +75,11 @@ class ScriptConsumer(
                 keywords = scriptResponse.tags
             ))
 
+            logPublisher.info("shorts-controller", "Script Generated: ${scriptResponse.title}", "Scenes: ${scriptResponse.scenes.size}ea", traceId = updatedHistory.id)
             println("✅ [ScriptConsumer] Script created & event published: ${event.title}")
 
         } catch (e: Exception) {
+            logPublisher.error("shorts-controller", "Script Generation Failed", "Error: ${e.message}")
             println("❌ [ScriptConsumer] Error: ${e.message}")
             e.printStackTrace()
             // Optional: Publish to DLQ

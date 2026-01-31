@@ -31,6 +31,7 @@ class KafkaConfig {
         const val TOPIC_UPLOAD_FAILED = "upload-failed"
         const val TOPIC_REGENERATION_REQUESTED = "regeneration-requested"
         const val TOPIC_DLQ = "dead-letter-queue"
+        const val TOPIC_SYSTEM_LOGS = "system-logs"
         
         const val GROUP_MAIN = "shorts-main-group"
         const val GROUP_UPLOAD = "shorts-upload-group"
@@ -86,6 +87,9 @@ class KafkaConfig {
         .partitions(1)
         .replicas(1)
         .build()
+
+    @Bean
+    fun systemLogsTopic(): NewTopic = TopicBuilder.name(TOPIC_SYSTEM_LOGS).partitions(1).replicas(1).build()
 
     // ==================== Producer (String 직렬화) ====================
 

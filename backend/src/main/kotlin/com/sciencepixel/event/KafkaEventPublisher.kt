@@ -70,4 +70,9 @@ class KafkaEventPublisher(
         val json = objectMapper.writeValueAsString(event)
         kafkaTemplate.send(KafkaConfig.TOPIC_DLQ, reason, json)
     }
+
+    fun publishSystemLog(event: SystemLogEvent) {
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_SYSTEM_LOGS, event.serviceName, json)
+    }
 }

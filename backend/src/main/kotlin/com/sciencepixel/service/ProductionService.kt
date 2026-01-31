@@ -10,7 +10,8 @@ import java.io.File
 class ProductionService(
     private val pexelsService: PexelsService,
     private val audioService: AudioService,
-    private val geminiService: GeminiService
+    private val geminiService: GeminiService,
+    private val logPublisher: LogPublisher
 ) {
     data class AssetsResult(
         val mood: String,
@@ -20,6 +21,7 @@ class ProductionService(
     )
 
     fun produceAssetsOnly(title: String, scenes: List<Scene>, videoId: String): AssetsResult {
+        logPublisher.info("shorts-controller", "Rendering Started: $title", "Scenes: ${scenes.size}ea", traceId = videoId)
         // Use videoId for workspace unique path
         val workspace = File("shared-data/workspace_$videoId").apply { mkdirs() }
         val clipFiles = mutableListOf<File>()
@@ -78,9 +80,7 @@ class ProductionService(
         
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
         
-        // Cleanup workspace
-        // workspace.deleteRecursively() // Keep for debug in SAGA for now?
-        
+        logPublisher.info("shorts-controller", "Production Completed: $title", "Path: ${finalOutput.name}", traceId = videoId)
         return finalOutput.absolutePath
     }
 
@@ -177,7 +177,7 @@ class ProductionService(
             workspace.deleteRecursively()
         }
         
-        println("✅ Final video with synced subtitles: ${finalOutput.absolutePath}")
+        logPublisher.info("shorts-controller", "Batch Production Completed: $title", "Path: ${finalOutput.name}")
         return finalOutput.absolutePath
     }
 
