@@ -186,6 +186,51 @@ class AdminController(
         ))
     }
 
+    @PostMapping("/youtube/fix-video-description")
+    fun fixVideoDescription(@RequestParam videoId: String): ResponseEntity<Map<String, Any>> {
+        val allVideos = videoRepository.findAll()
+        val videoInDb = allVideos.find { it.youtubeUrl.contains(videoId) }
+        
+        val title: String
+        val summary: String
+        
+        if (videoInDb != null) {
+            title = videoInDb.title
+            summary = videoInDb.summary
+        } else {
+            val snippet = youtubeService.getVideoSnippet(videoId) ?: return ResponseEntity.badRequest().body(mapOf("error" to "Video not found on YouTube"))
+            title = snippet.title
+            summary = snippet.title
+        }
+
+        val generated = geminiService.regenerateMetadataOnly(title, summary)
+        val baseDescription = generated.description
+        
+        // 업로드 로직과 동일하게 해시태그 추가 (기존에 #이 없을 경우만)
+        val finalDescription = if (baseDescription.contains("#")) {
+            baseDescription
+        } else {
+            "${baseDescription}\n\n#Science #News #Shorts"
+        }
+
+        youtubeService.updateVideoMetadata(videoId, description = finalDescription)
+
+        if (videoInDb != null) {
+            videoRepository.save(videoInDb.copy(
+                description = finalDescription,
+                updatedAt = LocalDateTime.now()
+            ))
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "status" to "success",
+            "videoId" to videoId,
+            "title" to title,
+            "generatedDescription" to finalDescription,
+            "message" to "Description fixed successfully."
+        ))
+    }
+
     @PostMapping("/videos/rematch-files")
     fun rematchFilesWithDb(): ResponseEntity<Map<String, Any>> {
         val outputDir = File("/app/shared-data")

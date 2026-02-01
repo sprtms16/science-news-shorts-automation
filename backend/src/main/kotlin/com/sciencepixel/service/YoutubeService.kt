@@ -31,7 +31,8 @@ class YoutubeService(
     private val CREDENTIALS_FILE_PATH = "/client_secret.json"
     private val SCOPES = listOf(
         "https://www.googleapis.com/auth/youtube.upload",
-        "https://www.googleapis.com/auth/youtube.readonly"
+        "https://www.googleapis.com/auth/youtube.readonly",
+        "https://www.googleapis.com/auth/youtube"
     )
     private val APPLICATION_NAME = "Science News Shorts Automation"
 
@@ -90,6 +91,12 @@ class YoutubeService(
         }.sortedByDescending { it.publishedAt }
 
         return YoutubeVideoResponse(videos, nextPageToken)
+    }
+
+    fun getVideoSnippet(videoId: String): VideoSnippet? {
+        val youtube = getYoutubeClient()
+        val response = youtube.videos().list(listOf("snippet")).setId(listOf(videoId)).execute()
+        return response.items.firstOrNull()?.snippet
     }
 
     fun isTitleDuplicateOnChannel(title: String): Boolean {

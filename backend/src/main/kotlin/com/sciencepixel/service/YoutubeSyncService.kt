@@ -53,11 +53,7 @@ class YoutubeSyncService(
                 
                 pageToken = response.nextPageToken
                 
-                // If we already have the oldest video in this batch, we might be able to stop
-                // (Optimized sync: if all videos in this batch exist and viewCounts haven't changed much, we could break)
-                // For simplicity, let's just fetch everything for now if count is small.
-                
-            } while (pageToken != null && count < 100) // Fetch up to 100 latest
+            } while (pageToken != null && count < 500) // Increase sync limit to 500 for better history
             
             println("✅ YouTube sync completed. Synced $count videos.")
         } catch (e: Exception) {

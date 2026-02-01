@@ -64,15 +64,28 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
             } else {
                 setVideos(prev => [...prev, ...response.data.videos]);
             }
-            setNextPage(response.data.nextPage);
-            // Total count might not be provided in the current structure, but let's assume it might be added or we use current length
-            // For now, next page truth is enough for infinite scroll.
+            // Fix: response field name is nextPageToken, not nextPage
+            setNextPage(response.data.nextPageToken);
         } catch (err: any) {
             console.error('Failed to fetch YouTube videos:', err);
             setError(err.message || 'Failed to load videos from YouTube.');
         } finally {
             setLoading(false);
             setLoadingMore(false);
+        }
+    };
+
+    const handleFixDescription = async (videoId: string) => {
+        if (!window.confirm(language === 'ko' ? '이 영상의 설명을 새로 생성하여 업데이트하시겠습니까?' : 'Do you want to regenerate and update the description for this video?')) return;
+
+        try {
+            const response = await axios.post(`/admin/youtube/fix-video-description?videoId=${videoId}`);
+            if (response.data.status === 'success') {
+                alert(language === 'ko' ? '설명이 성공적으로 수정되었습니다.' : 'Description fixed successfully.');
+            }
+        } catch (err: any) {
+            console.error('Failed to fix description:', err);
+            alert(language === 'ko' ? '설명 수정에 실패했습니다.' : 'Failed to fix description.');
         }
     };
 
@@ -186,15 +199,24 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
                                         <Calendar className="w-3.5 h-3.5" />
                                         <span>{new Date(video.publishedAt).toLocaleDateString()}</span>
                                     </div>
-                                    <a
-                                        href={`https://youtube.com/watch?v=${video.videoId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-blue-400 hover:underline flex items-center gap-1"
-                                    >
-                                        {t.watchOnYoutube}
-                                        <ExternalLink className="w-3 h-3" />
-                                    </a>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleFixDescription(video.videoId.toString())}
+                                            className="text-purple-400 hover:text-purple-300 transition-colors"
+                                            title={language === 'ko' ? '설명 복구' : 'Fix Description'}
+                                        >
+                                            <RefreshCw className="w-4 h-4" />
+                                        </button>
+                                        <a
+                                            href={`https://youtube.com/watch?v=${video.videoId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-blue-400 hover:underline flex items-center gap-1"
+                                        >
+                                            {t.watchOnYoutube}
+                                            <ExternalLink className="w-3 h-3" />
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
