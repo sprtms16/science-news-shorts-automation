@@ -64,6 +64,8 @@ class ManualGenerationController(
         println("🧹 Manually triggering resource cleanup...")
         cleanupService.cleanupUploadedVideos()
         cleanupService.cleanupOldWorkspaces()
+        cleanupService.cleanupOrphanedVideos()
+        cleanupService.cleanupAiBgm()
         return "✅ Cleanup triggered manually. Check logs."
     }
 
