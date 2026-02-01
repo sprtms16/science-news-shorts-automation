@@ -89,7 +89,6 @@ services:
       - kafka
     volumes:
       - ./shared-data:/app/shared-data
-      - ./backend/client_secret.json:/app/client_secret.json
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
@@ -97,6 +96,7 @@ services:
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - YOUTUBE_CLIENT_SECRET_JSON=${YOUTUBE_CLIENT_SECRET_JSON}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
       - TZ=Asia/Seoul

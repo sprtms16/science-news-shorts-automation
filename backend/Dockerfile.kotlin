@@ -24,4 +24,5 @@ COPY --from=build /app/build/libs /app/libs
 RUN find /app/libs -name "*.jar" -not -name "*plain.jar" -exec cp {} /app/app.jar \;
 
 # Run the application
-ENTRYPOINT ["sh", "-c", "exec java -jar /app/app.jar"]
+# Run the application (Create client_secret.json from ENV if exists)
+ENTRYPOINT ["sh", "-c", "if [ -n \"$YOUTUBE_CLIENT_SECRET_JSON\" ]; then echo \"$YOUTUBE_CLIENT_SECRET_JSON\" > /app/client_secret.json; fi && exec java -jar /app/app.jar"]
