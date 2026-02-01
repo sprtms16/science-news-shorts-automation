@@ -538,6 +538,49 @@ class AdminController(
             .orElse(ResponseEntity.notFound().build())
     }
 
+    @PostMapping("/maintenance/cleanup-deleted-youtube")
+    fun cleanupDeletedYoutubeVideos(): ResponseEntity<Map<String, Any>> {
+        val uploadedVideos = videoRepository.findByStatus(VideoStatus.UPLOADED)
+        var cleanedCount = 0
+        val deletedIds = mutableListOf<String>()
+
+        uploadedVideos.forEach { video ->
+            if (video.youtubeUrl.isNotBlank()) {
+                val videoId = if (video.youtubeUrl.contains("youtu.be/")) {
+                    video.youtubeUrl.substringAfter("youtu.be/").substringBefore("?").trim()
+                } else if (video.youtubeUrl.contains("v=")) {
+                    video.youtubeUrl.substringAfter("v=").substringBefore("&").trim()
+                } else {
+                    null
+                }
+
+                if (videoId != null) {
+                    try {
+                        val snippet = youtubeService.getVideoSnippet(videoId)
+                        if (snippet == null) {
+                            // Video is missing on YT
+                            videoRepository.save(video.copy(
+                                status = VideoStatus.DELETED_ON_YOUTUBE,
+                                updatedAt = LocalDateTime.now()
+                            ))
+                            cleanedCount++
+                            deletedIds.add(video.id ?: "unknown")
+                        }
+                    } catch (e: Exception) {
+                        println("⚠️ Failed to check existence for ${video.id}: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "checkedCount" to uploadedVideos.size,
+            "cleanedCount" to cleanedCount,
+            "deletedIds" to deletedIds,
+            "message" to "Cleanup of deleted YouTube videos finished."
+        ))
+    }
+
     @PostMapping("/maintenance/sync-uploaded")
     fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
         val videos = videoRepository.findByStatusIn(listOf(

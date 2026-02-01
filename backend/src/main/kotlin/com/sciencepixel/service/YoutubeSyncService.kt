@@ -30,12 +30,23 @@ class YoutubeSyncService(
             // Let's fetch up to 50 (1 page) every hour, which is usually enough for a shorts channel.
             // But to be safe, let's fetch until we see duplicates we already have.
             
+            val allFetchedIds = mutableSetOf<String>()
+            var oldestPublishedAt: String? = null
+
             do {
                 val response = youtubeService.getMyVideosStats(limit = 50, pageToken = pageToken)
                 val videos = response.videos
                 
                 if (videos.isEmpty()) break
                 
+                allFetchedIds.addAll(videos.map { it.videoId })
+                if (videos.isNotEmpty()) {
+                    val currentOldest = videos.last().publishedAt
+                    if (oldestPublishedAt == null || currentOldest < oldestPublishedAt!!) {
+                        oldestPublishedAt = currentOldest
+                    }
+                }
+
                 val entities = videos.map { stat ->
                     YoutubeVideoEntity(
                         videoId = stat.videoId,
@@ -54,7 +65,20 @@ class YoutubeSyncService(
                 
                 pageToken = response.nextPageToken
                 
-            } while (pageToken != null && count < 500) // Increase sync limit to 500 for better history
+            } while (pageToken != null && count < 500)
+
+            // Pruning logic: Delete local records that are NOT on YouTube anymore (within the checked range)
+            if (allFetchedIds.isNotEmpty()) {
+                val localVideos = youtubeVideoRepository.findAll()
+                val toDelete = localVideos.filter { local ->
+                    // Not in current YT list AND is within the time range we just refreshed
+                    !allFetchedIds.contains(local.videoId) && (oldestPublishedAt == null || local.publishedAt >= oldestPublishedAt!!)
+                }
+                if (toDelete.isNotEmpty()) {
+                    youtubeVideoRepository.deleteAll(toDelete)
+                    println("🧹 Pruned ${toDelete.size} deleted videos from local DB.")
+                }
+            }
             
             println("✅ YouTube sync completed. Synced $count videos.")
         } catch (e: Exception) {

@@ -144,14 +144,15 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending') => {
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
     try {
       const endpoint = action === 'sync-uploaded' ? `/admin/maintenance/sync-uploaded` :
         action === 'cleanup-sensitive' ? `/admin/videos/cleanup-sensitive` :
-          `/admin/videos/${action}`;
+          action === 'prune-deleted' ? `/admin/maintenance/cleanup-deleted-youtube` :
+            `/admin/videos/${action}`;
       const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");

@@ -44,7 +44,8 @@ enum class VideoStatus {
     RENDERING,
     ERROR_RENDERING,
     PROCESSING_ASSETS,
-    ERROR_ASSETS
+    ERROR_ASSETS,
+    DELETED_ON_YOUTUBE
 }
 
 @Document(collection = "quota_usage")

@@ -69,6 +69,9 @@ export const translations = {
         forceUploadTitle: '업로드 강제 실행',
         forceUploadDesc: '대기 중인 영상을 즉시 업로드합니다 (최대 3개). 스케줄러가 놓친 영상을 수동으로 처리할 때 유용합니다.',
         triggerUpload: '업로드 실행',
+        pruneDeleted: '유령 영상 정리',
+        pruneDescription: '유튜브에서 삭제된 영상들을 검색하여 DB 상태를 최신화(DELETED_ON_YOUTUBE) 합니다.',
+        runPrune: '정리 실행',
     },
     en: {
         dashboard: 'Dashboard',
@@ -138,5 +141,8 @@ export const translations = {
         forceUploadTitle: 'Force Upload Pending',
         forceUploadDesc: 'Manually trigger the YouTube upload scheduler for pending videos (Max 3 at a time). Useful if the auto-scheduler missed them.',
         triggerUpload: 'Trigger Upload',
+        pruneDeleted: 'Prune Deleted Videos',
+        pruneDescription: 'Scans for videos deleted from YouTube and updates DB status to DELETED_ON_YOUTUBE.',
+        runPrune: 'Run Prune',
     }
 };

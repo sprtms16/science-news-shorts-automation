@@ -3,12 +3,13 @@ import {
     RefreshCw,
     PlayCircle,
     AlertCircle,
-    ShieldCheck
+    ShieldCheck,
+    Trash2
 } from 'lucide-react';
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -94,6 +95,27 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                                     className="px-8 py-3 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-rose-500/20"
                                 >
                                     {t.executePurge}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-indigo-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <Trash2 size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-indigo-500 mb-1">{t.pruneDeleted}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.pruneDescription}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('prune-deleted')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-indigo-500/20"
+                                >
+                                    {t.runPrune}
                                 </button>
                             </div>
                         </div>
