@@ -737,6 +737,59 @@ class AdminController(
             "resetCount" to resetCount
         ))
     }
+
+    @PostMapping("/maintenance/translate-uploaded-videos")
+    fun translateUploadedEnglishVideos(): ResponseEntity<Map<String, Any>> {
+        val uploadedVideos = videoRepository.findByStatus(VideoStatus.UPLOADED)
+        var updateCount = 0
+        val updatedVideos = mutableListOf<String>()
+
+        uploadedVideos.forEach { video ->
+            if (video.youtubeUrl.isNotBlank()) {
+                // Check for English title
+                val hasKorean = video.title.any { it in '\uAC00'..'\uD7A3' }
+                if (!hasKorean) {
+                    println("🔄 Found English title for video ${video.id} (${video.title}). Translating...")
+                    
+                    try {
+                        // 1. Regenerate Metadata (Korean)
+                        val newMeta = geminiService.regenerateMetadataOnly(video.title, video.summary)
+                        
+                        // 2. Extract Video ID
+                        val videoId = video.youtubeUrl.substringAfterLast("/").substringAfter("v=")
+                        
+                        if (videoId.isNotBlank() && videoId != video.youtubeUrl) {
+                            // 3. Update YouTube
+                            youtubeService.updateVideoMetadata(
+                                videoId = videoId,
+                                title = newMeta.title,
+                                description = newMeta.description
+                            )
+                            
+                            // 4. Update Local DB
+                            videoRepository.save(video.copy(
+                                title = newMeta.title,
+                                description = newMeta.description,
+                                tags = newMeta.tags,
+                                sources = newMeta.sources,
+                                updatedAt = LocalDateTime.now()
+                            ))
+                            
+                            updatedVideos.add("${video.title} -> ${newMeta.title}")
+                            updateCount++
+                        }
+                    } catch (e: Exception) {
+                        println("❌ Failed to translate video ${video.id}: ${e.message}")
+                    }
+                }
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "message" to "Translated and updated $updateCount videos.",
+            "updatedVideos" to updatedVideos
+        ))
+    }
 }
 
 data class UpdateStatusRequest(val status: VideoStatus, val youtubeUrl: String? = null)
