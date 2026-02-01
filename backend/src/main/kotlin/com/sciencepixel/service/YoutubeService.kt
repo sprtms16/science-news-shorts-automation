@@ -262,7 +262,7 @@ class YoutubeService(
         }
     }
 
-    fun uploadVideo(file: File, title: String, description: String, tags: List<String>): String {
+    fun uploadVideo(file: File, title: String, description: String, tags: List<String>, thumbnailFile: File? = null): String {
         println("📡 Connecting to YouTube API (Google Client)...")
         val credential = getCredentials() // might throw
         
@@ -305,6 +305,19 @@ class YoutubeService(
         quotaTracker.recordUpload()
         
         println("✅ YouTube Upload Complete! ID: ${response.id}")
+        
+        // Custom Thumbnail Upload
+        if (thumbnailFile != null && thumbnailFile.exists()) {
+            try {
+                println("🖼️ Uploading Custom Thumbnail...")
+                val thumbContent = InputStreamContent("image/jpeg", FileInputStream(thumbnailFile))
+                youtube.thumbnails().set(response.id, thumbContent).execute()
+                println("✅ Thumbnail Set Successfully!")
+            } catch (e: Exception) {
+                println("⚠️ Failed to upload thumbnail: ${e.message}")
+            }
+        }
+        
         return "https://youtu.be/${response.id}"
     }
 

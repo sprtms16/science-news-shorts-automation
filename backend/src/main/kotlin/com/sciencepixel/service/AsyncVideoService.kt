@@ -35,6 +35,7 @@ class AsyncVideoService(
             val result = productionService.produceVideo(news, historyId)
             val filePath = result.filePath
             val keywords = result.keywords
+            val thumbnailPath = result.thumbnailPath
             
             if (filePath.isNotEmpty()) {
                 // Update status to COMPLETED
@@ -43,6 +44,7 @@ class AsyncVideoService(
                     val completedVideo = videoHistoryRepository.save(history.copy(
                         status = VideoStatus.COMPLETED,
                         filePath = filePath,
+                        thumbnailPath = thumbnailPath,
                         title = result.title.ifBlank { history.title },
                         description = result.description.ifBlank { history.description },
                         tags = if (result.tags.isNotEmpty()) result.tags else history.tags,
@@ -59,6 +61,7 @@ class AsyncVideoService(
                             description = completedVideo.description,
                             link = completedVideo.link,
                             filePath = filePath,
+                            thumbnailPath = thumbnailPath,
                             keywords = keywords
                         ))
                     }

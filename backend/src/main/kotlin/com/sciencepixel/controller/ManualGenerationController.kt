@@ -261,6 +261,7 @@ class ManualGenerationController(
                 val completedVideo = videoHistoryRepository.save(savedHistory.copy(
                     status = VideoStatus.COMPLETED,
                     filePath = filePath,
+                    thumbnailPath = result.thumbnailPath,
                     title = result.title.ifBlank { savedHistory.title },
                     description = result.description.ifBlank { savedHistory.description },
                     tags = if (result.tags.isNotEmpty()) result.tags else savedHistory.tags,
@@ -276,7 +277,8 @@ class ManualGenerationController(
                         description = completedVideo.description,
                         link = completedVideo.link,
                         filePath = filePath,
-                        keywords = result.keywords
+                        keywords = result.keywords,
+                        thumbnailPath = result.thumbnailPath
                     ))
                 }
                 

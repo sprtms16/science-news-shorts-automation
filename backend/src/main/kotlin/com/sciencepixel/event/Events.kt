@@ -16,6 +16,7 @@ data class VideoCreatedEvent(
     val link: String,
     val filePath: String,
     val keywords: List<String> = emptyList(),
+    val thumbnailPath: String = "",
     val timestamp: Long = Instant.now().toEpochMilli()
 )
 
@@ -34,6 +35,7 @@ data class UploadFailedEvent(
     val reason: String,
     val retryCount: Int,
     val keywords: List<String> = emptyList(),
+    val thumbnailPath: String = "",
     val timestamp: Long = Instant.now().toEpochMilli()
 )
 

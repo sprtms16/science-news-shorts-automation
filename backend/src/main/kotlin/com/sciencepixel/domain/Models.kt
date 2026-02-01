@@ -25,7 +25,8 @@ data class VideoHistory(
     val createdAt: LocalDateTime = LocalDateTime.now(),
     val updatedAt: LocalDateTime = LocalDateTime.now(),
     val filePath: String = "",
-    val youtubeUrl: String = ""
+    val youtubeUrl: String = "",
+    val thumbnailPath: String = "" // Local path to thumbnail image
 )
 
 enum class VideoStatus {
@@ -62,7 +63,8 @@ data class ProductionResult(
     val title: String = "",
     val description: String = "",
     val tags: List<String> = emptyList(),
-    val sources: List<String> = emptyList()
+    val sources: List<String> = emptyList(),
+    val thumbnailPath: String = ""
 )
 
 @Document(collection = "system_prompt")

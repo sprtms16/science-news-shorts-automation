@@ -98,8 +98,26 @@ class ProductionService(
             return ProductionResult("", emptyList())
         }
         
+        
         val keywords = response.scenes.map { it.keyword }.distinct()
         val filePath = produceVideoFromScenes(news.title, response.scenes, response.mood, videoId)
+        
+        // Phase 4: Thumbnail Selection
+        val thumbnailPath = try {
+            val thumbKeyword = keywords.firstOrNull() ?: news.title
+            val thumbUrl = pexelsService.searchPhoto(thumbKeyword)
+            if (thumbUrl != null) {
+                val thumbFile = File("shared-data/workspace_$videoId/thumbnail.jpeg")
+                // Download
+                java.net.URL(thumbUrl).openStream().use { input ->
+                    thumbFile.outputStream().use { output -> input.copyTo(output) }
+                }
+                thumbFile.absolutePath
+            } else ""
+        } catch (e: Exception) {
+            println("❌ Thumbnail download failed: ${e.message}")
+            ""
+        }
         
         return ProductionResult(
             filePath = filePath,
@@ -107,7 +125,8 @@ class ProductionService(
             title = response.title,
             description = response.description,
             tags = response.tags,
-            sources = response.sources
+            sources = response.sources,
+            thumbnailPath = thumbnailPath
         )
     }
 

@@ -74,7 +74,8 @@ class UploadRetryConsumer(
                     description = video.description,
                     link = video.link,
                     filePath = event.filePath,
-                    keywords = event.keywords
+                    keywords = event.keywords,
+                    thumbnailPath = video.thumbnailPath
                 ))
             } else {
                 // 최대 재시도 횟수 초과

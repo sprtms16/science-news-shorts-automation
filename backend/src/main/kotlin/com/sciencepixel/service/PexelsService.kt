@@ -91,4 +91,44 @@ class PexelsService(
         }
         return true
     }
+
+    // New: Search for a high-quality photo for thumbnail
+    fun searchPhoto(keyword: String): String? {
+        val encodedKeyword = java.net.URLEncoder.encode(keyword, "UTF-8")
+        val request = Request.Builder()
+            .url("https://api.pexels.com/v1/search?query=$encodedKeyword&per_page=5&orientation=portrait")
+            .addHeader("Authorization", apiKey)
+            .build()
+
+        println("🔎 Pexels Photo Search: '$keyword'")
+
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    println("❌ Pexels Photo Error: ${response.code}")
+                    return null
+                }
+                
+                val body = response.body?.string() ?: return null
+                val json = JSONObject(body)
+                val photos = json.optJSONArray("photos")
+                
+                if (photos == null || photos.length() == 0) {
+                    println("⚠️ No photos found for '$keyword'")
+                    return null
+                }
+                
+                // Pick the first high-quality one
+                val photo = photos.getJSONObject(0)
+                val src = photo.getJSONObject("src")
+                val url = src.getString("large2x") // High res URL
+                
+                println("✅ Found Thumbnail Candidate: $url")
+                url
+            }
+        } catch (e: Exception) {
+            println("❌ Pexels Photo Exception: ${e.message}")
+            null
+        }
+    }
 }

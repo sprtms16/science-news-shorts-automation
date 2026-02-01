@@ -109,11 +109,16 @@ class VideoUploadConsumer(
                     "${baseDescription}\n\n#Science #News #Shorts"
                 }
 
+                val thumbnailFile = if (event.thumbnailPath.isNotBlank()) {
+                    File(event.thumbnailPath)
+                } else null
+
                 val youtubeUrl = youtubeService.uploadVideo(
                     file,
                     event.title,
                     finalDescription,
-                    combinedTags
+                    combinedTags,
+                    thumbnailFile
                 )
 
                 // Update DB
@@ -144,7 +149,8 @@ class VideoUploadConsumer(
                     title = event.title,
                     filePath = event.filePath,
                     reason = "File not found",
-                    retryCount = 0
+                    retryCount = 0,
+                    thumbnailPath = event.thumbnailPath
                 ))
             }
         } catch (e: Exception) {
@@ -155,7 +161,8 @@ class VideoUploadConsumer(
                 title = event.title,
                 filePath = event.filePath,
                 reason = e.message ?: "Unknown error",
-                retryCount = 0
+                retryCount = 0,
+                thumbnailPath = event.thumbnailPath
             ))
         }
     }
