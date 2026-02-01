@@ -222,6 +222,7 @@ class ManualGenerationController(
             )
 
         val statusMessage = when (history.status) {
+            VideoStatus.QUEUED -> "⏸️ 비디오 생성 대기 중..."
             VideoStatus.CREATING -> "⏳ 비디오 생성 중..."
             VideoStatus.COMPLETED -> "✅ 비디오 생성 완료! YouTube 업로드 대기 중..."
             VideoStatus.UPLOADED -> "🎉 YouTube 업로드 완료!"

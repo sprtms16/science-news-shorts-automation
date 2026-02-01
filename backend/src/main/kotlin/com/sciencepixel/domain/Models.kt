@@ -28,7 +28,8 @@ data class VideoHistory(
 )
 
 enum class VideoStatus {
-    CREATING,   // 생성중
+    QUEUED,     // 대기 중 (배치 등록 직후)
+    CREATING,   // 생성 중 (작업 시작됨)
     FAILED,     // 생성 실패
     COMPLETED,  // 생성 완료
     UPLOADED    // 업로드 완료

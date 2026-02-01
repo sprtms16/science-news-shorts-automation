@@ -80,7 +80,7 @@ class VideoProcessor(
                 title = item.title,
                 summary = item.summary,
                 link = item.link,
-                status = VideoStatus.CREATING,
+                status = VideoStatus.QUEUED,
                 createdAt = java.time.LocalDateTime.now(),
                 updatedAt = java.time.LocalDateTime.now()
             )
@@ -93,7 +93,7 @@ class VideoProcessor(
                 category = "general"
             ))
             
-            println("🚀 [Batch] Event Published: ${item.title} (Status: CREATING)")
+            println("🚀 [Batch] Event Published: ${item.title} (Status: QUEUED)")
             
             // Return null because we handled persistence and event publishing manually.
             // This prevents the ItemWriter from trying to save it again or doing duplicate work.
