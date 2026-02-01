@@ -41,7 +41,9 @@ class RegenerationConsumer(
             println("🚫 Max regeneration attempts reached: ${event.videoId}")
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = VideoStatus.REGEN_FAILED,
+                    status = VideoStatus.FAILED,
+                    failureStep = "REGEN",
+                    errorMessage = "Max regeneration attempts reached",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
@@ -79,7 +81,7 @@ class RegenerationConsumer(
 
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = VideoStatus.REGENERATING,
+                    status = VideoStatus.CREATING,
                     regenCount = event.regenCount + 1,
                     retryCount = 0,
                     updatedAt = java.time.LocalDateTime.now()
@@ -127,7 +129,9 @@ class RegenerationConsumer(
                 println("❌ Regeneration failed: Empty file path")
                 repository.findById(event.videoId).ifPresent { video ->
                     repository.save(video.copy(
-                        status = VideoStatus.REGEN_FAILED,
+                        status = VideoStatus.FAILED,
+                        failureStep = "REGEN",
+                        errorMessage = "Regeneration produced empty file path",
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                 }
@@ -138,7 +142,9 @@ class RegenerationConsumer(
             e.printStackTrace()
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = VideoStatus.REGEN_FAILED,
+                    status = VideoStatus.FAILED,
+                    failureStep = "REGEN",
+                    errorMessage = e.message ?: "Unknown Regeneration Error",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }

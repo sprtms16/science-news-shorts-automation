@@ -16,7 +16,8 @@ class BatchScheduler(
     private val shortsJob: Job,
     private val videoHistoryRepository: VideoHistoryRepository,
     private val systemSettingRepository: SystemSettingRepository,
-    private val cleanupService: CleanupService
+    private val cleanupService: CleanupService,
+    private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher
 ) {
 
     // 매 10분마다 실행 (0, 10, 20, 30, 40, 50분)
@@ -39,8 +40,7 @@ class BatchScheduler(
         // 3. Count Active/Pending videos (Include COMPLETED but exclude UPLOADED and permanent failures)
         val excludedStatuses = listOf(
             VideoStatus.UPLOADED, 
-            VideoStatus.PERMANENTLY_FAILED,
-            VideoStatus.REGEN_FAILED
+            VideoStatus.FAILED
         )
         val activeCount = videoHistoryRepository.findByStatusNotIn(excludedStatuses).size
 
@@ -61,6 +61,47 @@ class BatchScheduler(
             }
         } else {
             println("🛑 Buffer Full (>= $limit). Skipping generation.")
+        }
+    }
+
+    // 매시 5분에 실패한 영상 재시도 체크 (0 5 * * * *)
+    @Scheduled(cron = "0 5 * * * *")
+    fun retryFailedGenerations() {
+        println("⏰ Batch Scheduler: Checking for FAILED videos to retry at ${Date()}")
+        
+        val failedVideos = videoHistoryRepository.findByStatus(VideoStatus.FAILED)
+            .filter { it.regenCount < 1 } // 재생성 시도 안 한 것만
+        
+        if (failedVideos.isNotEmpty()) {
+            println("🔄 Found ${failedVideos.size} FAILED videos. Analyzing failure steps...")
+            
+            failedVideos.take(5).forEach { video ->
+                if (video.failureStep == "UPLOAD") {
+                    val file = java.io.File(video.filePath)
+                    if (file.exists() && file.length() > 0) {
+                        println("♻️ [Auto-Recovery] File exists for ${video.title} (UPLOAD fail). Resetting to COMPLETED for retry.")
+                        videoHistoryRepository.save(video.copy(
+                            status = VideoStatus.COMPLETED,
+                            failureStep = "",
+                            errorMessage = "",
+                            updatedAt = java.time.LocalDateTime.now()
+                        ))
+                        return@forEach
+                    }
+                }
+                
+                // Default: Full Regeneration
+                println("🔄 [Auto-Recovery] Triggering full regeneration for: ${video.title} (Step: ${video.failureStep})")
+                kafkaEventPublisher.publishRegenerationRequested(
+                    com.sciencepixel.event.RegenerationRequestedEvent(
+                        videoId = video.id!!,
+                        title = video.title,
+                        summary = video.summary,
+                        link = video.link,
+                        regenCount = video.regenCount
+                    )
+                )
+            }
         }
     }
 }

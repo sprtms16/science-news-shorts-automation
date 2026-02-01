@@ -13,39 +13,25 @@ data class VideoHistory(
     val summary: String,
     @Indexed(unique = true)
     val link: String,
-    val filePath: String = "",
-    val youtubeUrl: String = "",
-    val status: VideoStatus = VideoStatus.PENDING_PROCESSING,
+    val status: VideoStatus = VideoStatus.CREATING,
+    val failureStep: String = "", // e.g. "SCRIPT", "ASSETS", "RENDER", "UPLOAD"
+    val errorMessage: String = "",
     val description: String = "", // YouTube description (Korean)
     val tags: List<String> = emptyList(), // Hashtags
     val sources: List<String> = emptyList(), // Reference URLs/Sources
     val retryCount: Int = 0,  // Retry count for upload failures
     val regenCount: Int = 0,  // Regeneration attempt count
     val createdAt: LocalDateTime = LocalDateTime.now(),
-    val updatedAt: LocalDateTime = LocalDateTime.now()
+    val updatedAt: LocalDateTime = LocalDateTime.now(),
+    val filePath: String = "",
+    val youtubeUrl: String = ""
 )
 
 enum class VideoStatus {
-    PENDING_PROCESSING,
-    PROCESSING,
-    SCRIPT_READY,
-    COMPLETED,
-    RETRY_PENDING,
-    REGENERATING,
-    UPLOADED,
-    FILE_NOT_FOUND,
-    REGEN_FAILED,
-    ERROR,
-    PERMANENTLY_FAILED,
-    STALE_JOB_ABANDONED,
-    QUOTA_EXCEEDED,
-    QUEUED,
-    ERROR_SCRIPT_EMPTY,
-    RENDERING,
-    ERROR_RENDERING,
-    PROCESSING_ASSETS,
-    ERROR_ASSETS,
-    DELETED_ON_YOUTUBE
+    CREATING,   // 생성중
+    FAILED,     // 생성 실패
+    COMPLETED,  // 생성 완료
+    UPLOADED    // 업로드 완료
 }
 
 @Document(collection = "quota_usage")

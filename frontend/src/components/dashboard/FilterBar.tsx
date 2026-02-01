@@ -59,14 +59,9 @@ export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFi
                     >
                         <option value="ALL" className="bg-slate-900 text-white dark:bg-slate-900">{t.statusAll}</option>
                         <option value="UPLOADED" className="bg-slate-900 text-white dark:bg-slate-900">✅ {t.statusUploaded}</option>
-                        <option value="NOT_UPLOADED" className="bg-slate-900 text-white dark:bg-slate-900">⏳ {t.statusNotUploaded}</option>
-                        <option value="QUEUED" className="bg-slate-900 text-white dark:bg-slate-900">🕒 Queued</option>
-                        <option value="PROCESSING" className="bg-slate-900 text-white dark:bg-slate-900">⚙️ AI Processing</option>
-                        <option value="SCRIPT_READY" className="bg-slate-900 text-white dark:bg-slate-900">📜 Script Ready</option>
-                        <option value="RENDERING" className="bg-slate-900 text-white dark:bg-slate-900">🎞️ Rendering</option>
-                        <option value="COMPLETED" className="bg-slate-900 text-white dark:bg-slate-900">📦 Asset Ready</option>
-                        <option value="ERROR" className="bg-slate-900 text-white dark:bg-slate-900">❌ Fatal Error</option>
-                        <option value="REGENERATING" className="bg-slate-900 text-white dark:bg-slate-900">🔄 Healing/Regen</option>
+                        <option value="COMPLETED" className="bg-slate-900 text-white dark:bg-slate-900">📦 {t.statusCompleted}</option>
+                        <option value="CREATING" className="bg-slate-900 text-white dark:bg-slate-900">⚙️ {t.statusCreating}</option>
+                        <option value="FAILED" className="bg-slate-900 text-white dark:bg-slate-900">❌ {t.statusFailed}</option>
                     </select>
                 </div>
             </div>

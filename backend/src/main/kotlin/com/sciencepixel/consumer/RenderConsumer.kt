@@ -33,7 +33,7 @@ class RenderConsumer(
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.RENDERING,
+                    status = VideoStatus.CREATING,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
@@ -51,7 +51,9 @@ class RenderConsumer(
             if (finalPath.isEmpty()) {
                 println("❌ Rendering failed (empty path).")
                 videoHistoryRepository.save(history!!.copy(
-                    status = VideoStatus.ERROR_RENDERING,
+                    status = VideoStatus.FAILED,
+                    failureStep = "RENDER",
+                    errorMessage = "Rendering produced empty file path",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 return
@@ -81,6 +83,18 @@ class RenderConsumer(
         } catch (e: Exception) {
             println("❌ [RenderConsumer] Error: ${e.message}")
             e.printStackTrace()
+             // Try to mark as FAILED
+            val event = try { objectMapper.readValue(message, VideoAssetsReadyEvent::class.java) } catch(ex: Exception) { null }
+            event?.let { 
+                videoHistoryRepository.findById(it.videoId).ifPresent { v ->
+                    videoHistoryRepository.save(v.copy(
+                        status = VideoStatus.FAILED, 
+                        failureStep = "RENDER",
+                        errorMessage = e.message ?: "Unknown Rendering Error",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                }
+            }
         }
     }
 }

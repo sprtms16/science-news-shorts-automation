@@ -50,9 +50,8 @@ class VideoUploadConsumer(
                 }
                 
                 // Status check: Is it ready? (Avoid race with rendering/etc)
-                if (video.status != VideoStatus.COMPLETED && video.status != VideoStatus.RETRY_PENDING && video.status != VideoStatus.QUOTA_EXCEEDED) {
-                    println("⏳ Video ${event.videoId} is in status ${video.status}. Waiting for it to reach a triggerable state.")
-                    // Optional: You could republish with delay if needed, but the scheduler will eventually pick it up
+                if (video.status != VideoStatus.COMPLETED) {
+                    println("⏳ Video ${event.videoId} is in status ${video.status}. Waiting for it to reach COMPLETED state.")
                     return
                 }
             } else {

@@ -32,9 +32,9 @@ class UploadRetryConsumer(
         val event = objectMapper.readValue(message, UploadFailedEvent::class.java)
         println("📥 Received UploadFailedEvent: ${event.videoId} (Retry: ${event.retryCount})")
 
-        // ⚠️ Quota Exceeded Check - Mark for later retry
+        // ⚠️ Quota Exceeded Check - Keep as COMPLETED for scheduler to retry later
         if (event.reason.lowercase().contains("quota") || event.reason.contains("403")) {
-            println("🛑 YouTube quota exceeded for video: ${event.videoId}. Status marked as QUOTA_EXCEEDED for later retry.")
+            println("🛑 YouTube quota exceeded for video: ${event.videoId}. Status remains COMPLETED for later retry.")
             
             repository.findById(event.videoId).ifPresent { video ->
                 if (video.status == VideoStatus.UPLOADED) {
@@ -42,8 +42,9 @@ class UploadRetryConsumer(
                     return@ifPresent
                 }
                 
+                // We keep it as COMPLETED so the YoutubeUploadScheduler picks it up later
                 repository.save(video.copy(
-                    status = VideoStatus.QUOTA_EXCEEDED,
+                    status = VideoStatus.COMPLETED,
                     retryCount = event.retryCount,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
@@ -57,12 +58,12 @@ class UploadRetryConsumer(
             
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = VideoStatus.RETRY_PENDING,
+                    status = VideoStatus.COMPLETED,
                     retryCount = event.retryCount + 1,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 
-                // 다시 VideoCreatedEvent 발행 (retryCount 증가, 키워드 유지)
+                // 다시 VideoCreatedEvent 발행
                 eventPublisher.publishVideoCreated(VideoCreatedEvent(
                     videoId = event.videoId,
                     title = event.title,
@@ -81,10 +82,9 @@ class UploadRetryConsumer(
                 val file = java.io.File(video.filePath)
                 
                 if (file.exists() && file.length() > 0) {
-                    // 파일이 이미 존재하면 다시 생성할 필요가 없음 (AI 토큰 절약)
-                    println("🚩 File already exists. Skipping regeneration to save tokens. Status marked as PERMANENTLY_FAILED.")
+                    println("🚩 File already exists. Status marked as COMPLETED (for manual retry).")
                     repository.save(video.copy(
-                        status = VideoStatus.PERMANENTLY_FAILED,
+                        status = VideoStatus.COMPLETED,
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                     eventPublisher.publishToDeadLetterQueue(event, "Max retries exceeded with existing file")
@@ -98,12 +98,24 @@ class UploadRetryConsumer(
                         link = video.link,
                         regenCount = video.regenCount
                     ))
+                    // Mark as FAILED while waiting for regen? Or keep as FAILED if regen fails.
+                    // Actually, let's mark as FAILED now.
+                    repository.save(video.copy(
+                        status = VideoStatus.FAILED, 
+                        failureStep = "UPLOAD",
+                        errorMessage = "File missing or empty after upload attempts: ${event.reason}",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
                 } else {
-                    // 재생성도 이미 시도한 경우 -> 파일 및 DB 레코드 삭제
-                    println("💀 Regeneration already attempted. Deleting video record and file.")
-                    cleanupService.deleteVideoFile(video.filePath) 
-                    repository.delete(video) // Delete from DB
-                    eventPublisher.publishToDeadLetterQueue(event, "Max retries and regeneration failed (Record Deleted)")
+                    // 재생성도 이미 시도한 경우 -> 상태 FAILED로 유지
+                    println("💀 Regeneration already attempted. Marking as FAILED.")
+                    repository.save(video.copy(
+                        status = VideoStatus.FAILED, 
+                        failureStep = "UPLOAD",
+                        errorMessage = "Max retries and regeneration failed: ${event.reason}",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                    eventPublisher.publishToDeadLetterQueue(event, "Max retries and regeneration failed")
                 }
             }
         }

@@ -29,9 +29,7 @@ class VideoProcessor(
         
         val currentActive = videoHistoryRepository.findByStatusNotIn(listOf(
             VideoStatus.UPLOADED, 
-            VideoStatus.REGEN_FAILED, 
-            VideoStatus.ERROR,
-            VideoStatus.PERMANENTLY_FAILED
+            VideoStatus.FAILED
         )).size
         if (currentActive >= limit) {
             println("🛑 Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping: ${item.title}")
@@ -82,7 +80,7 @@ class VideoProcessor(
                 title = item.title,
                 summary = item.summary,
                 link = item.link,
-                status = VideoStatus.QUEUED,
+                status = VideoStatus.CREATING,
                 createdAt = java.time.LocalDateTime.now(),
                 updatedAt = java.time.LocalDateTime.now()
             )
@@ -95,7 +93,7 @@ class VideoProcessor(
                 category = "general"
             ))
             
-            println("🚀 [Batch] Event Published: ${item.title} (Status: QUEUED)")
+            println("🚀 [Batch] Event Published: ${item.title} (Status: CREATING)")
             
             // Return null because we handled persistence and event publishing manually.
             // This prevents the ItemWriter from trying to save it again or doing duplicate work.

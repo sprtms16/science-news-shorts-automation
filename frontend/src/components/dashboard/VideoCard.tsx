@@ -28,21 +28,14 @@ interface VideoCardProps {
 }
 
 export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete, t }, ref) => {
-    const statusColors: Record<string, { bg: string, text: string, border: string, icon: any }> = {
-        'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} /> },
-        'PROCESSING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" /> },
-        'REGENERATING': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', icon: <RefreshCw size={12} className="animate-spin" /> },
-        'ERROR': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} /> },
-        'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} /> },
-        'QUOTA_EXCEEDED': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', icon: <AlertCircle size={12} /> },
-        'RETRY_PENDING': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', icon: <Clock size={12} /> },
-        'FILE_NOT_FOUND': { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', icon: <AlertCircle size={12} /> },
-        'QUEUED': { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: <Clock size={12} /> },
-        'SCRIPT_READY': { bg: 'bg-blue-500/10', text: 'text-blue-400', border: 'border-blue-500/20', icon: <CheckCircle2 size={12} /> },
-        'RENDERING': { bg: 'bg-cyan-500/10', text: 'text-cyan-400', border: 'border-cyan-500/20', icon: <RefreshCw size={12} className="animate-spin" /> },
+    const statusColors: Record<string, { bg: string, text: string, border: string, icon: any, label: string }> = {
+        'CREATING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: t.statusCreating },
+        'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
+        'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} />, label: t.statusCompleted },
+        'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} />, label: t.statusUploaded },
     };
 
-    const currentStatus = statusColors[video.status] || { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: <AlertCircle size={12} /> };
+    const currentStatus = statusColors[video.status] || { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: <AlertCircle size={12} />, label: video.status };
     const isKoreanTitle = /[가-힣]/.test(video.title);
 
     const copyTitle = () => {
@@ -79,10 +72,21 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                                 currentStatus.bg, currentStatus.text, currentStatus.border
                             )}>
                                 {currentStatus.icon}
-                                {video.status}
+                                {currentStatus.label}
                             </span>
                             {!isKoreanTitle && (
                                 <span className="px-3 py-1 bg-orange-500/10 text-orange-400 text-[10px] font-bold rounded-full border border-orange-500/20 tracking-wider uppercase">{t.needsLocalization}</span>
+                            )}
+                            {video.status === 'FAILED' && video.errorMessage && (
+                                <div className="w-full mt-2 p-3 bg-rose-500/5 rounded-xl border border-rose-500/10 flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-500 text-[8px] font-black rounded uppercase leading-none">Step: {video.failureStep}</span>
+                                        <span className="text-[10px] font-bold text-rose-400/80 uppercase tracking-tighter">Diagnostic Data</span>
+                                    </div>
+                                    <p className="text-[11px] text-rose-300 font-medium leading-tight">
+                                        {video.errorMessage}
+                                    </p>
+                                </div>
                             )}
                         </div>
 

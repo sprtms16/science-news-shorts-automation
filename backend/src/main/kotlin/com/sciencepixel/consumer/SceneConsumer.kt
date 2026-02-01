@@ -38,7 +38,7 @@ class SceneConsumer(
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.PROCESSING_ASSETS,
+                    status = VideoStatus.CREATING,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
@@ -50,7 +50,9 @@ class SceneConsumer(
             if (assetResult.clipPaths.isEmpty()) {
                 println("❌ Assets generation failed (empty clips).")
                 videoHistoryRepository.save(history!!.copy(
-                    status = VideoStatus.ERROR_ASSETS,
+                    status = VideoStatus.FAILED,
+                    failureStep = "ASSETS",
+                    errorMessage = "Empty asset clips generated",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 return
@@ -73,6 +75,18 @@ class SceneConsumer(
         } catch (e: Exception) {
             println("❌ [SceneConsumer] Error: ${e.message}")
             e.printStackTrace()
+            // Try to mark as FAILED
+            val event = try { objectMapper.readValue(message, ScriptCreatedEvent::class.java) } catch(ex: Exception) { null }
+            event?.let { 
+                videoHistoryRepository.findById(it.videoId).ifPresent { v ->
+                    videoHistoryRepository.save(v.copy(
+                        status = VideoStatus.FAILED, 
+                        failureStep = "ASSETS",
+                        errorMessage = e.message ?: "Unknown Asset Generation Error",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                }
+            }
         }
     }
 }

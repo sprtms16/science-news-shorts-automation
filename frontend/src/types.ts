@@ -6,6 +6,8 @@ export interface VideoHistory {
     filePath: string;
     youtubeUrl: string;
     status: string;
+    failureStep?: string;
+    errorMessage?: string;
     description: string;
     tags: string[];
     sources: string[];

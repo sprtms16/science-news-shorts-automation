@@ -38,12 +38,9 @@ class YoutubeUploadScheduler(
             return
         }
 
-        // 2. Fetch target videos (COMPLETED, RETRY_PENDING, QUOTA_EXCEEDED)
+        // 2. Fetch target videos (COMPLETED means 제작 완료 but not yet UPLOADED)
         val targetStatuses = listOf(
-            VideoStatus.COMPLETED, 
-            VideoStatus.RETRY_PENDING, 
-            VideoStatus.QUOTA_EXCEEDED,
-            VideoStatus.STALE_JOB_ABANDONED
+            VideoStatus.COMPLETED
         )
         val pendingVideos = repository.findByStatusIn(targetStatuses).sortedBy { it.createdAt }
         
@@ -83,7 +80,7 @@ class YoutubeUploadScheduler(
             ))
         } else {
             println("🚫 Max regeneration reached for: ${video.title}")
-            repository.save(video.copy(status = VideoStatus.REGEN_FAILED, updatedAt = java.time.LocalDateTime.now()))
+            repository.save(video.copy(status = VideoStatus.FAILED, updatedAt = java.time.LocalDateTime.now()))
         }
     }
 }

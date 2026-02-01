@@ -658,68 +658,51 @@ class AdminController(
     @PostMapping("/maintenance/repair-all")
     fun repairSystem(): ResponseEntity<Map<String, Any>> {
         val videos = videoRepository.findAll()
-        var localizedCount = 0
+        var updatedCount = 0
         var regenTriggeredCount = 0
-        var fileCleanedCount = 0
-
-        val englishPattern = Regex("^[\\x00-\\x7F]*$") // ASCII check (rough English check)
+        val now = LocalDateTime.now()
 
         videos.forEach { video ->
             try {
-                var currentVideo = video
-                var needsSave = false
-                var needsRegen = false
+                val file = File(video.filePath)
+                val hasLink = video.youtubeUrl.isNotBlank()
+                val hasFile = video.filePath.isNotBlank() && file.exists()
+                
+                var targetStatus: VideoStatus = video.status
 
-                // 1. Localization Check (If title is purely English or Tags empty)
-                if (englishPattern.matches(video.title) || video.tags.isEmpty()) {
-                    val newMeta = geminiService.regenerateMetadataOnly(video.title, video.summary)
-                    currentVideo = currentVideo.copy(
-                        title = newMeta.title,
-                        description = newMeta.description,
-                        tags = newMeta.tags,
-                        sources = newMeta.sources,
-                        updatedAt = LocalDateTime.now()
-                    )
-                    needsSave = true
-                    localizedCount++
-                    // User requested regen after localization
-                    needsRegen = true
+                if (hasLink) {
+                    targetStatus = VideoStatus.UPLOADED
+                } else if (hasFile) {
+                    targetStatus = VideoStatus.COMPLETED
+                } else {
+                    // No link, No file
+                    // If it was recently updated (within 30 mins), maybe it's still CREATING
+                    val isRecent = video.updatedAt.isAfter(now.minusMinutes(30))
+                    targetStatus = if (isRecent) VideoStatus.CREATING else VideoStatus.FAILED
                 }
 
-                // 2. File Sync Check
-                val file = File(video.filePath)
-                if (video.status == VideoStatus.COMPLETED || video.status == VideoStatus.UPLOADED) {
-                    if (!file.exists()) {
-                         // File missing -> Trigger Regeneration
-                         needsRegen = true
+                if (video.status != targetStatus) {
+                    val updatedVideo = video.copy(
+                        status = targetStatus,
+                        updatedAt = LocalDateTime.now()
+                    )
+                    videoRepository.save(updatedVideo)
+                    updatedCount++
+
+                    // If it became FAILED, trigger regeneration
+                    if (targetStatus == VideoStatus.FAILED && video.regenCount < 1) {
+                        kafkaEventPublisher.publishRegenerationRequested(
+                            com.sciencepixel.event.RegenerationRequestedEvent(
+                                videoId = video.id!!,
+                                title = video.title,
+                                summary = video.summary,
+                                link = video.link,
+                                regenCount = video.regenCount
+                            )
+                        )
+                        regenTriggeredCount++
                     }
                 }
-
-                if (needsRegen && video.status != VideoStatus.PROCESSING && video.status != VideoStatus.REGENERATING) {
-                    currentVideo = currentVideo.copy(
-                        status = VideoStatus.REGENERATING, 
-                        regenCount = video.regenCount + 1,
-                        updatedAt = LocalDateTime.now()
-                    )
-                    needsSave = true
-                    
-                    // Trigger Regeneration Event
-                    kafkaEventPublisher.publishRegenerationRequested(
-                        com.sciencepixel.event.RegenerationRequestedEvent(
-                            videoId = currentVideo.id!!,
-                            title = currentVideo.title,
-                            summary = currentVideo.summary,
-                            link = currentVideo.link,
-                            regenCount = currentVideo.regenCount
-                        )
-                    )
-                    regenTriggeredCount++
-                }
-
-                if (needsSave) {
-                    videoRepository.save(currentVideo)
-                }
-
             } catch (e: Exception) {
                 println("❌ Repair Error for ${video.id}: ${e.message}")
             }
@@ -727,9 +710,9 @@ class AdminController(
 
         return ResponseEntity.ok(mapOf(
             "totalChecked" to videos.size,
-            "localized" to localizedCount,
+            "updatedStatusCount" to updatedCount,
             "regenerationTriggered" to regenTriggeredCount,
-            "message" to "Deep repair complete. Monitoring logic will pick up regenerations."
+            "message" to "Repair and migration to 4-status system complete."
         ))
     }
 }
