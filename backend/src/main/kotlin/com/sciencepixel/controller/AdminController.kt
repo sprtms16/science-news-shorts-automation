@@ -103,20 +103,9 @@ class AdminController(
 
     @PostMapping("/maintenance/reset-quota-status")
     fun resetQuotaStatus(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findByStatus(VideoStatus.QUOTA_EXCEEDED)
-        val videosToUpdate = videos.map {
-            it.copy(
-                status = VideoStatus.RETRY_PENDING,
-                updatedAt = java.time.LocalDateTime.now()
-            )
-        }
-        
-        if (videosToUpdate.isNotEmpty()) {
-            videoRepository.saveAll(videosToUpdate)
-        }
+        // Now quota handling is automatic (remains COMPLETED)
         return ResponseEntity.ok(mapOf(
-            "count" to videos.size,
-            "message" to "Successfully reset ${videos.size} videos from QUOTA_EXCEEDED to RETRY_PENDING."
+            "message" to "Quota status reset is now automatic in the new status system."
         ))
     }
 
@@ -245,10 +234,8 @@ class AdminController(
 
         val videosToMatchStatuses = listOf(
             VideoStatus.COMPLETED,
-            VideoStatus.RETRY_PENDING,
-            VideoStatus.FILE_NOT_FOUND,
-            VideoStatus.REGENERATING,
-            VideoStatus.PENDING_PROCESSING
+            VideoStatus.CREATING,
+            VideoStatus.FAILED
         )
         val videosToMatch = videoRepository.findByStatusIn(videosToMatchStatuses).filter { 
             it.filePath.isBlank() || !File(it.filePath).exists()
@@ -283,7 +270,9 @@ class AdminController(
             if (matchingFile != null) {
                 videoRepository.save(video.copy(
                     filePath = matchingFile.absolutePath,
-                    status = if (video.status == VideoStatus.FILE_NOT_FOUND || video.status == VideoStatus.PENDING_PROCESSING) VideoStatus.COMPLETED else video.status,
+                    status = if (video.status == VideoStatus.FAILED) VideoStatus.COMPLETED else video.status,
+                    failureStep = "",
+                    errorMessage = "",
                     updatedAt = LocalDateTime.now()
                 ))
                 matchedCount++
@@ -302,7 +291,7 @@ class AdminController(
     fun regenerateMissingFiles(): ResponseEntity<Map<String, Any>> {
         val regenerationTargetStatuses = listOf(
             VideoStatus.COMPLETED,
-            VideoStatus.FILE_NOT_FOUND
+            VideoStatus.FAILED
         )
         val targetVideos = videoRepository.findByStatusIn(regenerationTargetStatuses).filter {
             it.filePath.isBlank() || !File(it.filePath).exists()
@@ -311,7 +300,7 @@ class AdminController(
         var triggeredCount = 0
         targetVideos.forEach { video ->
             // Update status (Preserve UPLOADED status to avoid re-uploading)
-            val nextStatus = if (video.status == VideoStatus.UPLOADED) VideoStatus.UPLOADED else VideoStatus.REGENERATING
+            val nextStatus = if (video.status == VideoStatus.UPLOADED) VideoStatus.UPLOADED else VideoStatus.CREATING
             videoRepository.save(video.copy(status = nextStatus, updatedAt = LocalDateTime.now()))
             
             kafkaEventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
@@ -560,7 +549,9 @@ class AdminController(
                         if (snippet == null) {
                             // Video is missing on YT
                             videoRepository.save(video.copy(
-                                status = VideoStatus.DELETED_ON_YOUTUBE,
+                                status = VideoStatus.FAILED,
+                                failureStep = "YOUTUBE",
+                                errorMessage = "Video deleted on YouTube",
                                 updatedAt = LocalDateTime.now()
                             ))
                             cleanedCount++
@@ -585,9 +576,8 @@ class AdminController(
     fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
         val videos = videoRepository.findByStatusIn(listOf(
             VideoStatus.COMPLETED,
-            VideoStatus.RETRY_PENDING,
-            VideoStatus.FILE_NOT_FOUND,
-            VideoStatus.REGENERATING
+            VideoStatus.CREATING,
+            VideoStatus.FAILED
         )).filter { 
             it.youtubeUrl.isNotBlank() 
         }

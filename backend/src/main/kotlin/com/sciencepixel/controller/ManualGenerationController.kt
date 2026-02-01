@@ -187,7 +187,7 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = VideoStatus.PROCESSING,
+            status = VideoStatus.CREATING,
             updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
@@ -198,7 +198,7 @@ class ManualGenerationController(
         return JobStatus(
             id = savedHistory.id!!,
             title = news.title,
-            status = VideoStatus.PROCESSING.name,
+            status = VideoStatus.CREATING.name,
             filePath = null,
             youtubeUrl = null,
             message = "✅ 작업이 시작되었습니다. 완료 시 Discord/Telegram으로 알림됩니다. GET /manual/status/${savedHistory.id}로 상태 확인 가능"
@@ -222,11 +222,10 @@ class ManualGenerationController(
             )
 
         val statusMessage = when (history.status) {
-            VideoStatus.PROCESSING -> "⏳ 비디오 생성 중..."
+            VideoStatus.CREATING -> "⏳ 비디오 생성 중..."
             VideoStatus.COMPLETED -> "✅ 비디오 생성 완료! YouTube 업로드 대기 중..."
             VideoStatus.UPLOADED -> "🎉 YouTube 업로드 완료!"
-            VideoStatus.PERMANENTLY_FAILED, VideoStatus.REGEN_FAILED -> "❌ 비디오 생성 실패"
-            VideoStatus.ERROR -> "⚠️ 에러 발생"
+            VideoStatus.FAILED -> "❌ 비디오 생성 실패: ${history.errorMessage}"
             else -> "상태: ${history.status}"
         }
 
@@ -248,7 +247,7 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = VideoStatus.PROCESSING,
+            status = VideoStatus.CREATING,
             updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
@@ -269,7 +268,7 @@ class ManualGenerationController(
                 ))
                 
                 if (completedVideo.id != null) {
-                    kafkaEventPublisher.publishVideoCreated(VideoCreatedEvent(
+                    kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
                         videoId = completedVideo.id!!,
                         title = completedVideo.title,
                         summary = completedVideo.summary,
@@ -283,14 +282,18 @@ class ManualGenerationController(
                 "✅ Video created successfully: $filePath (Queued for Upload via Kafka)"
             } else {
                 videoHistoryRepository.save(savedHistory.copy(
-                    status = VideoStatus.PERMANENTLY_FAILED,
+                    status = VideoStatus.FAILED,
+                    failureStep = "RENDER",
+                    errorMessage = "Empty file path produced",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 "❌ Failed to create video."
             }
         } catch (e: Exception) {
             videoHistoryRepository.save(savedHistory.copy(
-                status = VideoStatus.ERROR,
+                status = VideoStatus.FAILED,
+                failureStep = "SYNC_PROCESS",
+                errorMessage = e.message ?: "Unknown error during sync creation",
                 updatedAt = java.time.LocalDateTime.now()
             ))
             e.printStackTrace()

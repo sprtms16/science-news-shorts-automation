@@ -70,10 +70,11 @@ class AsyncVideoService(
                 println("✅ [ASYNC] Video created successfully: $filePath")
                 CompletableFuture.completedFuture(filePath)
             } else {
-                val history = videoHistoryRepository.findById(historyId).orElse(null)
-                if (history != null) {
+                videoHistoryRepository.findById(historyId).ifPresent { history ->
                     videoHistoryRepository.save(history.copy(
-                        status = VideoStatus.PERMANENTLY_FAILED,
+                        status = VideoStatus.FAILED,
+                        failureStep = "RENDER_ASYNC",
+                        errorMessage = "Empty file path produced",
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                 }
@@ -82,10 +83,11 @@ class AsyncVideoService(
                 CompletableFuture.completedFuture("")
             }
         } catch (e: Exception) {
-            val history = videoHistoryRepository.findById(historyId).orElse(null)
-            if (history != null) {
+            videoHistoryRepository.findById(historyId).ifPresent { history ->
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.ERROR,
+                    status = VideoStatus.FAILED,
+                    failureStep = "ASYNC_PROCESS",
+                    errorMessage = e.message ?: "Unknown error during async creation",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }

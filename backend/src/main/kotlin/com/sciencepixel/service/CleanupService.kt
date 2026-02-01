@@ -63,9 +63,9 @@ class CleanupService(
     }
 
     fun cleanupFailedVideos() {
-        println("🧹 Starting cleanup of FAILED videos (ERROR, REGEN_FAILED)...")
+        println("🧹 Starting cleanup of FAILED videos...")
         val failedVideos = repository.findAll().filter { 
-            (it.status == VideoStatus.ERROR || it.status == VideoStatus.REGEN_FAILED) && !it.filePath.isNullOrBlank() 
+            (it.status == VideoStatus.FAILED) && !it.filePath.isNullOrBlank() 
         }
 
         if (failedVideos.isEmpty()) {
@@ -87,10 +87,11 @@ class CleanupService(
                         file.delete()
                     }
                     repository.save(video.copy(
-                        status = VideoStatus.PERMANENTLY_FAILED,
+                        filePath = "",
+                        errorMessage = (video.errorMessage + "\n[System] File deleted due to old binary").trim(),
                         updatedAt = LocalDateTime.now()
                     ))
-                    println("🚩 Marked video as PERMANENTLY_FAILED (record preserved): ${video.title}")
+                    println("🚩 Cleaned up file for FAILED video (record preserved): ${video.title}")
                     deletedCount++
                 }
             } catch (e: Exception) {
@@ -155,8 +156,8 @@ class CleanupService(
         val threshold = LocalDateTime.now().minusHours(1)
         
         val staleVideos = repository.findAll().filter { 
-            (it.status == VideoStatus.PROCESSING || it.status == VideoStatus.REGENERATING || it.status == VideoStatus.ERROR) && 
-            it.createdAt.isBefore(threshold) 
+            (it.status == VideoStatus.CREATING) && 
+            it.updatedAt.isBefore(threshold) 
         }
 
         if (staleVideos.isEmpty()) {
@@ -179,10 +180,12 @@ class CleanupService(
                 
                 // Update status instead of deleting the record
                 repository.save(video.copy(
-                    status = VideoStatus.STALE_JOB_ABANDONED,
+                    status = VideoStatus.FAILED,
+                    failureStep = "STALE_CLEANUP",
+                    errorMessage = "Job abandoned due to inactivity (>1h in CREATING state)",
                     updatedAt = LocalDateTime.now()
                 ))
-                println("🚩 Marked stale job as ABANDONED: ${video.title} (Created: ${video.createdAt})")
+                println("🚩 Marked stale job as FAILED: ${video.title} (Updated: ${video.updatedAt})")
                 deletedCount++
             } catch (e: Exception) {
                 println("❌ Error cleaning up stale job '${video.title}': ${e.message}")
