@@ -744,6 +744,8 @@ class AdminController(
         var updateCount = 0
         val updatedVideos = mutableListOf<String>()
 
+        println("🔍 [Batch Translation] Found ${uploadedVideos.size} videos in UPLOADED status.")
+
         uploadedVideos.forEach { video ->
             if (video.youtubeUrl.isNotBlank()) {
                 // Check for English title (Robust Korean detection)
@@ -755,10 +757,10 @@ class AdminController(
                 }
                 
                 // Debug log to check detection
-                // println("🔍 Checking Video: '${video.title}' (ID: ${video.id}) -> hasKorean: $hasKorean")
+                println("   Video [${video.id}]: '${video.title}' -> Has Korean? $hasKorean, URL: ${video.youtubeUrl.take(20)}...")
 
                 if (!hasKorean) {
-                    println("🔄 Found English title for video ${video.id} (${video.title}). Translating...")
+                    println("🚀 TARGET Found! English title for video ${video.id} (${video.title}). Translating...")
                     
                     try {
                         // 1. Regenerate Metadata (Korean)
