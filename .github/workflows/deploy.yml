@@ -27,6 +27,8 @@ jobs:
           
       - name: Create client_secret.json
         run: |
+          # Remove potentially existing directory (created by Docker mistakenly)
+          rm -rf backend/client_secret.json
           echo '${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}' > backend/client_secret.json
 
       - name: Deploy to Docker Compose
