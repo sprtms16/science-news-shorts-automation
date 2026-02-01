@@ -746,8 +746,17 @@ class AdminController(
 
         uploadedVideos.forEach { video ->
             if (video.youtubeUrl.isNotBlank()) {
-                // Check for English title
-                val hasKorean = video.title.any { it in '\uAC00'..'\uD7A3' }
+                // Check for English title (Robust Korean detection)
+                val normalizedTitle = java.text.Normalizer.normalize(video.title, java.text.Normalizer.Form.NFC)
+                val hasKorean = normalizedTitle.any { c ->
+                    c in '\uAC00'..'\uD7A3' || // Hangul Syllables
+                    c in '\u3131'..'\u318E' || // Hangul Compatibility Jamo
+                    c in '\u1100'..'\u11FF'    // Hangul Jamo
+                }
+                
+                // Debug log to check detection
+                // println("🔍 Checking Video: '${video.title}' (ID: ${video.id}) -> hasKorean: $hasKorean")
+
                 if (!hasKorean) {
                     println("🔄 Found English title for video ${video.id} (${video.title}). Translating...")
                     
