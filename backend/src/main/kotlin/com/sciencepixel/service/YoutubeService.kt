@@ -83,6 +83,7 @@ class YoutubeService(
             YoutubeVideoStat(
                 videoId = video.id,
                 title = video.snippet.title,
+                description = video.snippet.description ?: "",
                 viewCount = video.statistics.viewCount?.toLong() ?: 0L,
                 likeCount = video.statistics.likeCount?.toLong() ?: 0L,
                 publishedAt = video.snippet.publishedAt.toString(),

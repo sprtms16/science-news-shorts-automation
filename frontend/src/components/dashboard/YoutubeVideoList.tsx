@@ -12,6 +12,7 @@ import axios from 'axios';
 interface YoutubeVideoStat {
     videoId: String;
     title: string;
+    description: string;
     viewCount: number;
     likeCount: number;
     publishedAt: string;
@@ -182,6 +183,10 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
                                 <h3 className="font-semibold text-white line-clamp-2 min-h-[3rem]">
                                     {video.title}
                                 </h3>
+
+                                <p className="text-xs text-gray-500 line-clamp-3 min-h-[3rem]">
+                                    {video.description}
+                                </p>
 
                                 <div className="flex items-center gap-4 text-sm text-gray-400">
                                     <div className="flex items-center gap-1.5">

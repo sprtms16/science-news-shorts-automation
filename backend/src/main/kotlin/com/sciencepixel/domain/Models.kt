@@ -108,6 +108,7 @@ data class ScriptResponse(
 data class YoutubeVideoStat(
     val videoId: String,
     val title: String,
+    val description: String = "",
     val viewCount: Long,
     val likeCount: Long,
     val publishedAt: String,
@@ -120,6 +121,7 @@ data class YoutubeVideoEntity(
     val videoId: String,
     @Indexed
     val title: String,
+    val description: String = "",
     val viewCount: Long,
     val likeCount: Long,
     val publishedAt: String,

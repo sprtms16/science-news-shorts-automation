@@ -40,6 +40,7 @@ class YoutubeSyncService(
                     YoutubeVideoEntity(
                         videoId = stat.videoId,
                         title = stat.title,
+                        description = stat.description,
                         viewCount = stat.viewCount,
                         likeCount = stat.likeCount,
                         publishedAt = stat.publishedAt,

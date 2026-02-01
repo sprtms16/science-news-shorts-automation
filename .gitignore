@@ -33,6 +33,7 @@ ai-media-service/output/
 shared-data/
 shared-data-back/
 vpn-state/
+runner-work/
 
 # --- Media Files ---
 *.jpg
