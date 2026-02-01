@@ -704,6 +704,8 @@ class AdminController(
             "regenerationTriggered" to regenTriggeredCount,
             "message" to "Repair and migration to 4-status system complete."
         ))
+    }
+
     @PostMapping("/maintenance/reset-creating-to-queued")
     fun resetCreatingToQueued(): ResponseEntity<Map<String, Any>> {
         val stuckVideos = videoRepository.findByStatus(VideoStatus.CREATING)

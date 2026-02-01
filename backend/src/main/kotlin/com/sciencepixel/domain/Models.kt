@@ -19,6 +19,7 @@ data class VideoHistory(
     val description: String = "", // YouTube description (Korean)
     val tags: List<String> = emptyList(), // Hashtags
     val sources: List<String> = emptyList(), // Reference URLs/Sources
+    val validationErrors: List<String> = emptyList(), // Validation failure reasons
     val retryCount: Int = 0,  // Retry count for upload failures
     val regenCount: Int = 0,  // Regeneration attempt count
     val createdAt: LocalDateTime = LocalDateTime.now(),
