@@ -79,6 +79,9 @@ export const translations = {
         translateUploadedTitle: "업로드된 영상 한글화",
         translateUploadedDesc: "이미 업로드된 영상 중 영문 제목인 영상을 찾아 한글로 번역하고 유튜브 정보를 업데이트합니다.",
         translateUploadedBtn: "한글화 실행",
+        growthAnalysisTitle: "채널 성장 분석 (AI)",
+        growthAnalysisDesc: "상위 10% 인기 영상을 분석하여 성공 요인을 도출하고, 이를 다음 대본 생성 프롬프트에 자동 반영합니다.",
+        runGrowthAnalysis: "성장 전략 분석 실행"
     },
     en: {
         dashboard: 'Dashboard',
@@ -157,6 +160,9 @@ export const translations = {
         runPrune: 'Run Prune',
         translateUploadedTitle: "Localize Uploaded Videos",
         translateUploadedDesc: "Find uploaded videos with English titles, translate metadata to Korean, and update YouTube.",
-        translateUploadedBtn: "Run Localization"
+        translateUploadedBtn: "Run Localization",
+        growthAnalysisTitle: "Channel Growth Analysis (AI)",
+        growthAnalysisDesc: "Analyze top 10% videos to find success patterns and auto-inject them into future prompts.",
+        runGrowthAnalysis: "Run Analysis"
     }
 };

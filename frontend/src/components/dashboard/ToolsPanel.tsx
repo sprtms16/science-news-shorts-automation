@@ -5,12 +5,13 @@ import {
     AlertCircle,
     ShieldCheck,
     Trash2,
-    Languages
+    Languages,
+    TrendingUp
 } from 'lucide-react';
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -25,6 +26,28 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Growth Analysis Card (New) */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-pink-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-pink-500/10 flex items-center justify-center text-pink-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <TrendingUp size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-pink-500 mb-1">{t.growthAnalysisTitle}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.growthAnalysisDesc}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('growth-analysis')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-pink-600/10 hover:bg-pink-600 text-pink-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-pink-500/20"
+                                >
+                                    {t.runGrowthAnalysis}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-blue-500/30 transition-all group">
                         <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4 group-hover:scale-110 transition-transform">
                             <RefreshCw size={24} />
