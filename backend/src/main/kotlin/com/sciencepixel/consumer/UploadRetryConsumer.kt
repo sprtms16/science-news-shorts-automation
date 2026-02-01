@@ -52,14 +52,17 @@ class UploadRetryConsumer(
             return 
         }
 
-        if (event.retryCount < MAX_RETRY_COUNT) {
-            // 재시도: VideoCreatedEvent를 다시 발행
-            println("🔄 Retrying upload (${event.retryCount + 1}/$MAX_RETRY_COUNT)")
+        // Fix: Use DB retryCount as source of truth to avoid infinite loop
+        repository.findById(event.videoId).ifPresent { video ->
+            val currentRetryCount = video.retryCount
             
-            repository.findById(event.videoId).ifPresent { video ->
+            if (currentRetryCount < MAX_RETRY_COUNT) {
+                 // 재시도: VideoCreatedEvent를 다시 발행
+                println("🔄 Retrying upload (${currentRetryCount + 1}/$MAX_RETRY_COUNT)")
+                
                 repository.save(video.copy(
                     status = VideoStatus.COMPLETED,
-                    retryCount = event.retryCount + 1,
+                    retryCount = currentRetryCount + 1,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 
@@ -73,12 +76,10 @@ class UploadRetryConsumer(
                     filePath = event.filePath,
                     keywords = event.keywords
                 ))
-            }
-        } else {
-            // 최대 재시도 횟수 초과
-            println("🚫 Max retries exceeded for ${event.videoId}")
-            
-            repository.findById(event.videoId).ifPresent { video ->
+            } else {
+                // 최대 재시도 횟수 초과
+                println("🚫 Max retries exceeded for ${event.videoId} (Count: $currentRetryCount)")
+                
                 val file = java.io.File(video.filePath)
                 
                 if (file.exists() && file.length() > 0) {
@@ -98,8 +99,7 @@ class UploadRetryConsumer(
                         link = video.link,
                         regenCount = video.regenCount
                     ))
-                    // Mark as FAILED while waiting for regen? Or keep as FAILED if regen fails.
-                    // Actually, let's mark as FAILED now.
+                    
                     repository.save(video.copy(
                         status = VideoStatus.FAILED, 
                         failureStep = "UPLOAD",
