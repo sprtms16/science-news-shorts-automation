@@ -14,5 +14,5 @@ jobs:
 
       - name: Deploy to Docker Compose
         run: |
-          docker-compose up -d --build
+          docker-compose up -d --build ai-media-service mongo shorts-controller shorts-log-service frontend-server tailscale zookeeper kafka
           docker image prune -f

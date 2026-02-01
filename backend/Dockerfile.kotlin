@@ -3,9 +3,7 @@ FROM gradle:8.5-jdk17 AS build
 WORKDIR /app
 
 # Copy only files needed for dependency resolution first to leverage cache
-COPY build.gradle.kts .
-# If there's a settings.gradle.kts at backend level, copy it (checked before, but safer to try if it exists)
-# COPY settings.gradle.kts . 
+COPY build.gradle.kts settings.gradle.kts ./
 
 # Copy source
 COPY src ./src
