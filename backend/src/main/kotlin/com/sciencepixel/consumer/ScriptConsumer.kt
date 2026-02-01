@@ -37,8 +37,26 @@ class ScriptConsumer(
             // 1. Create or Get History (Idempotency)
             val history = getOrCreateHistory(event)
             
+            // 전역 차단 상태 확인 (업로드 차단 상태이면 아예 생성을 안 하는 것이 토큰 절약에 유리할 수 있음)
+            // 여기서는 일단 기존 로직대로 진행하되, 중복 호출 체크만 강화함
+            
+            // 이미 완료되었거나 업로드된 경우 건너뜀
             if (history.status == VideoStatus.COMPLETED || history.status == VideoStatus.UPLOADED) {
-                println("⚠️ Video already completed for: ${event.title}. Skipping.")
+                println("⚠️ Video already completed/uploaded for: ${event.title}. Skipping Gemini call.")
+                return
+            }
+
+            // 이미 파이프라인 진행 중인 경우 건너뜀 (대기 중, 스크립트 생성됨, 렌더링 중, 업로드 대기 중 등)
+            val inProgressStatuses = listOf(
+                VideoStatus.SCRIPT_READY,
+                VideoStatus.PROCESSING_ASSETS,
+                VideoStatus.RENDERING,
+                VideoStatus.RETRY_PENDING,
+                VideoStatus.QUOTA_EXCEEDED,
+                VideoStatus.REGENERATING
+            )
+            if (history.status in inProgressStatuses) {
+                println("⏭️ Video already in pipeline (Status: ${history.status}) for: ${event.title}. Skipping Gemini call to save tokens.")
                 return
             }
 

@@ -78,11 +78,23 @@ class UploadRetryConsumer(
                 ))
             }
         } else {
-            // 최대 재시도 횟수 초과 -> 재생성 요청
-            println("🚫 Max retries exceeded. Requesting regeneration...")
+            // 최대 재시도 횟수 초과
+            println("🚫 Max retries exceeded for ${event.videoId}")
             
             repository.findById(event.videoId).ifPresent { video ->
-                if (video.regenCount < 1) {
+                val file = java.io.File(video.filePath)
+                
+                if (file.exists() && file.length() > 0) {
+                    // 파일이 이미 존재하면 다시 생성할 필요가 없음 (AI 토큰 절약)
+                    println("🚩 File already exists. Skipping regeneration to save tokens. Status marked as PERMANENTLY_FAILED.")
+                    repository.save(video.copy(
+                        status = VideoStatus.PERMANENTLY_FAILED,
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                    eventPublisher.publishToDeadLetterQueue(event, "Max retries exceeded with existing file")
+                } else if (video.regenCount < 1) {
+                    // 파일이 없거나 빈 파일인 경우에만 재생성 시도
+                    println("🔄 File missing or empty. Requesting regeneration for ${video.title}...")
                     eventPublisher.publishRegenerationRequested(RegenerationRequestedEvent(
                         videoId = event.videoId,
                         title = video.title,
@@ -91,7 +103,7 @@ class UploadRetryConsumer(
                         regenCount = video.regenCount
                     ))
                 } else {
-                    // 재생성도 실패한 경우 -> 파일 및 DB 레코드 삭제
+                    // 재생성도 이미 시도한 경우 -> 파일 및 DB 레코드 삭제
                     println("💀 Regeneration already attempted. Deleting video record and file.")
                     cleanupService.deleteVideoFile(video.filePath) 
                     repository.delete(video) // Delete from DB

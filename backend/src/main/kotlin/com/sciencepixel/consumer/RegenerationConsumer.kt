@@ -53,6 +53,29 @@ class RegenerationConsumer(
         println("🔄 Regenerating video: ${event.title}")
 
         try {
+            val existingVideo = repository.findById(event.videoId).orElse(null)
+            if (existingVideo != null && existingVideo.filePath.isNotBlank() && java.io.File(existingVideo.filePath).exists()) {
+                println("⏭️ File already exists for ${event.title}. Skipping AI generation and re-using existing file to save tokens.")
+                
+                // Status를 COMPLETED로 돌려 스케줄러가 다시 집도록 함
+                repository.save(existingVideo.copy(
+                    status = VideoStatus.COMPLETED,
+                    retryCount = 0,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+                
+                // 새로운 VideoCreatedEvent 발행 (바로 업로드 시도)
+                eventPublisher.publishVideoCreated(VideoCreatedEvent(
+                    videoId = event.videoId,
+                    title = event.title,
+                    summary = event.summary,
+                    link = event.link,
+                    filePath = existingVideo.filePath,
+                    keywords = existingVideo.tags
+                ))
+                return
+            }
+
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
                     status = VideoStatus.REGENERATING,
