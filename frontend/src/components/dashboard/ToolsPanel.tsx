@@ -4,12 +4,13 @@ import {
     PlayCircle,
     AlertCircle,
     ShieldCheck,
-    Trash2
+    Trash2,
+    Languages
 } from 'lucide-react';
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -55,6 +56,23 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                             className="w-full py-3 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-emerald-600/20"
                         >
                             {t.translateAll}
+                        </button>
+                    </div>
+
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-violet-500/30 transition-all group">
+                        <div className="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400 mb-4 group-hover:scale-110 transition-transform">
+                            <Languages size={24} />
+                        </div>
+                        <h4 className="text-lg font-bold text-violet-400 mb-2">{t.translateUploadedTitle}</h4>
+                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-6">
+                            {t.translateUploadedDesc}
+                        </p>
+                        <button
+                            onClick={() => runBatchAction('translate-uploaded')}
+                            disabled={loading}
+                            className="w-full py-3 bg-violet-600/10 hover:bg-violet-600 text-violet-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-violet-600/20"
+                        >
+                            {t.translateUploadedBtn}
                         </button>
                     </div>
 

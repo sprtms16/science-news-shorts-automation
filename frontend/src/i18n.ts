@@ -76,6 +76,9 @@ export const translations = {
         pruneDeleted: '유령 영상 정리',
         pruneDescription: '유튜브에서 삭제된 영상들을 검색하여 DB 상태를 최신화(DELETED_ON_YOUTUBE) 합니다.',
         runPrune: '정리 실행',
+        translateUploadedTitle: "업로드된 영상 한글화",
+        translateUploadedDesc: "이미 업로드된 영상 중 영문 제목인 영상을 찾아 한글로 번역하고 유튜브 정보를 업데이트합니다.",
+        translateUploadedBtn: "한글화 실행",
     },
     en: {
         dashboard: 'Dashboard',
@@ -152,5 +155,8 @@ export const translations = {
         pruneDeleted: 'Prune Deleted Videos',
         pruneDescription: 'Scans for videos deleted from YouTube and updates DB status to DELETED_ON_YOUTUBE.',
         runPrune: 'Run Prune',
+        translateUploadedTitle: "Localize Uploaded Videos",
+        translateUploadedDesc: "Find uploaded videos with English titles, translate metadata to Korean, and update YouTube.",
+        translateUploadedBtn: "Run Localization"
     }
 };
