@@ -755,10 +755,15 @@ class AdminController(
                         // 1. Regenerate Metadata (Korean)
                         val newMeta = geminiService.regenerateMetadataOnly(video.title, video.summary)
                         
-                        // 2. Extract Video ID
-                        val videoId = video.youtubeUrl.substringAfterLast("/").substringAfter("v=")
+                        // 2. Extract Video ID (Robust Regex)
+                        // Supports: https://youtu.be/ID, https://www.youtube.com/watch?v=ID, https://youtube.com/shorts/ID
+                        val idPattern = Regex("(?:v=|/)([0-9A-Za-z_-]{11}).*")
+                        val match = idPattern.find(video.youtubeUrl)
+                        val videoId = match?.groupValues?.get(1) ?: video.youtubeUrl.substringAfterLast("/").takeIf { it.length == 11 }
                         
-                        if (videoId.isNotBlank() && videoId != video.youtubeUrl) {
+                        if (!videoId.isNullOrBlank()) {
+                            println("   Target Video ID: $videoId")
+                            
                             // 3. Update YouTube
                             youtubeService.updateVideoMetadata(
                                 videoId = videoId,
@@ -777,9 +782,13 @@ class AdminController(
                             
                             updatedVideos.add("${video.title} -> ${newMeta.title}")
                             updateCount++
+                            println("✅ Successfully updated video: $videoId")
+                        } else {
+                            println("⚠️ Could not extract valid Video ID from: ${video.youtubeUrl}")
                         }
                     } catch (e: Exception) {
                         println("❌ Failed to translate video ${video.id}: ${e.message}")
+                        e.printStackTrace()
                     }
                 }
             }

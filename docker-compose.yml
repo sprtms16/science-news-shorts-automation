@@ -6,7 +6,7 @@ services:
     environment:
       - REPO_URL=https://github.com/sprtms16/science-news-shorts-automation
       - RUNNER_NAME=shorts-server-runner
-      - RUNNER_TOKEN=AJGAASRWWPJMSGIDQ3RQ7LLJP5DHI
+      - RUNNER_TOKEN=AJGAASR7JVQ2D5RJ44TISS3JP5ZGA
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
     security_opt:
