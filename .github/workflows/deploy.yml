@@ -13,12 +13,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate .env file
+        env:
+          JSON_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
         run: |
           echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
           echo "PEXELS_API_KEY=${{ secrets.PEXELS_API_KEY }}" >> .env
           echo "TAILSCALE_AUTHKEY=${{ secrets.TAILSCALE_AUTHKEY }}" >> .env
           echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
-          echo "YOUTUBE_CLIENT_SECRET_JSON='${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}'" >> .env
+          
+          # Base64 Encode JSON Secret to avoid quote parsing issues
+          echo "YOUTUBE_CLIENT_SECRET_JSON_B64=$(echo -n "$JSON_SECRET" | base64 -w 0)" >> .env
 
       - name: Deploy to Docker Compose
         run: |
