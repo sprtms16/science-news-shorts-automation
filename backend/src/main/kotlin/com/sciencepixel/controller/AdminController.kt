@@ -67,6 +67,7 @@ class AdminController(
             com.sciencepixel.domain.YoutubeVideoStat(
                 videoId = entity.videoId,
                 title = entity.title,
+                description = entity.description,
                 viewCount = entity.viewCount,
                 likeCount = entity.likeCount,
                 publishedAt = entity.publishedAt.toString(),
