@@ -102,20 +102,77 @@ class YoutubeService(
 
     fun isTitleDuplicateOnChannel(title: String): Boolean {
         try {
-            // Normalized comparison with local DB
+            // 1. Normalized exact/containment check first (Fast)
             val normalizedTarget = title.replace(Regex("\\s+"), "").lowercase()
             
-            // Search by title containing (fuzzy-ish)
-            val potentialDuplicates = youtubeVideoRepository.findByTitleContainingIgnoreCase(title.take(10)) 
+            // Search by localized fuzzy
+            val potentialDuplicates = youtubeVideoRepository.findByTitleContainingIgnoreCase(title.take(5)) 
             
-            return potentialDuplicates.any { 
+            val exactMatch = potentialDuplicates.any { 
                 val normalizedExisting = it.title.replace(Regex("\\s+"), "").lowercase()
-                normalizedExisting.contains(normalizedTarget) || normalizedTarget.contains(normalizedExisting)
+                normalizedExisting == normalizedTarget
             }
+            
+            if (exactMatch) {
+                println("⚠️ Exact duplicate found locally: $title")
+                return true
+            }
+
+            // 2. Similarity Check (Levenshtein Distance) - Slower but more accurate for "different but similar" titles
+            // Fetch all headers (efficient enough for < 10k videos)
+            val allVideos = youtubeVideoRepository.findAll()
+            
+            // Threshold: 0.6 (60% match) - Adjust based on sensitivity needs
+            val threshold = 0.6
+            
+            val similarVideo = allVideos.find { video ->
+                val similarity = calculateSimilarity(title, video.title)
+                if (similarity >= threshold) {
+                    println("⚠️ Similar duplicate found: '${video.title}' (Score: $similarity) similar to '$title'")
+                    true
+                } else {
+                    false
+                }
+            }
+            
+            return similarVideo != null
+
         } catch (e: Exception) {
             println("⚠️ Error checking channel duplicates from local DB: ${e.message}")
             return false // Fallback
         }
+    }
+
+    // Levenshtein Distance based Similarity (0.0 to 1.0)
+    private fun calculateSimilarity(s1: String, s2: String): Double {
+        val longer = if (s1.length > s2.length) s1 else s2
+        val shorter = if (s1.length > s2.length) s2 else s1
+        
+        if (longer.isEmpty()) return 1.0 // both empty
+        
+        val levDistance = getLevenshteinDistance(longer, shorter)
+        return (longer.length - levDistance).toDouble() / longer.length.toDouble()
+    }
+
+    private fun getLevenshteinDistance(x: String, y: String): Int {
+        val m = x.length
+        val n = y.length
+        val dp = Array(m + 1) { IntArray(n + 1) }
+    
+        for (i in 0..m) dp[i][0] = i
+        for (j in 0..n) dp[0][j] = j
+    
+        for (i in 1..m) {
+            for (j in 1..n) {
+                val cost = if (x[i - 1] == y[j - 1]) 0 else 1
+                dp[i][j] = minOf(
+                    dp[i - 1][j] + 1,       // deletion
+                    dp[i][j - 1] + 1,       // insertion
+                    dp[i - 1][j - 1] + cost // substitution
+                )
+            }
+        }
+        return dp[m][n]
     }
 
     private fun getFlow(): GoogleAuthorizationCodeFlow {
