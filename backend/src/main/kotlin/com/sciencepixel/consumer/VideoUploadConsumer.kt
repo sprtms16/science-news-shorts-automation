@@ -88,10 +88,19 @@ class VideoUploadConsumer(
                 println("✅ Verification Passed. Meta: Title='${event.title}' (${if(hasKorean) "KR" else "NON-KR"}), Tags=${combinedTags.size}ea")
 
                 
+                val baseDescription = if (event.description.isNotBlank()) event.description else event.summary
+                
+                // Only append default hashtags if none are present in the base description
+                val finalDescription = if (baseDescription.contains("#")) {
+                    baseDescription
+                } else {
+                    "${baseDescription}\n\n#Science #News #Shorts"
+                }
+
                 val youtubeUrl = youtubeService.uploadVideo(
                     file,
                     event.title,
-                    "${event.summary}\n\n#Science #News #Shorts",
+                    finalDescription,
                     combinedTags
                 )
 

@@ -26,6 +26,7 @@ class MongoWriter(
                     videoId = video.id!!,
                     title = video.title,
                     summary = video.summary,
+                    description = video.description,
                     link = video.link,
                     filePath = video.filePath,
                     keywords = emptyList() // Batch 처리 시에는 현재 키워드 추출 로직이 없음

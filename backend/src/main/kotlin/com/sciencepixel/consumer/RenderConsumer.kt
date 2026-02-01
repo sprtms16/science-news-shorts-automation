@@ -69,7 +69,8 @@ class RenderConsumer(
             eventPublisher.publishVideoCreated(VideoCreatedEvent(
                 videoId = event.videoId,
                 title = event.title,
-                summary = event.scriptEvent?.summary ?: "",
+                summary = history?.summary ?: "",
+                description = event.scriptEvent?.summary ?: "", // ScriptCreatedEvent.summary is description
                 link = event.scriptEvent?.sourceLink ?: "",
                 filePath = finalPath,
                 keywords = event.keywords

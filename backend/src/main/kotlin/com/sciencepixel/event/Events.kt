@@ -12,6 +12,7 @@ data class VideoCreatedEvent(
     val videoId: String,
     val title: String,
     val summary: String,
+    val description: String = "",
     val link: String,
     val filePath: String,
     val keywords: List<String> = emptyList(),

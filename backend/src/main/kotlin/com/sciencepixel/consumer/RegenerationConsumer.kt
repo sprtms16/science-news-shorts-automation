@@ -68,7 +68,8 @@ class RegenerationConsumer(
                 eventPublisher.publishVideoCreated(VideoCreatedEvent(
                     videoId = event.videoId,
                     title = event.title,
-                    summary = event.summary,
+                    summary = existingVideo.summary,
+                    description = existingVideo.description,
                     link = event.link,
                     filePath = existingVideo.filePath,
                     keywords = existingVideo.tags
@@ -116,6 +117,7 @@ class RegenerationConsumer(
                         videoId = event.videoId,
                         title = event.title,
                         summary = event.summary,
+                        description = result.description,
                         link = event.link,
                         filePath = newFilePath,
                         keywords = result.keywords

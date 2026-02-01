@@ -56,6 +56,7 @@ class AsyncVideoService(
                             videoId = completedVideo.id!!,
                             title = completedVideo.title,
                             summary = completedVideo.summary,
+                            description = completedVideo.description,
                             link = completedVideo.link,
                             filePath = filePath,
                             keywords = keywords

@@ -67,6 +67,7 @@ class UploadRetryConsumer(
                     videoId = event.videoId,
                     title = event.title,
                     summary = video.summary,
+                    description = video.description,
                     link = video.link,
                     filePath = event.filePath,
                     keywords = event.keywords
