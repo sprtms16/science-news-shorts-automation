@@ -1,4 +1,14 @@
 services:
+  watchtower:
+    image: containrrr/watchtower
+    container_name: shorts-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_POLL_INTERVAL=1800
+      - WATCHTOWER_CLEANUP=true
+    restart: unless-stopped
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: shorts-zookeeper
