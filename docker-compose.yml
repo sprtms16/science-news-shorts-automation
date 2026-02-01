@@ -2,13 +2,15 @@ services:
   github-runner:
     image: myoung34/github-runner:latest
     container_name: shorts-github-runner
-    restart: unless-stopped
+    restart: always
     environment:
       - REPO_URL=https://github.com/sprtms16/science-news-shorts-automation
       - RUNNER_NAME=shorts-server-runner
       - RUNNER_TOKEN=${GITHUB_RUNNER_TOKEN}
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
+    security_opt:
+      - apparmor:unconfined
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./runner-work:/tmp/runner
