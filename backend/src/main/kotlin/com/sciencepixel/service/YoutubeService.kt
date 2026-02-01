@@ -198,10 +198,6 @@ class YoutubeService(
     }
 
     fun uploadVideo(file: File, title: String, description: String, tags: List<String>): String {
-        if (!quotaTracker.canUpload()) {
-            throw RuntimeException("YouTube API Quota Exceeded for today. Remaining uploads: ${quotaTracker.getRemainingUploads()}")
-        }
-
         println("📡 Connecting to YouTube API (Google Client)...")
         val credential = getCredentials() // might throw
         

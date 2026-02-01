@@ -17,8 +17,7 @@ class UploadRetryConsumer(
     private val repository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
     private val objectMapper: ObjectMapper,
-    private val cleanupService: com.sciencepixel.service.CleanupService,
-    private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository
+    private val cleanupService: com.sciencepixel.service.CleanupService
 ) {
 
     companion object {
@@ -33,15 +32,11 @@ class UploadRetryConsumer(
         val event = objectMapper.readValue(message, UploadFailedEvent::class.java)
         println("📥 Received UploadFailedEvent: ${event.videoId} (Retry: ${event.retryCount})")
 
-        // ⚠️ Quota Exceeded Check - Do NOT retry if quota exceeded
+        // ⚠️ Quota Exceeded Check - Mark for later retry
         if (event.reason.lowercase().contains("quota") || event.reason.contains("403")) {
-            println("🛑 YouTube quota exceeded. Blocking and stopping retry loop. Video: ${event.videoId}")
+            println("🛑 YouTube quota exceeded for video: ${event.videoId}. Status marked as QUOTA_EXCEEDED for later retry.")
             
-            // Set System-wide Block
-            markQuotaExceeded()
-
             repository.findById(event.videoId).ifPresent { video ->
-                // Idempotency check: Don't revert if already uploaded
                 if (video.status == VideoStatus.UPLOADED) {
                     println("⏭️ Video ${event.videoId} already marked as UPLOADED. Ignoring quota failure update.")
                     return@ifPresent
@@ -53,7 +48,7 @@ class UploadRetryConsumer(
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
-            return // Exit immediately, do not retry
+            return 
         }
 
         if (event.retryCount < MAX_RETRY_COUNT) {
@@ -113,19 +108,4 @@ class UploadRetryConsumer(
         }
     }
 
-    private fun markQuotaExceeded() {
-        println("⛔ Quota Exceeded. Blocking uploads until next reset (Tomorrow 17:00 KST).")
-        val now = java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Seoul"))
-        val nextReset = if (now.hour >= 17) {
-            now.plusDays(1).withHour(17).withMinute(0).withSecond(0)
-        } else {
-            now.withHour(17).withMinute(0).withSecond(0)
-        }
-        
-        systemSettingRepository.save(com.sciencepixel.domain.SystemSetting(
-            key = "UPLOAD_BLOCKED_UNTIL",
-            value = nextReset.toString(),
-            description = "Blocked due to YouTube Quota Exceeded"
-        ))
-    }
 }

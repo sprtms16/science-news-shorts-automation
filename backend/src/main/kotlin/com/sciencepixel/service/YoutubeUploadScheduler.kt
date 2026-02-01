@@ -32,22 +32,6 @@ class YoutubeUploadScheduler(
     fun uploadPendingVideos() {
         println("⏰ Scheduler Triggered: Checking for pending/stuck videos at ${java.time.LocalDateTime.now()}")
 
-        // 1. Check Quota Block
-        val blockedSetting = systemSettingRepository.findById("UPLOAD_BLOCKED_UNTIL").orElse(null)
-        if (blockedSetting != null) {
-            try {
-                val blockedUntil = java.time.LocalDateTime.parse(blockedSetting.value)
-                if (java.time.LocalDateTime.now().isBefore(blockedUntil)) {
-                    println("⛔ Upload is currently BLOCKED until $blockedUntil.")
-                    return
-                } else {
-                    systemSettingRepository.delete(blockedSetting)
-                }
-            } catch (e: Exception) {
-                systemSettingRepository.delete(blockedSetting)
-            }
-        }
-        
         // 2. Fetch target videos (COMPLETED, RETRY_PENDING, QUOTA_EXCEEDED)
         val targetStatuses = listOf(
             VideoStatus.COMPLETED, 
