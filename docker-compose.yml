@@ -38,6 +38,7 @@ services:
     restart: unless-stopped
 
   ai-media-service:
+    image: ghcr.io/sprtms16/science-news-shorts-automation-ai-service:develop
     build: ./backend/ai-media-service
     container_name: shorts-ai-service
     ports:
@@ -70,6 +71,7 @@ services:
     restart: unless-stopped
 
   shorts-controller:
+    image: ghcr.io/sprtms16/science-news-shorts-automation-controller:develop
     build:
       context: ./backend
       dockerfile: Dockerfile.kotlin
@@ -100,6 +102,7 @@ services:
       - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
 
   shorts-log-service:
+    image: ghcr.io/sprtms16/science-news-shorts-automation-log-service:develop
     build:
       context: ./backend/shorts-log-service
     container_name: shorts-log-service
@@ -115,6 +118,7 @@ services:
     restart: unless-stopped
 
   frontend-server:
+    image: ghcr.io/sprtms16/science-news-shorts-automation-frontend:develop
     build: ./frontend
     container_name: shorts-frontend
     network_mode: "service:tailscale"
