@@ -68,7 +68,7 @@ class RegenerationConsumer(
                 link = event.link
             )
 
-            val result = productionService.produceVideo(newsItem)
+            val result = productionService.produceVideo(newsItem, event.videoId)
             val newFilePath = result.filePath
 
             if (newFilePath.isNotBlank()) {

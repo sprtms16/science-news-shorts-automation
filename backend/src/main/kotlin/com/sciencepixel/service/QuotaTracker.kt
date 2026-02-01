@@ -2,6 +2,7 @@ package com.sciencepixel.service
 
 import com.sciencepixel.domain.QuotaUsage
 import com.sciencepixel.repository.QuotaUsageRepository
+import com.sciencepixel.repository.SystemSettingRepository
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -11,11 +12,20 @@ import java.time.format.DateTimeFormatter
  * YouTube API 할당량 추적 및 관리 서비스
  */
 @Service
-class QuotaTracker(private val repository: QuotaUsageRepository) {
+class QuotaTracker(
+    private val repository: QuotaUsageRepository,
+    private val systemSettingRepository: SystemSettingRepository
+) {
 
     companion object {
-        const val DAILY_QUOTA_LIMIT = 10000
+        const val DEFAULT_DAILY_QUOTA_LIMIT = 10000
         const val UPLOAD_COST = 1600
+    }
+
+    private fun getDailyLimit(): Int {
+        return systemSettingRepository.findById("YOUTUBE_DAILY_QUOTA_LIMIT")
+            .map { it.value.toIntOrNull() ?: DEFAULT_DAILY_QUOTA_LIMIT }
+            .orElse(DEFAULT_DAILY_QUOTA_LIMIT)
     }
 
     /**
@@ -23,7 +33,7 @@ class QuotaTracker(private val repository: QuotaUsageRepository) {
      */
     fun canUpload(): Boolean {
         val quota = getOrCreateQuota()
-        return (quota.usedUnits + UPLOAD_COST) <= DAILY_QUOTA_LIMIT
+        return (quota.usedUnits + UPLOAD_COST) <= getDailyLimit()
     }
 
     /**
@@ -31,11 +41,27 @@ class QuotaTracker(private val repository: QuotaUsageRepository) {
      */
     fun recordUpload() {
         val quota = getOrCreateQuota()
+        val limit = getDailyLimit()
         repository.save(quota.copy(
             usedUnits = quota.usedUnits + UPLOAD_COST,
             updatedAt = LocalDateTime.now()
         ))
-        println("📊 YouTube Quota Updated: ${quota.usedUnits + UPLOAD_COST} / $DAILY_QUOTA_LIMIT")
+        println("📊 YouTube Quota Updated: ${quota.usedUnits + UPLOAD_COST} / $limit")
+    }
+
+    /**
+     * 할당량 사용량 강제 초기화
+     */
+    fun resetQuota() {
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
+        val newQuota = QuotaUsage(
+            id = "youtube_upload",
+            usedUnits = 0,
+            date = today,
+            updatedAt = LocalDateTime.now()
+        )
+        repository.save(newQuota)
+        println("🔄 YouTube Daily Quota units reset to 0 for $today")
     }
 
     /**
@@ -43,7 +69,8 @@ class QuotaTracker(private val repository: QuotaUsageRepository) {
      */
     fun getRemainingUploads(): Int {
         val quota = getOrCreateQuota()
-        val remainingUnits = DAILY_QUOTA_LIMIT - quota.usedUnits
+        val limit = getDailyLimit()
+        val remainingUnits = limit - quota.usedUnits
         return remainingUnits / UPLOAD_COST
     }
 

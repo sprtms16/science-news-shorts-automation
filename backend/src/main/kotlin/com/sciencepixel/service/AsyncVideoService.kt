@@ -32,7 +32,7 @@ class AsyncVideoService(
         println("🚀 [ASYNC] Starting video creation: ${news.title}")
         
         return try {
-            val result = productionService.produceVideo(news)
+            val result = productionService.produceVideo(news, historyId)
             val filePath = result.filePath
             val keywords = result.keywords
             

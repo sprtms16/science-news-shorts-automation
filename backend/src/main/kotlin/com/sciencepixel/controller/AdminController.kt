@@ -41,7 +41,8 @@ class AdminController(
     private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler,
     private val youtubeService: com.sciencepixel.service.YoutubeService,
     private val youtubeVideoRepository: YoutubeVideoRepository,
-    private val youtubeSyncService: YoutubeSyncService
+    private val youtubeSyncService: YoutubeSyncService,
+    private val quotaTracker: com.sciencepixel.service.QuotaTracker
 ) {
 
     @PostMapping("/videos/upload-pending")
@@ -115,6 +116,18 @@ class AdminController(
         return ResponseEntity.ok(mapOf(
             "count" to videos.size,
             "message" to "Successfully reset ${videos.size} videos from QUOTA_EXCEEDED to RETRY_PENDING."
+        ))
+    }
+
+    @PostMapping("/maintenance/reset-daily-quota-units")
+    fun resetDailyQuotaUnits(): ResponseEntity<Map<String, Any>> {
+        quotaTracker.resetQuota()
+        
+        // Also clear any system-wide block settings
+        systemSettingRepository.deleteById("UPLOAD_BLOCKED_UNTIL")
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Successfully reset internal YouTube daily quota units and cleared block settings."
         ))
     }
 

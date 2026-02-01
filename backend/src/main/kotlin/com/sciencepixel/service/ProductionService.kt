@@ -76,7 +76,8 @@ class ProductionService(
         
         val sanitizedTitle = title.take(20).replace(Regex("[^a-zA-Z0-9가-힣]"), "_").lowercase()
         val outcomeDir = File("shared-data/videos").apply { mkdirs() }
-        val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_${System.currentTimeMillis()}.mp4")
+        // Use videoId for deterministic filename to avoid duplicates
+        val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_$videoId.mp4")
         
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
         
@@ -87,8 +88,8 @@ class ProductionService(
 
 
     // Entry point for Batch Job (Legacy - Deprecated)
-    fun produceVideo(news: NewsItem): ProductionResult {
-        println("🎬 Producing video for: ${news.title}")
+    fun produceVideo(news: NewsItem, videoId: String): ProductionResult {
+        println("🎬 Producing video for: ${news.title} (ID: $videoId)")
         
         // 1. Script Generation (Gemini)
         val response = geminiService.writeScript(news.title, news.summary)
@@ -98,7 +99,7 @@ class ProductionService(
         }
         
         val keywords = response.scenes.map { it.keyword }.distinct()
-        val filePath = produceVideoFromScenes(news.title, response.scenes, response.mood)
+        val filePath = produceVideoFromScenes(news.title, response.scenes, response.mood, videoId)
         
         return ProductionResult(
             filePath = filePath,
@@ -111,8 +112,8 @@ class ProductionService(
     }
 
     // Core Logic - 3 Phase Pipeline
-    private fun produceVideoFromScenes(title: String, scenes: List<Scene>, mood: String): String {
-        val workspace = File("shared-data/workspace_${System.currentTimeMillis()}").apply { mkdirs() }
+    private fun produceVideoFromScenes(title: String, scenes: List<Scene>, mood: String, videoId: String): String {
+        val workspace = File("shared-data/workspace_$videoId").apply { mkdirs() }
         val clipFiles = mutableListOf<File>()
         val durations = mutableListOf<Double>()
         val subtitles = mutableListOf<String>()
@@ -167,7 +168,8 @@ class ProductionService(
         
         // Ensure outcome directory exists
         val outcomeDir = File("shared-data/videos").apply { mkdirs() }
-        val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_${System.currentTimeMillis()}.mp4")
+        // Use videoId for deterministic filename
+        val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_$videoId.mp4")
         
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
         
@@ -177,7 +179,7 @@ class ProductionService(
             workspace.deleteRecursively()
         }
         
-        logPublisher.info("shorts-controller", "Batch Production Completed: $title", "Path: ${finalOutput.name}")
+        logPublisher.info("shorts-controller", "Batch Production Completed: $title", "Path: ${finalOutput.name}", traceId = videoId)
         return finalOutput.absolutePath
     }
 

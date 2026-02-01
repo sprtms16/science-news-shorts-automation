@@ -252,7 +252,7 @@ class ManualGenerationController(
         val savedHistory = videoHistoryRepository.save(history)
         
         try {
-            val result = productionService.produceVideo(news)
+            val result = productionService.produceVideo(news, savedHistory.id!!)
             val filePath = result.filePath
             
             return if (filePath.isNotEmpty()) {
