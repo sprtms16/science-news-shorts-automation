@@ -1,22 +1,29 @@
-FROM gradle:8.5-jdk17
+# Build Stage
+FROM gradle:8.5-jdk17 AS build
+WORKDIR /app
 
+# Copy only files needed for dependency resolution first to leverage cache
+COPY build.gradle.kts .
+# If there's a settings.gradle.kts at backend level, copy it (checked before, but safer to try if it exists)
+# COPY settings.gradle.kts . 
+
+# Copy source
+COPY src ./src
+
+# Build the application
+RUN gradle clean build -x test --no-daemon
+
+# Runtime Stage
+FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app
 
 # Install FFmpeg and Korean Fonts
 RUN apt-get update && apt-get install -y ffmpeg fonts-nanum && rm -rf /var/lib/apt/lists/*
 
+# Copy the built jar from the build stage (avoiding -plain.jar)
+RUN mkdir -p /app/libs
+COPY --from=build /app/build/libs /app/libs
+RUN find /app/libs -name "*.jar" -not -name "*plain.jar" -exec cp {} /app/app.jar \;
 
-# Copy project files
-COPY build.gradle.kts .
-COPY src ./src
-
-# Set Gradle memory options to avoid OOM
-ENV GRADLE_OPTS="-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx1536m"
-
-# Build and Run
-# Build
-RUN gradle clean build -x test --stacktrace --no-daemon --info
-
-# Run
-RUN find build/libs -name "*.jar" -not -name "*plain.jar" -exec cp {} build/libs/app.jar \;
-ENTRYPOINT ["sh", "-c", "exec java -jar build/libs/app.jar"]
+# Run the application
+ENTRYPOINT ["sh", "-c", "exec java -jar /app/app.jar"]

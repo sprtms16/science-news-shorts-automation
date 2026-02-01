@@ -1,0 +1,10 @@
+.gradle
+build
+bin
+out
+*.jar
+gradle
+gradlew
+gradlew.bat
+tokens
+shared-data

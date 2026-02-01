@@ -1,0 +1,13 @@
+.git
+.gradle
+.idea
+build
+dist
+node_modules
+runner-work
+shared-data
+shared-data-back
+vpn-state
+*.mp4
+*.wav
+*.log
