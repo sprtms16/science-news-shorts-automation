@@ -71,9 +71,22 @@ class VideoUploadConsumer(
                 }
                 
                 // 2. 제목 한글 포함 여부 체크 (한국어 채널)
+                // 2. 제목 한글 포함 여부 체크 (한국어 채널)
                 val hasKorean = event.title.any { it in '\uAC00'..'\uD7A3' }
                 if (!hasKorean) {
-                    println("⚠️ Warning: Title contains no Korean characters. Might be raw translation?")
+                    println("⛔ Upload BLOCKED: Title contains no Korean characters. (${event.title})")
+                    
+                    // FAILED 상태와 함께 validationErrors 저장
+                    repository.findById(event.videoId).ifPresent { video ->
+                        repository.save(video.copy(
+                            status = VideoStatus.FAILED,
+                            failureStep = "VALIDATION",
+                            errorMessage = "Validation Failed: Title is English",
+                            validationErrors = listOf("TITLE_ENGLISH"),
+                            updatedAt = java.time.LocalDateTime.now()
+                        ))
+                    }
+                    return // 업로드 중단
                 }
 
                 // 3. 태그 검증
