@@ -706,6 +706,15 @@ class AdminController(
         ))
     }
 
+    @PostMapping("/maintenance/growth-analysis")
+    fun analyzechannelGrowth(): ResponseEntity<Map<String, Any>> {
+        val result = geminiService.analyzeChannelGrowth()
+        return ResponseEntity.ok(mapOf(
+            "message" to "Channel growth analysis completed.",
+            "insights" to result
+        ))
+    }
+
     @PostMapping("/maintenance/reset-creating-to-queued")
     fun resetCreatingToQueued(): ResponseEntity<Map<String, Any>> {
         val stuckVideos = videoRepository.findByStatus(VideoStatus.CREATING)

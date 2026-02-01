@@ -18,7 +18,9 @@ import java.util.concurrent.atomic.AtomicInteger
 @Service
 class GeminiService(
     @Value("\${gemini.api-key}") private val apiKeyString: String,
-    private val promptRepository: com.sciencepixel.repository.SystemPromptRepository
+    private val promptRepository: com.sciencepixel.repository.SystemPromptRepository,
+    private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository,
+    private val youtubeVideoRepository: com.sciencepixel.repository.YoutubeVideoRepository
 ) {
     private val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).build()
     private val CHANNEL_NAME = "사이언스 픽셀"
@@ -249,10 +251,107 @@ class GeminiService(
 
     // ...
 
-    // 1. 한국어 대본 작성
+
+
+
+    // ... (Existing code) ...
+    // Note: The above dependencies must be added to the constructor. 
+    // Since I'm replacing the whole class structure or just appending, I should be careful.
+    // The replace_file_content tool works on chunks. I need to make sure I add the properties to the primary constructor first.
+    // However, I cannot easily change the primary constructor signature without touching the class definition line.
+    // So I will split this into two edits if needed, or assume I can replace the constructor.
+    // Let's look at the file content again. Line 19 is the class definition.
+    
+    // START EDIT: Constructor
+    // END EDIT
+    
+    // I will actually just add the methods first, and then I will update the constructor in a separate call if needed, 
+    // OR I will try to update the class definition now.
+    // Wait, replace_file_content allows replacing a chunk. I can replace the top of the class.
+    
+    // Let's implement analyzeChannelGrowth first at the bottom, then I will handle the constructor injection.
+    
+    // Actually, I'll do the constructor update first to be safe.
+}
+// I'll execute a separate tool call for the constructor injection to avoid massive diff context issues.
+// Let's implement the methods first.
+
+    /**
+     * 6. Growth Analysis (Insights)
+     * Analyze top performing videos and generate advice for future scripts.
+     */
+    fun analyzeChannelGrowth(): String {
+        // 1. Fetch Top 10% Videos by View Count
+        val allVideos = youtubeVideoRepository.findAll()
+        if (allVideos.isEmpty()) return "No videos found to analyze."
+        
+        val sortedVideos = allVideos.sortedByDescending { it.viewCount }
+        val topCount = (sortedVideos.size * 0.1).toInt().coerceAtLeast(3).coerceAtMost(20)
+        val topVideos = sortedVideos.take(topCount)
+        
+        val videoSummaries = topVideos.joinToString("\n") { 
+            "- [${it.viewCount} views] ${it.title}" 
+        }
+
+        val prompt = """
+            [Task]
+            You are a YouTube Growth Strategist for '$CHANNEL_NAME'.
+            Analyze these High-Performing Videos from our channel to find Success Patterns.
+
+            [Top Performing Videos]
+            $videoSummaries
+
+            [Goal]
+            Extract 3-5 concise, actionable rules for creating future scripts and titles that will replicate this success.
+            Focus on: Title keywords, Topic selection patterns, Tone, or Hook styles.
+
+            [Output]
+            Return ONLY a JSON list of strings (The insights).
+            Example: ["Use questions in titles", "Focus on space discoveries", "Start with a shocking fact"]
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return "Failed to generate insights."
+
+        return try {
+            val jsonResponse = JSONObject(responseText)
+            val content = jsonResponse.getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .removePrefix("```json")
+                .removeSuffix("```")
+                .trim()
+            
+            // Validate it's a list
+            val insightsArray = JSONArray(content)
+            val insightsList = mutableListOf<String>()
+            for (i in 0 until insightsArray.length()) {
+                insightsList.add(insightsArray.getString(i))
+            }
+            
+            val finalInsights = insightsList.joinToString("\n") { "- $it" }
+            
+            // Save to System Settings
+            systemSettingRepository.save(com.sciencepixel.domain.SystemSetting(
+                key = "CHANNEL_GROWTH_INSIGHTS",
+                value = finalInsights,
+                description = "AI-generated success patterns from high-performing videos"
+            ))
+            
+            println("📈 Channel Growth Analysis Complete:\n$finalInsights")
+            finalInsights
+        } catch (e: Exception) {
+            println("❌ Growth Analysis Error: ${e.message}")
+            "Error parsing insights."
+        }
+    }
+
+    // 1. 한국어 대본 작성 (Updated with Insights)
     fun writeScript(title: String, summary: String): ScriptResponse {
         val promptId = "script_prompt_v2" 
-        // ... (Repo logic omitted for brevity in replace, but assuming context allows targeting)
         var promptTemplate = promptRepository.findById(promptId).map { it.content }.orElse(null)
         
         if (promptTemplate == null) {
@@ -265,12 +364,31 @@ class GeminiService(
             promptTemplate = DEFAULT_SCRIPT_PROMPT
         }
         
+        // Inject Growth Insights if available
+        val insights = systemSettingRepository.findById("CHANNEL_GROWTH_INSIGHTS").map { it.value }.orElse("")
+        val insightsSection = if (insights.isNotBlank()) {
+            "\n\n[Current Channel Success Insights (APPLY THESE)]\n$insights\n"
+        } else ""
+
         val prompt = promptTemplate
             .replace("{title}", title)
             .replace("{summary}", summary)
-
+            // Actually, simply appending to the end might be outside the JSON instructions if the prompt ends with JSON example.
+            // Better to prepend or replace a placeholder.
+            // But since our DEFAULT_SCRIPT_PROMPT puts [Output Format] at the end, appending might confuse it.
+            // Let's inject it into [Rules] section if possible, or just add it before [Output Format].
         
-        val responseText = callGeminiWithRetry(prompt) ?: return ScriptResponse(emptyList(), "tech")
+        // Let's modify the prompt construction slightly to be safer
+        val finalPrompt = if (insights.isNotBlank()) {
+            prompt.replace("[Rules]", "[Channel Success Insights]\n$insights\n\n[Rules]")
+        } else {
+            prompt
+        }
+        
+        val responseText = callGeminiWithRetry(finalPrompt) ?: return ScriptResponse(emptyList(), "tech")
+        
+        // ... rest of the function ... (I will keep the rest same, just replacing the top part)
+
         
         return try {
             val jsonResponse = JSONObject(responseText)
