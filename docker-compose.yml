@@ -1,13 +1,17 @@
 services:
-  watchtower:
-    image: containrrr/watchtower
-    container_name: shorts-watchtower
+  github-runner:
+    image: myoung34/github-runner:latest
+    container_name: shorts-github-runner
+    restart: unless-stopped
+    environment:
+      - REPO_URL=https://github.com/sprtms16/science-news-shorts-automation
+      - RUNNER_NAME=shorts-server-runner
+      - RUNNER_TOKEN=${GITHUB_RUNNER_TOKEN}
+      - RUNNER_WORKDIR=/tmp/runner
+      - LABELS=self-hosted,linux,x64
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - WATCHTOWER_POLL_INTERVAL=1800
-      - WATCHTOWER_CLEANUP=true
-    restart: unless-stopped
+      - ./runner-work:/tmp/runner
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -38,7 +42,6 @@ services:
     restart: unless-stopped
 
   ai-media-service:
-    image: ghcr.io/sprtms16/science-news-shorts-automation-ai-service:develop
     build: ./backend/ai-media-service
     container_name: shorts-ai-service
     ports:
@@ -71,7 +74,6 @@ services:
     restart: unless-stopped
 
   shorts-controller:
-    image: ghcr.io/sprtms16/science-news-shorts-automation-controller:develop
     build:
       context: ./backend
       dockerfile: Dockerfile.kotlin
@@ -102,7 +104,6 @@ services:
       - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
 
   shorts-log-service:
-    image: ghcr.io/sprtms16/science-news-shorts-automation-log-service:develop
     build:
       context: ./backend/shorts-log-service
     container_name: shorts-log-service
@@ -118,7 +119,6 @@ services:
     restart: unless-stopped
 
   frontend-server:
-    image: ghcr.io/sprtms16/science-news-shorts-automation-frontend:develop
     build: ./frontend
     container_name: shorts-frontend
     network_mode: "service:tailscale"

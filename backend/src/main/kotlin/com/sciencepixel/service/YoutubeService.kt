@@ -242,4 +242,38 @@ class YoutubeService(
         println("✅ YouTube Upload Complete! ID: ${response.id}")
         return "https://youtu.be/${response.id}"
     }
+
+    fun updateVideoMetadata(videoId: String, title: String? = null, description: String? = null) {
+        println("📡 Updating YouTube metadata for video ID: $videoId")
+        val youtube = getYoutubeClient()
+
+        // 1. Get existing video snippet
+        val listResponse = youtube.videos().list(listOf("snippet")).setId(listOf(videoId)).execute()
+        if (listResponse.items.isEmpty()) {
+            println("⚠️ Video not found on YouTube: $videoId")
+            return
+        }
+
+        val video = listResponse.items.first()
+        val snippet = video.snippet
+
+        // 2. Update snippet fields
+        if (title != null) {
+            val sanitizedTitle = title
+                .replace(Regex("[<>\"'/\\\\\\p{Cntrl}]"), "")
+                .trim()
+            snippet.title = if (sanitizedTitle.length > 100) sanitizedTitle.substring(0, 97) + "..." else sanitizedTitle
+        }
+
+        if (description != null) {
+            val sanitizedDesc = description
+                .replace("<", "")
+                .replace(">", "")
+            snippet.description = if (sanitizedDesc.length > 4000) sanitizedDesc.substring(0, 3997) + "..." else sanitizedDesc
+        }
+
+        // 3. Execute update
+        youtube.videos().update(listOf("snippet"), video).execute()
+        println("✅ Metadata updated successfully for video: $videoId")
+    }
 }

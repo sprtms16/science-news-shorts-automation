@@ -148,6 +148,44 @@ class AdminController(
         return ResponseEntity.ok(videoRepository.save(updated))
     }
 
+    @PostMapping("/youtube/update-all-descriptions")
+    fun updateAllYoutubeDescriptions(): ResponseEntity<Map<String, Any>> {
+        val uploadedVideos = videoRepository.findByStatus(VideoStatus.UPLOADED)
+        var updatedCount = 0
+        val failedVideos = mutableListOf<String>()
+
+        uploadedVideos.forEach { video ->
+            if (video.youtubeUrl.isNotBlank() && video.description.isNotBlank()) {
+                try {
+                    val videoId = if (video.youtubeUrl.contains("youtu.be/")) {
+                        video.youtubeUrl.substringAfter("youtu.be/").substringBefore("?").trim()
+                    } else if (video.youtubeUrl.contains("v=")) {
+                        video.youtubeUrl.substringAfter("v=").substringBefore("&").trim()
+                    } else {
+                        null
+                    }
+
+                    if (videoId != null && videoId.isNotEmpty()) {
+                        youtubeService.updateVideoMetadata(videoId, description = video.description)
+                        updatedCount++
+                        Thread.sleep(300) // Safety delay
+                    }
+                } catch (e: Exception) {
+                    println("❌ Failed to update description for ${video.id}: ${e.message}")
+                    failedVideos.add("${video.id}: ${e.message}")
+                }
+            }
+        }
+
+        return ResponseEntity.ok(mapOf(
+            "totalAttempted" to uploadedVideos.size,
+            "updatedCount" to updatedCount,
+            "failedCount" to failedVideos.size,
+            "failedItems" to failedVideos,
+            "message" to "Batch description update process finished."
+        ))
+    }
+
     @PostMapping("/videos/rematch-files")
     fun rematchFilesWithDb(): ResponseEntity<Map<String, Any>> {
         val outputDir = File("/app/shared-data")
