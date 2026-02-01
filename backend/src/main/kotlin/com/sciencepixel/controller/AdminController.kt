@@ -704,6 +704,36 @@ class AdminController(
             "regenerationTriggered" to regenTriggeredCount,
             "message" to "Repair and migration to 4-status system complete."
         ))
+    @PostMapping("/maintenance/reset-creating-to-queued")
+    fun resetCreatingToQueued(): ResponseEntity<Map<String, Any>> {
+        val stuckVideos = videoRepository.findByStatus(VideoStatus.CREATING)
+        var resetCount = 0
+        
+        stuckVideos.forEach { video ->
+            videoRepository.save(video.copy(
+                status = VideoStatus.QUEUED,
+                updatedAt = LocalDateTime.now()
+            ))
+            // Re-publish RSS event to restart the pipeline? 
+            // Better to let ScriptConsumer pick it up if we implement a poller, 
+            // OR we just set to QUEUED and manually republish event?
+            // Since our system is Event-Driven, just changing status to QUEUED isn't enough to trigger Consumer active listening if the event is gone.
+            // BUT ScriptConsumer consumes events. It doesn't poll DB.
+            // So we MUST also re-publish the RssNewItemEvent for these items.
+            
+            kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
+                url = video.link,
+                title = video.title,
+                category = "general"
+            ))
+            
+            resetCount++
+        }
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Reset $resetCount stuck CREATING videos to QUEUED and re-published events.",
+            "resetCount" to resetCount
+        ))
     }
 }
 
