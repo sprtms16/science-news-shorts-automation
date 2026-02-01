@@ -8,7 +8,13 @@ import org.springframework.scheduling.annotation.EnableScheduling
 @SpringBootApplication
 @EnableScheduling
 @EnableAsync
-class SciencePixelApplication
+class SciencePixelApplication {
+    @jakarta.annotation.PostConstruct
+    fun init() {
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Asia/Seoul"))
+        println("🕒 Application TimeZone set to Asia/Seoul: ${java.time.LocalDateTime.now()}")
+    }
+}
 
 fun main(args: Array<String>) {
     runApplication<SciencePixelApplication>(*args)

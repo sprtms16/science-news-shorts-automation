@@ -45,6 +45,7 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - TZ=Asia/Seoul
     restart: unless-stopped
 
   mongo:
@@ -52,6 +53,8 @@ services:
     container_name: shorts-mongo
     ports:
       - "27017:27017"
+    environment:
+      - TZ=Asia/Seoul
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
@@ -80,6 +83,7 @@ services:
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - TZ=Asia/Seoul
       # 알림 설정 (선택사항)
       - NOTIFICATION_DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL:-}
       - NOTIFICATION_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
@@ -97,6 +101,7 @@ services:
     environment:
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/shorts-logs
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - TZ=Asia/Seoul
     restart: unless-stopped
 
   frontend-server:
