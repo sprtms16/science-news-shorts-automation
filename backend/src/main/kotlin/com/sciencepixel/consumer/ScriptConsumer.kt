@@ -50,10 +50,11 @@ class ScriptConsumer(
             // (새로운 체계에서는 CREATING 상태가 모든 진행 중인 상태를 포함합니다)
             // 단, 최초 생성인 경우에도 CREATING이므로, 여기서 getOrCreateHistory 이후의 상태를 세밀하게 볼 필요가 없으면 그대로 둡니다.
             // 여기서는 중복 발행 방지를 위해 체크합니다.
-            if (history.status == VideoStatus.CREATING && history.updatedAt.isAfter(LocalDateTime.now().minusMinutes(5))) {
-                 println("⏭️ Video already in pipeline (Status: ${history.status}) for: ${event.title}. Skipping Gemini call to save tokens.")
-                 return
-            }
+            // 5분 이내 중복 체크 로직 제거 (VideoProcessor가 이미 CREATING으로 생성해서 넘기므로 여기서 막힘)
+            // if (history.status == VideoStatus.CREATING && history.updatedAt.isAfter(LocalDateTime.now().minusMinutes(5))) {
+            //      println("⏭️ Video already in pipeline (Status: ${history.status}) for: ${event.title}. Skipping Gemini call to save tokens.")
+            //      return
+            // }
 
             // 2. Call Gemini
             println("🤖 generating script for: ${event.title}...")
