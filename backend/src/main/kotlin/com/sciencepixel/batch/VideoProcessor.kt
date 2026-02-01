@@ -27,15 +27,33 @@ class VideoProcessor(
             .map { it.value.toIntOrNull() ?: 10 }
             .orElse(10)
         
-        val currentActive = videoHistoryRepository.findByStatusNotIn(listOf(VideoStatus.UPLOADED, VideoStatus.REGEN_FAILED, VideoStatus.ERROR)).size
+        val currentActive = videoHistoryRepository.findByStatusNotIn(listOf(
+            VideoStatus.UPLOADED, 
+            VideoStatus.REGEN_FAILED, 
+            VideoStatus.ERROR,
+            VideoStatus.PERMANENTLY_FAILED
+        )).size
         if (currentActive >= limit) {
             println("🛑 Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping: ${item.title}")
             return null
         }
 
         // 1. Duplicate Check (Link & Title)
-        if (videoHistoryRepository.findByLink(item.link) != null) {
-            println("⏭️ Skipped (Link Duplicate): ${item.link}")
+        val normalizedLink = try {
+            val url = java.net.URL(item.link)
+            "${url.protocol}://${url.host}${url.path}" // Remove query parameters & fragments
+        } catch (e: Exception) {
+            item.link
+        }
+
+        if (videoHistoryRepository.findByLink(item.link) != null || videoHistoryRepository.findByLink(normalizedLink) != null) {
+            println("⏭️ Skipped (Link Duplicate): $normalizedLink")
+            return null
+        }
+
+        // Local DB Title Duplicate Check
+        if (videoHistoryRepository.findByTitle(item.title).isNotEmpty()) {
+            println("⏭️ Skipped (Local DB Title Duplicate): ${item.title}")
             return null
         }
 
