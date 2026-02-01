@@ -16,6 +16,7 @@ class QuotaTracker(
     private val repository: QuotaUsageRepository,
     private val systemSettingRepository: SystemSettingRepository
 ) {
+    private val dateFormatter = DateTimeFormatter.ISO_DATE
 
     companion object {
         const val DEFAULT_DAILY_QUOTA_LIMIT = 10000
@@ -50,18 +51,30 @@ class QuotaTracker(
     }
 
     /**
-     * 할당량 사용량 강제 초기화
+     * 할당량 사용량 강제 초기화 (매일 16시 자동 실행 및 수동 호출)
      */
+    @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 16 * * *")
     fun resetQuota() {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
+        val quotaDate = getCurrentQuotaDate()
         val newQuota = QuotaUsage(
             id = "youtube_upload",
             usedUnits = 0,
-            date = today,
+            date = quotaDate,
             updatedAt = LocalDateTime.now()
         )
         repository.save(newQuota)
-        println("🔄 YouTube Daily Quota units reset to 0 for $today")
+        println("🔄 YouTube Daily Quota units reset to 0 for period starting at $quotaDate (Reset triggered at 16:00 or manually)")
+    }
+
+    private fun getCurrentQuotaDate(): String {
+        val now = LocalDateTime.now()
+        // 16시(오후 4시)를 기준으로 할당량이 초기화됨
+        val quotaDate = if (now.hour < 16) {
+            now.toLocalDate().minusDays(1)
+        } else {
+            now.toLocalDate()
+        }
+        return quotaDate.format(dateFormatter)
     }
 
     /**
@@ -75,15 +88,15 @@ class QuotaTracker(
     }
 
     private fun getOrCreateQuota(): QuotaUsage {
-        val today = LocalDate.now().format(DateTimeFormatter.ISO_DATE)
+        val quotaDate = getCurrentQuotaDate()
         val existing = repository.findById("youtube_upload").orElse(null)
 
-        return if (existing == null || existing.date != today) {
-            // 날짜가 바뀌었거나 레코드가 없으면 초기화
+        return if (existing == null || existing.date != quotaDate) {
+            // 날짜(제한 기준)가 바뀌었거나 레코드가 없으면 초기화
             val newQuota = QuotaUsage(
                 id = "youtube_upload",
                 usedUnits = 0,
-                date = today,
+                date = quotaDate,
                 updatedAt = LocalDateTime.now()
             )
             repository.save(newQuota)

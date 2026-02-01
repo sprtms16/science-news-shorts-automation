@@ -19,7 +19,8 @@ class YoutubeUploadScheduler(
     private val repository: VideoHistoryRepository,
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher,
     private val systemSettingRepository: SystemSettingRepository,
-    private val notificationService: NotificationService
+    private val notificationService: NotificationService,
+    private val quotaTracker: QuotaTracker
 ) {
     
     companion object {
@@ -32,6 +33,11 @@ class YoutubeUploadScheduler(
     fun uploadPendingVideos() {
         println("⏰ Scheduler Triggered: Checking for pending/stuck videos at ${java.time.LocalDateTime.now()}")
 
+        if (!quotaTracker.canUpload()) {
+            println("🛑 Quota exceeded. Skipping hourly upload trigger.")
+            return
+        }
+
         // 2. Fetch target videos (COMPLETED, RETRY_PENDING, QUOTA_EXCEEDED)
         val targetStatuses = listOf(
             VideoStatus.COMPLETED, 
@@ -43,8 +49,8 @@ class YoutubeUploadScheduler(
         
         println("📦 Found ${pendingVideos.size} videos for re-triggering.")
 
-        // 3. Trigger via Kafka (Maximum 10 at once to avoid flood)
-        pendingVideos.take(10).forEach { video ->
+        // 3. Trigger via Kafka (Take only 1 video per hour to maintain cadence and quota)
+        pendingVideos.take(1).forEach { video ->
             if (video.filePath.isNotBlank() && File(video.filePath).exists()) {
                 println("🚀 Re-triggering upload via Kafka: ${video.title}")
                 kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
