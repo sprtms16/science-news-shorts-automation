@@ -65,7 +65,7 @@ class YoutubeSyncService(
                 
                 pageToken = response.nextPageToken
                 
-            } while (pageToken != null && count < 500)
+            } while (pageToken != null)
 
             // Pruning logic: Delete local records that are NOT on YouTube anymore (within the checked range)
             if (allFetchedIds.isNotEmpty()) {
