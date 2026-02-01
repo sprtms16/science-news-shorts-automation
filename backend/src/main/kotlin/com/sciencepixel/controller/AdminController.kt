@@ -740,73 +740,74 @@ class AdminController(
 
     @PostMapping("/maintenance/translate-uploaded-videos")
     fun translateUploadedEnglishVideos(): ResponseEntity<Map<String, Any>> {
-        val uploadedVideos = videoRepository.findByStatus(VideoStatus.UPLOADED)
+        // Refactor: Use Synced YouTube Data instead of Local History (which might be deleted)
+        val allYoutubeVideos = youtubeVideoRepository.findAll()
         var updateCount = 0
         val updatedVideos = mutableListOf<String>()
 
-        println("🔍 [Batch Translation] Found ${uploadedVideos.size} videos in UPLOADED status.")
+        println("🔍 [Batch Translation] Found ${allYoutubeVideos.size} videos from Synced YouTube Data.")
 
-        uploadedVideos.forEach { video ->
-            if (video.youtubeUrl.isNotBlank()) {
-                // Check for English title (Robust Korean detection)
-                val normalizedTitle = java.text.Normalizer.normalize(video.title, java.text.Normalizer.Form.NFC)
-                val hasKorean = normalizedTitle.any { c ->
-                    c in '\uAC00'..'\uD7A3' || // Hangul Syllables
-                    c in '\u3131'..'\u318E' || // Hangul Compatibility Jamo
-                    c in '\u1100'..'\u11FF'    // Hangul Jamo
-                }
-                
-                // Debug log to check detection
-                println("   Video [${video.id}]: '${video.title}' -> Has Korean? $hasKorean, URL: ${video.youtubeUrl.take(20)}...")
+        allYoutubeVideos.forEach { ytVideo ->
+            // Check for English title (Robust Korean detection)
+            val normalizedTitle = java.text.Normalizer.normalize(ytVideo.title, java.text.Normalizer.Form.NFC)
+            val hasKorean = normalizedTitle.any { c ->
+                c in '\uAC00'..'\uD7A3' || // Hangul Syllables
+                c in '\u3131'..'\u318E' || // Hangul Compatibility Jamo
+                c in '\u1100'..'\u11FF'    // Hangul Jamo
+            }
 
-                if (!hasKorean) {
-                    println("🚀 TARGET Found! English title for video ${video.id} (${video.title}). Translating...")
+            println("   YT Video [${ytVideo.videoId}]: '${ytVideo.title}' -> Has Korean? $hasKorean")
+
+            if (!hasKorean) {
+                println("🚀 TARGET Found! English title for YT Video ${ytVideo.videoId} (${ytVideo.title}). Translating...")
+
+                try {
+                    // 1. Regenerate Metadata (Korean)
+                    val newMeta = geminiService.regenerateMetadataOnly(ytVideo.title, ytVideo.description)
+
+                    // 2. Update YouTube via API
+                    youtubeService.updateVideoMetadata(
+                        videoId = ytVideo.videoId,
+                        title = newMeta.title,
+                        description = newMeta.description
+                    )
+
+                    // 3. Update Synced DB
+                    youtubeVideoRepository.save(ytVideo.copy(
+                        title = newMeta.title,
+                        description = newMeta.description,
+                        updatedAt = LocalDateTime.now()
+                    ))
                     
-                    try {
-                        // 1. Regenerate Metadata (Korean)
-                        val newMeta = geminiService.regenerateMetadataOnly(video.title, video.summary)
-                        
-                        // 2. Extract Video ID (Robust Regex)
-                        // Supports: https://youtu.be/ID, https://www.youtube.com/watch?v=ID, https://youtube.com/shorts/ID
-                        val idPattern = Regex("(?:v=|/)([0-9A-Za-z_-]{11}).*")
-                        val match = idPattern.find(video.youtubeUrl)
-                        val videoId = match?.groupValues?.get(1) ?: video.youtubeUrl.substringAfterLast("/").takeIf { it.length == 11 }
-                        
-                        if (!videoId.isNullOrBlank()) {
-                            println("   Target Video ID: $videoId")
-                            
-                            // 3. Update YouTube
-                            youtubeService.updateVideoMetadata(
-                                videoId = videoId,
-                                title = newMeta.title,
-                                description = newMeta.description
-                            )
-                            
-                            // 4. Update Local DB
-                            videoRepository.save(video.copy(
-                                title = newMeta.title,
-                                description = newMeta.description,
-                                tags = newMeta.tags,
-                                sources = newMeta.sources,
-                                updatedAt = LocalDateTime.now()
-                            ))
-                            
-                            updatedVideos.add("${video.title} -> ${newMeta.title}")
-                            updateCount++
-                            println("✅ Successfully updated video: $videoId")
-                        } else {
-                            println("⚠️ Could not extract valid Video ID from: ${video.youtubeUrl}")
-                        }
-                    } catch (e: Exception) {
-                        println("❌ Failed to translate video ${video.id}: ${e.message}")
-                        e.printStackTrace()
+                    // 4. Update Local History DB (if exists, best effort)
+                    // Try to find by YouTube Link ID or fuzzy search
+                    val localVideo = videoRepository.findAll().find { 
+                        it.youtubeUrl.contains(ytVideo.videoId)
                     }
+                    
+                    if (localVideo != null) {
+                        videoRepository.save(localVideo.copy(
+                            title = newMeta.title,
+                            description = newMeta.description,
+                            updatedAt = LocalDateTime.now()
+                        ))
+                    }
+
+                    updatedVideos.add("${ytVideo.title} -> ${newMeta.title}")
+                    updateCount++
+                    println("✅ Successfully updated video: ${ytVideo.videoId}")
+
+                } catch (e: Exception) {
+                    println("❌ Failed to translate video ${ytVideo.videoId}: ${e.message}")
+                    e.printStackTrace()
                 }
             }
         }
 
         return ResponseEntity.ok(mapOf(
-            "message" to "Translated and updated $updateCount videos.",
+            "message" to "Translated and updated $updateCount videos based on YouTube Sync data.",
+            "totalChecked" to allYoutubeVideos.size,
+            "updatedCount" to updateCount,
             "updatedVideos" to updatedVideos
         ))
     }
