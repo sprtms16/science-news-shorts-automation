@@ -49,12 +49,14 @@ class SceneConsumer(
 
             if (assetResult.clipPaths.isEmpty()) {
                 println("❌ Assets generation failed (empty clips).")
-                videoHistoryRepository.save(history!!.copy(
-                    status = VideoStatus.FAILED,
-                    failureStep = "ASSETS",
-                    errorMessage = "Empty asset clips generated",
-                    updatedAt = java.time.LocalDateTime.now()
-                ))
+                history?.let {
+                    videoHistoryRepository.save(it.copy(
+                        status = VideoStatus.FAILED,
+                        failureStep = "ASSETS",
+                        errorMessage = "Empty asset clips generated",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                }
                 return
             }
 

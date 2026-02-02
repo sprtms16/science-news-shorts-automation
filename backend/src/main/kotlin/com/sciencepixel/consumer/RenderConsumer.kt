@@ -50,21 +50,25 @@ class RenderConsumer(
 
             if (finalPath.isEmpty()) {
                 println("❌ Rendering failed (empty path).")
-                videoHistoryRepository.save(history!!.copy(
-                    status = VideoStatus.FAILED,
-                    failureStep = "RENDER",
-                    errorMessage = "Rendering produced empty file path",
-                    updatedAt = java.time.LocalDateTime.now()
-                ))
+                history?.let {
+                    videoHistoryRepository.save(it.copy(
+                        status = VideoStatus.FAILED,
+                        failureStep = "RENDER",
+                        errorMessage = "Rendering produced empty file path",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                }
                 return
             }
 
             // Update History to COMPLETED (Ready for Upload)
-            val completedHistory = videoHistoryRepository.save(history!!.copy(
-                status = VideoStatus.COMPLETED,
-                filePath = finalPath,
-                updatedAt = java.time.LocalDateTime.now()
-            ))
+            val completedHistory = if (history != null) {
+                videoHistoryRepository.save(history.copy(
+                    status = VideoStatus.COMPLETED,
+                    filePath = finalPath,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            } else null
 
             // Publish 'video.created' -> This triggers the existing VideoUploadConsumer!
             // We bridge the new SAGA pipeline to the existing Upload pipeline here.
