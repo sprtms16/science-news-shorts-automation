@@ -17,8 +17,9 @@ class PexelsService(
 
     fun downloadVerifiedVideo(keyword: String, context: String, outputFile: File): Boolean {
         // 1. Search Pexels
+        val encodedKeyword = java.net.URLEncoder.encode(keyword, "UTF-8")
         val request = Request.Builder()
-            .url("https://api.pexels.com/videos/search?query=$keyword&per_page=5")
+            .url("https://api.pexels.com/videos/search?query=$encodedKeyword&per_page=5")
             .addHeader("Authorization", apiKey)
             .build()
             

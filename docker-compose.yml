@@ -136,6 +136,7 @@ services:
     environment:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
+      - TS_EXTRA_ARGS=--hostname=shorts-admin
     ports:
       - "3000:80"
     volumes:

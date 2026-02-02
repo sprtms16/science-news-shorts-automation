@@ -35,7 +35,10 @@ class ProductionService(
             val clipFile = File(workspace, "clip_$i.mp4")
 
             if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: ${scene.sentence}", videoFile)) {
-                return@forEachIndexed
+                println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
+                if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
+                    return@forEachIndexed
+                }
             }
 
             val duration = try {
@@ -148,8 +151,11 @@ class ProductionService(
 
             // 1. Video (Pexels - License: Free to use, no attribution required)
             if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: ${scene.sentence}", videoFile)) {
-                println("⚠️ Skipping scene $i due to no video found")
-                return@forEachIndexed
+                println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
+                if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
+                    println("⚠️ Skipping scene $i even after fallback")
+                    return@forEachIndexed
+                }
             }
 
             // 2. Audio (Edge-TTS)

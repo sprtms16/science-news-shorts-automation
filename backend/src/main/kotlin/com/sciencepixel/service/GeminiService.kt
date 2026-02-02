@@ -232,6 +232,7 @@ class GeminiService(
             5. **Intro/Outro:** Start with "$CHANNEL_NAME" greeting, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
             6. **Evidence & Sources:** You MUST provide a brief "Verification Note" checking accuracy and list sources (e.g., "Nature", "NASA") in the JSON output.
             7. **Description:** Write a compelling YouTube description including the summary and sources.
+            8. **Keywords:** Scenes' keywords MUST be visual, common English terms (e.g., 'nebula', 'laboratory', 'robot', 'brain') rather than abstract or overly specific scientific names that might not have stock footage.
 
             [Output Format - JSON Only]
             Return ONLY a valid JSON object with this exact structure:
@@ -242,7 +243,7 @@ class GeminiService(
                 "sources": ["source1", "source2"],
                 "verification": "Fact check note (e.g., 'Verified from Nature journal')",
                 "scenes": [
-                    {"sentence": "Korean Sentence 1", "keyword": "english search keyword"},
+                    {"sentence": "Korean Sentence 1", "keyword": "visual english keyword (1-3 words)"},
                     ...
                 ],
                 "mood": "calm|exciting|tech|epic"
@@ -328,7 +329,7 @@ class GeminiService(
 
     // 1. 한국어 대본 작성 (Updated with Insights)
     fun writeScript(title: String, summary: String): ScriptResponse {
-        val promptId = "script_prompt_v2" 
+        val promptId = "script_prompt_v3" 
         var promptTemplate = promptRepository.findById(promptId).map { it.content }.orElse(null)
         
         if (promptTemplate == null) {
@@ -770,14 +771,16 @@ class GeminiService(
             [Task]
             Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for a pure science channel.
             
-            [Sensitive Topics to Avoid]
+            [Topics to Avoid]
             1. Politics (Elections, Parties, Legislation, Diplomatic conflicts)
             2. Religion (Doctrines, Figures, Conflicts)
             3. Ideology (Feminism, Anti-feminism, Racism, Nationalism, Social Movements)
             4. Social Conflict (War, Terrorism, Protests, Abortion, Death Penalty)
+            5. General Lifestyle/Consumer Advice (Phone plans, Travel guides, Personal finance)
+            6. Non-science Business (Executive drama, Stock market unless technical/scientific)
             
             [Exception]
-            - Purely scientific/technological news (e.g., "New missile technology", "AI bias research") is SAFE unless it focuses on political/social conflict.
+            - Purely scientific/technological news (e.g., "New Mars rover", "Cancer research breakthrough") is SAFE.
             
             [Input News]
             Title: $title
