@@ -63,7 +63,7 @@ class VideoProcessor(
         }
 
         // 2. Semantic Deduplication (AI)
-        val recentVideos = videoHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).take(15) // Slightly reduced from 20 for efficiency
+        val recentVideos = videoHistoryRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).take(30) // Increased from 15 for better coverage
         if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
              println("⏭️ Skipped (High Semantic Similarity): ${item.title}")
              return null

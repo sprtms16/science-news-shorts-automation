@@ -106,8 +106,9 @@ class YoutubeService(
             // 1. Normalized exact/containment check first (Fast)
             val normalizedTarget = title.replace(Regex("\\s+"), "").lowercase()
             
-            // Search by localized fuzzy
-            val potentialDuplicates = youtubeVideoRepository.findByTitleContainingIgnoreCase(title.take(5)) 
+            // Search for potential duplicates in local DB (cached YouTube titles)
+            // Instead of .take(5), we search for a broader range or just fetch the most recent subset
+            val potentialDuplicates = youtubeVideoRepository.findAll(org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "updatedAt")).take(100)
             
             val exactMatch = potentialDuplicates.any { 
                 val normalizedExisting = it.title.replace(Regex("\\s+"), "").lowercase()

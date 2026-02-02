@@ -723,7 +723,8 @@ class GeminiService(
         val prompt = """
             [Task]
             Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos".
-            Ignore minor differences in wording. Focus on the core event or scientific discovery.
+            Ignore minor differences in wording, source, or catchy AI titles. 
+            If they cover the same core scientific discovery, event, or research, it IS a duplicate.
             
             [New News Item]
             Title: $newTitle
