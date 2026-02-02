@@ -26,7 +26,8 @@ data class VideoHistory(
     val updatedAt: LocalDateTime = LocalDateTime.now(),
     val filePath: String = "",
     val youtubeUrl: String = "",
-    val thumbnailPath: String = "" // Local path to thumbnail image
+    val thumbnailPath: String = "", // Local path to thumbnail image
+    val rssTitle: String? = null // Original RSS title for deduplication
 )
 
 enum class VideoStatus {
@@ -34,6 +35,7 @@ enum class VideoStatus {
     CREATING,   // 생성 중 (작업 시작됨)
     FAILED,     // 생성 실패
     COMPLETED,  // 생성 완료
+    UPLOADING,  // 업로드 진행 중 (선점)
     UPLOADED    // 업로드 완료
 }
 

@@ -43,9 +43,14 @@ class VideoUploadConsumer(
             val videoOpt = repository.findById(event.videoId)
             if (videoOpt.isPresent) {
                 val video = videoOpt.get()
-                // Idempotency check: Already uploaded?
+                // Idempotency check: Already uploaded or currently uploading?
                 if (video.status == VideoStatus.UPLOADED && video.youtubeUrl.isNotBlank()) {
                     println("⏭️ Video ${event.videoId} already uploaded to YouTube. Skipping duplicate upload.")
+                    return
+                }
+                
+                if (video.status == VideoStatus.UPLOADING) {
+                    println("⏳ Video ${event.videoId} is already being uploaded by another process. Skipping.")
                     return
                 }
                 
@@ -54,6 +59,13 @@ class VideoUploadConsumer(
                     println("⏳ Video ${event.videoId} is in status ${video.status}. Waiting for it to reach COMPLETED state.")
                     return
                 }
+
+                // Claim the upload (Set to UPLOADING)
+                repository.save(video.copy(
+                    status = VideoStatus.UPLOADING,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+                println("🔒 Claimed upload (COMPLETED -> UPLOADING): ${event.title}")
             } else {
                 println("⚠️ Video record ${event.videoId} not found in DB. Skipping.")
                 return

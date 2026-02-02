@@ -50,7 +50,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./shared-data:/app/output
+      - shorts-shared-data:/app/output
       - ~/.cache/huggingface:/root/.cache/huggingface # Model Caching
     deploy:
       resources:
@@ -89,7 +89,7 @@ services:
       - mongo
       - kafka
     volumes:
-      - ./shared-data:/app/shared-data
+      - shorts-shared-data:/app/shared-data
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
@@ -150,5 +150,6 @@ services:
 
 volumes:
   mongo-data:
+  shorts-shared-data:
 
 

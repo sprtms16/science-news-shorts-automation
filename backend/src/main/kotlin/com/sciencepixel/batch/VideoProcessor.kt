@@ -49,9 +49,10 @@ class VideoProcessor(
             return null
         }
 
-        // Local DB Title Duplicate Check
-        if (videoHistoryRepository.findByTitle(item.title).isNotEmpty()) {
-            println("⏭️ Skipped (Local DB Title Duplicate): ${item.title}")
+        // Local DB Title Duplicate Check (Checked against both AI transformed title and original RSS title)
+        if (videoHistoryRepository.findByTitle(item.title).isNotEmpty() || 
+            videoHistoryRepository.findByRssTitle(item.title).isNotEmpty()) {
+            println("⏭️ Skipped (Local DB Title/RssTitle Duplicate): ${item.title}")
             return null
         }
 
@@ -81,6 +82,7 @@ class VideoProcessor(
                 summary = item.summary,
                 link = item.link,
                 status = VideoStatus.QUEUED,
+                rssTitle = item.title,
                 createdAt = java.time.LocalDateTime.now(),
                 updatedAt = java.time.LocalDateTime.now()
             )

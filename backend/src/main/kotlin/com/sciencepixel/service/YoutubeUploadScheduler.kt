@@ -28,7 +28,6 @@ class YoutubeUploadScheduler(
     }
 
     @Scheduled(cron = "0 0 * * * *")
-    @EventListener(ApplicationReadyEvent::class)
     @Async
     fun uploadPendingVideos() {
         println("⏰ Scheduler Triggered: Checking for pending/stuck videos at ${java.time.LocalDateTime.now()}")
