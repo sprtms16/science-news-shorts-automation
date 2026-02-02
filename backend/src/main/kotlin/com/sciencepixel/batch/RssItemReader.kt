@@ -82,18 +82,23 @@ open class RssItemReader(
 
             // Attempt XML/RSS Parsing
             try {
-                // Pre-process XML: Rome can be picky about some common malformed XML or DOCTYPEs
-                var xmlContent = String(bodyBytes)
+                val xmlContent = String(bodyBytes)
                 
-                // Remove DOCTYPE if it causes issues (some feeds include it which Rome/Parser might block)
-                if (xmlContent.contains("<!DOCTYPE", ignoreCase = true)) {
-                    xmlContent = xmlContent.replace(Regex("<!DOCTYPE[^>]*>", RegexOption.IGNORE_CASE), "")
+                // Extra Robustness: If it looks like HTML (starts with <!DOCTYPE html> or <html>), and we already tried discovery, skip it.
+                if (xmlContent.trim().lowercase().startsWith("<!doctype html") || xmlContent.trim().lowercase().startsWith("<html")) {
+                    println("⚠️ Skipping XML parse for $urlStr: Content appears to be HTML but no RSS links found.")
+                    return
                 }
+
+                // Remove DOCTYPE if it causes issues
+                val processedXml = if (xmlContent.contains("<!DOCTYPE", ignoreCase = true)) {
+                    xmlContent.replace(Regex("<!DOCTYPE[^>]*>", RegexOption.IGNORE_CASE), "")
+                } else xmlContent
 
                 val input = SyndFeedInput()
                 input.isAllowDoctypes = false // Security
                 
-                val feed = input.build(XmlReader(ByteArrayInputStream(xmlContent.toByteArray())))
+                val feed = input.build(XmlReader(ByteArrayInputStream(processedXml.toByteArray())))
                 
                 feed.entries.take(5).forEach { entry ->
                     val link = entry.link ?: ""
