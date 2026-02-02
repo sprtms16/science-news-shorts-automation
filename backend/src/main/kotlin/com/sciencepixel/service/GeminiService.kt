@@ -249,32 +249,9 @@ class GeminiService(
             }
     """.trimIndent()
 
-    // ...
 
+    // Additional Analysis and Regeneration Tools
 
-
-
-    // ... (Existing code) ...
-    // Note: The above dependencies must be added to the constructor. 
-    // Since I'm replacing the whole class structure or just appending, I should be careful.
-    // The replace_file_content tool works on chunks. I need to make sure I add the properties to the primary constructor first.
-    // However, I cannot easily change the primary constructor signature without touching the class definition line.
-    // So I will split this into two edits if needed, or assume I can replace the constructor.
-    // Let's look at the file content again. Line 19 is the class definition.
-    
-    // START EDIT: Constructor
-    // END EDIT
-    
-    // I will actually just add the methods first, and then I will update the constructor in a separate call if needed, 
-    // OR I will try to update the class definition now.
-    // Wait, replace_file_content allows replacing a chunk. I can replace the top of the class.
-    
-    // Let's implement analyzeChannelGrowth first at the bottom, then I will handle the constructor injection.
-    
-    // Actually, I'll do the constructor update first to be safe.
-
-// I'll execute a separate tool call for the constructor injection to avoid massive diff context issues.
-// Let's implement the methods first.
 
     /**
      * 6. Growth Analysis (Insights)
@@ -609,6 +586,51 @@ class GeminiService(
         } catch (e: Exception) {
             println("❌ Metadata Regen Error: ${e.message}")
             ScriptResponse(emptyList(), "tech", currentTitle, currentSummary, listOf("SciencePixel", "Shorts"))
+        }
+    }
+
+    // 4. Extract Keywords for Thumbnail (Auto-Regeneration)
+    fun extractThumbnailKeyword(title: String, description: String): String {
+        val prompt = """
+            [Task]
+            You are an expert Stock Photo Searcher.
+            Convert the following YouTube Video Title and Description (KOREAN) into the **BEST SINGLE ENGLISH SEARCH KEYWORD** for finding a relevant, high-quality stock photo (Pexels).
+
+            [Input]
+            Title: $title
+            Description: $description
+
+            [Rules]
+            1. Output MUST be in **ENGLISH**.
+            2. Output MUST be 1-3 words max.
+            3. Focus on the main visual subject (e.g., "Black Hole", "DNA", "Robot", "Mars").
+            4. Do NOT output a sentence. Just the keywords.
+
+            [Output Example]
+            Input: "블랙홀이 새로운 우주를 만들 수 있다?!"
+            Output: Black Hole space
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return "science technology"
+
+        return try {
+            val jsonResponse = JSONObject(responseText)
+            val text = jsonResponse.getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .removePrefix("```json")
+                .removeSuffix("```")
+                .trim()
+            
+            // Basic cleanup
+            text.filter { it.isLetterOrDigit() || it.isWhitespace() }.take(50)
+        } catch (e: Exception) {
+            println("❌ Keyword Extraction Error: ${e.message}")
+            "science technology"
         }
     }
 

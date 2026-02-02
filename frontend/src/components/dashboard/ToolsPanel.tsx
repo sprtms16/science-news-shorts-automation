@@ -6,12 +6,13 @@ import {
     ShieldCheck,
     Trash2,
     Languages,
-    TrendingUp
+    TrendingUp,
+    Image
 } from 'lucide-react';
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -26,7 +27,7 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Growth Analysis Card (New) */}
+                    {/* Growth Analysis Card */}
                     <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-pink-500/30 transition-all group md:col-span-2">
                         <div className="flex items-start gap-6">
                             <div className="w-14 h-14 rounded-2xl bg-pink-500/10 flex items-center justify-center text-pink-500 shrink-0 group-hover:scale-105 transition-transform">
@@ -47,6 +48,29 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                             </div>
                         </div>
                     </div>
+
+                    {/* Thumbnail Regeneration Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-cyan-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 flex items-center justify-center text-cyan-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <Image size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-cyan-500 mb-1">{t.regenThumbnailsTitle || "Thumbnail Auto-Regeneration"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.regenThumbnailsDesc || "Automatically select and update thumbnails for existing videos based on their title and keywords using Pexels API."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('regenerate-thumbnails')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-cyan-600/10 hover:bg-cyan-600 text-cyan-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-cyan-500/20"
+                                >
+                                    {t.runRegenThumbnails || "Regenerate Thumbnails"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
 
                     <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-blue-500/30 transition-all group">
                         <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-4 group-hover:scale-110 transition-transform">
