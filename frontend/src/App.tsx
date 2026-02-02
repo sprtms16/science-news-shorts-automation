@@ -144,7 +144,21 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis') => {
+  const onManualUpload = async (id: string) => {
+    if (!confirm(language === 'ko' ? "이 영상을 유튜브에 수동으로 업로드하시겠습니까?" : "Manual upload this video to YouTube?")) return;
+    setLoading(true);
+    try {
+      await axios.post(`/admin/videos/${id}/upload`);
+      alert(language === 'ko' ? "업로드 요청이 성공적으로 전달되었습니다." : "Upload request sent successfully.");
+      await fetchData();
+    } catch (e) {
+      alert(language === 'ko' ? "업로드 요청 실패" : "Upload request failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
@@ -154,7 +168,8 @@ function App() {
           action === 'prune-deleted' ? `/admin/maintenance/cleanup-deleted-youtube` :
             action === 'translate-uploaded' ? `/admin/maintenance/translate-uploaded-videos` :
               action === 'growth-analysis' ? `/admin/maintenance/growth-analysis` :
-                `/admin/videos/${action}`;
+                action === 'regenerate-thumbnails' ? `/admin/maintenance/regenerate-thumbnails` :
+                  `/admin/videos/${action}`;
       const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");
@@ -280,6 +295,7 @@ function App() {
                   video={video}
                   onDownload={() => downloadVideo(video.id || '')}
                   onRegenerateMetadata={onRegenerateMetadata}
+                  onManualUpload={onManualUpload}
                   onUpdateStatus={updateVideoStatus}
                   onDelete={onDeleteVideo}
                   t={t}

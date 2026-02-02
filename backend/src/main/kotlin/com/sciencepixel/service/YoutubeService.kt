@@ -6,6 +6,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport
 import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.FileDataStoreFactory
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import com.google.api.services.youtube.YouTube
 import com.google.api.services.youtube.model.Video
 import com.google.api.services.youtube.model.VideoSnippet
@@ -299,10 +300,18 @@ class YoutubeService(
         val mediaContent = InputStreamContent("video/mp4", FileInputStream(file))
 
         val request = youtube.videos().insert(listOf("snippet", "status"), video, mediaContent)
-        val response = request.execute()
         
-        // 업로드 성공 시 할당량 기록
-        quotaTracker.recordUpload()
+        val response = try {
+            request.execute()
+        } catch (e: GoogleJsonResponseException) {
+            if (e.details?.errors?.any { it.reason == "quotaExceeded" } == true) {
+                println("🛑 YouTube Quota Exceeded detected during upload.")
+                quotaTracker.setSuspended("Quota Exceeded Error from YouTube API")
+            }
+            throw e
+        } catch (e: Exception) {
+            throw e
+        }
         
         println("✅ YouTube Upload Complete! ID: ${response.id}")
         
@@ -353,5 +362,24 @@ class YoutubeService(
         // 3. Execute update
         youtube.videos().update(listOf("snippet"), video).execute()
         println("✅ Metadata updated successfully for video: $videoId")
+    }
+
+    fun setThumbnail(videoId: String, file: File) {
+        if (!file.exists()) {
+            println("⚠️ Thumbnail file not found: ${file.path}")
+            return
+        }
+
+        println("🖼️ Setting custom thumbnail for video: $videoId")
+        val youtube = getYoutubeClient()
+        
+        try {
+            val thumbContent = InputStreamContent("image/jpeg", FileInputStream(file))
+            youtube.thumbnails().set(videoId, thumbContent).execute()
+            println("✅ Thumbnail upload complete for video: $videoId")
+        } catch (e: Exception) {
+            println("❌ Failed to set thumbnail for $videoId: ${e.message}")
+            throw e
+        }
     }
 }

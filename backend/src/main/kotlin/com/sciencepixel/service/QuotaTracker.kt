@@ -30,78 +30,46 @@ class QuotaTracker(
     }
 
     /**
-     * 현재 업로드 가능한지 확인
+     * 현재 업로드 가능한지 확인 (할당량 소진 여부 체크)
      */
     fun canUpload(): Boolean {
-        val quota = getOrCreateQuota()
-        return (quota.usedUnits + UPLOAD_COST) <= getDailyLimit()
+        val suspended = systemSettingRepository.findById("YOUTUBE_UPLOAD_SUSPENDED")
+            .map { it.value == "true" }
+            .orElse(false)
+        
+        return !suspended
     }
 
     /**
-     * 업로드 비용 기록
+     * 할당량 초과 시 호출하여 업로드를 중단시킴
      */
-    fun recordUpload() {
-        val quota = getOrCreateQuota()
-        val limit = getDailyLimit()
-        repository.save(quota.copy(
-            usedUnits = quota.usedUnits + UPLOAD_COST,
+    fun setSuspended(reason: String = "Quota Exceeded") {
+        systemSettingRepository.save(com.sciencepixel.domain.SystemSetting(
+            key = "YOUTUBE_UPLOAD_SUSPENDED",
+            value = "true",
+            description = "YouTube Upload Suspended: $reason",
             updatedAt = LocalDateTime.now()
         ))
-        println("📊 YouTube Quota Updated: ${quota.usedUnits + UPLOAD_COST} / $limit")
+        println("🛑 YouTube Upload SUSPENDED: $reason")
     }
 
     /**
-     * 할당량 사용량 강제 초기화 (매일 16시 자동 실행 및 수동 호출)
+     * 할당량 사용량 강제 초기화 (매일 16시 자동 실행)
      */
     @org.springframework.scheduling.annotation.Scheduled(cron = "0 0 16 * * *")
     fun resetQuota() {
-        val quotaDate = getCurrentQuotaDate()
-        val newQuota = QuotaUsage(
-            id = "youtube_upload",
-            usedUnits = 0,
-            date = quotaDate,
+        systemSettingRepository.save(com.sciencepixel.domain.SystemSetting(
+            key = "YOUTUBE_UPLOAD_SUSPENDED",
+            value = "false",
+            description = "YouTube Upload Resumed after Reset",
             updatedAt = LocalDateTime.now()
-        )
-        repository.save(newQuota)
-        println("🔄 YouTube Daily Quota units reset to 0 for period starting at $quotaDate (Reset triggered at 16:00 or manually)")
-    }
-
-    private fun getCurrentQuotaDate(): String {
-        val now = LocalDateTime.now()
-        // 16시(오후 4시)를 기준으로 할당량이 초기화됨
-        val quotaDate = if (now.hour < 16) {
-            now.toLocalDate().minusDays(1)
-        } else {
-            now.toLocalDate()
-        }
-        return quotaDate.format(dateFormatter)
+        ))
+        println("🔄 YouTube Daily Quota Reset: Uploading resumed at 16:00 KST.")
     }
 
     /**
-     * 남은 할당량 (업로드 가능 횟수) 반환
+     * 남은 할당량 추정 (UI 표시용 - 이제 에러 기반이므로 단순화)
      */
-    fun getRemainingUploads(): Int {
-        val quota = getOrCreateQuota()
-        val limit = getDailyLimit()
-        val remainingUnits = limit - quota.usedUnits
-        return remainingUnits / UPLOAD_COST
-    }
-
-    private fun getOrCreateQuota(): QuotaUsage {
-        val quotaDate = getCurrentQuotaDate()
-        val existing = repository.findById("youtube_upload").orElse(null)
-
-        return if (existing == null || existing.date != quotaDate) {
-            // 날짜(제한 기준)가 바뀌었거나 레코드가 없으면 초기화
-            val newQuota = QuotaUsage(
-                id = "youtube_upload",
-                usedUnits = 0,
-                date = quotaDate,
-                updatedAt = LocalDateTime.now()
-            )
-            repository.save(newQuota)
-        } else {
-            existing
-        }
-    }
+    fun isSuspended(): Boolean = !canUpload()
 }
+

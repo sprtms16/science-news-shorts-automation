@@ -52,22 +52,8 @@ class AsyncVideoService(
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                     
-                    // Kafka 이벤트 발행 - YouTube 업로드 트리거 (키워드 포함)
-                    if (completedVideo.id != null) {
-                        kafkaEventPublisher.publishVideoCreated(VideoCreatedEvent(
-                            videoId = completedVideo.id!!,
-                            title = completedVideo.title,
-                            summary = completedVideo.summary,
-                            description = completedVideo.description,
-                            link = completedVideo.link,
-                            filePath = filePath,
-                            thumbnailPath = thumbnailPath,
-                            keywords = keywords
-                        ))
-                    }
-                    
-                    // 생성 알림은 디버그용으로만 남김 (사용자 요청에 따라 업로드 알림이 우선)
-                    println("📢 Video created with keywords: $keywords")
+                    // 생성 알림은 디버그용으로만 남김
+                    println("📢 Video created successfully: ${completedVideo.title}")
                 }
                 
                 println("✅ [ASYNC] Video created successfully: $filePath")

@@ -22,12 +22,13 @@ interface VideoCardProps {
     video: VideoHistory;
     onDownload: () => void;
     onRegenerateMetadata: (id: string) => void;
+    onManualUpload: (id: string) => void;
     onUpdateStatus: (id: string, status: string, url?: string) => void;
     onDelete: (id: string) => void;
     t: any;
 }
 
-export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onUpdateStatus, onDelete, t }, ref) => {
+export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, t }, ref) => {
     const statusColors: Record<string, { bg: string, text: string, border: string, icon: any, label: string }> = {
         'CREATING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: t.statusCreating },
         'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
@@ -110,6 +111,14 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                         >
                             <RefreshCw size={14} /> {t.meta}
                         </button>
+                        {video.status === 'COMPLETED' && (
+                            <button
+                                onClick={() => onManualUpload(video.id || '')}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all text-xs font-bold animate-pulse"
+                            >
+                                <Youtube size={14} /> {t.manualUpload}
+                            </button>
+                        )}
                         <button
                             onClick={onDownload}
                             disabled={!video.filePath}
