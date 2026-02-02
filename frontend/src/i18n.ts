@@ -81,7 +81,11 @@ export const translations = {
         translateUploadedBtn: "한글화 실행",
         growthAnalysisTitle: "채널 성장 분석 (AI)",
         growthAnalysisDesc: "상위 10% 인기 영상을 분석하여 성공 요인을 도출하고, 이를 다음 대본 생성 프롬프트에 자동 반영합니다.",
-        runGrowthAnalysis: "성장 전략 분석 실행"
+        runGrowthAnalysis: "성장 전략 분석 실행",
+        regenThumbnailsTitle: "썸네일 자동 재생성",
+        regenThumbnailsDesc: "기존 영상의 제목과 설명을 분석하여 Pexels에서 고화질 썸네일을 찾아 자동으로 업데이트합니다.",
+        runRegenThumbnails: "썸네일 재생성 실행",
+        manualUpload: "유튜브 업로드"
     },
     en: {
         dashboard: 'Dashboard',
@@ -163,6 +167,10 @@ export const translations = {
         translateUploadedBtn: "Run Localization",
         growthAnalysisTitle: "Channel Growth Analysis (AI)",
         growthAnalysisDesc: "Analyze top 10% videos to find success patterns and auto-inject them into future prompts.",
-        runGrowthAnalysis: "Run Analysis"
+        runGrowthAnalysis: "Run Analysis",
+        regenThumbnailsTitle: "Auto-Regenerate Thumbnails",
+        regenThumbnailsDesc: "Analyzes existing video titles/descriptions to find and update high-quality thumbnails from Pexels.",
+        runRegenThumbnails: "Run Regeneration",
+        manualUpload: "Upload to YouTube"
     }
 };

@@ -42,7 +42,8 @@ class AdminController(
     private val youtubeService: com.sciencepixel.service.YoutubeService,
     private val youtubeVideoRepository: YoutubeVideoRepository,
     private val youtubeSyncService: YoutubeSyncService,
-    private val quotaTracker: com.sciencepixel.service.QuotaTracker
+    private val quotaTracker: com.sciencepixel.service.QuotaTracker,
+    private val pexelsService: com.sciencepixel.service.PexelsService
 ) {
 
     @PostMapping("/videos/upload-pending")
@@ -53,6 +54,34 @@ class AdminController(
         return ResponseEntity.ok(mapOf(
             "message" to "Triggered pending video upload check in background."
         ))
+    }
+
+    @PostMapping("/videos/{id}/upload")
+    fun uploadVideoManually(@PathVariable id: String): ResponseEntity<Map<String, Any>> {
+        val video = videoRepository.findById(id).orElseThrow { RuntimeException("Video not found") }
+        
+        if (video.status != com.sciencepixel.domain.VideoStatus.COMPLETED) {
+            return ResponseEntity.badRequest().body(mapOf("error" to "Video must be in COMPLETED status to upload"))
+        }
+
+        if (video.filePath.isBlank() || !File(video.filePath).exists()) {
+            return ResponseEntity.badRequest().body(mapOf("error" to "Video file not found on disk"))
+        }
+
+        println("🚀 Manual Upload Triggered for: ${video.title}")
+        
+        kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
+            videoId = video.id!!,
+            title = video.title,
+            summary = video.summary,
+            description = video.description,
+            link = video.link,
+            filePath = video.filePath,
+            thumbnailPath = video.thumbnailPath,
+            keywords = emptyList() // Manual trigger might not have original keywords, but consumer handles meta
+        ))
+
+        return ResponseEntity.ok(mapOf("message" to "Upload triggered for ${video.title}"))
     }
 
     @GetMapping("/youtube/my-videos")
@@ -516,6 +545,89 @@ class AdminController(
         ))
     }
 
+    @PostMapping("/maintenance/regenerate-thumbnails")
+    fun regenerateThumbnails(
+        @RequestParam(defaultValue = "10") limit: Int,
+        @RequestParam(defaultValue = "false") force: Boolean
+    ): ResponseEntity<Map<String, Any>> {
+        val allYoutubeVideos = youtubeVideoRepository.findAllByOrderByPublishedAtDesc(PageRequest.of(0, limit)).content
+        val updatedVideos = mutableListOf<String>()
+        var successCount = 0
+        var failCount = 0
+
+        println("🖼️ [Thumbnail Regen] Processing latest $limit videos... (Force: $force)")
+
+        allYoutubeVideos.forEach { ytVideo ->
+            // Skip if it already has a "max resolution" thumbnail (often user custom), 
+            // BUT user asked to "Regenerate based on title/desc", so force might be implied if they clicked the button.
+            // Let's assume if 'force=true' we overwrite anytime. 
+            // If 'force=false', we only do it if the keyword extraction and download works.
+            
+            try {
+                // 1. Keyword Extraction
+                val keyword = geminiService.extractThumbnailKeyword(ytVideo.title, ytVideo.description)
+                if (keyword.isBlank() || keyword == "science technology") {
+                    println("   Skip ${ytVideo.videoId}: No specific keyword found.")
+                    return@forEach
+                }
+
+                // 2. Pexels Search
+                val photoUrl = pexelsService.searchPhoto(keyword)
+                if (photoUrl == null) {
+                    println("   Skip ${ytVideo.videoId}: No Pexels photo found for '$keyword'")
+                    return@forEach
+                }
+
+                // 3. Download to Permanent Storage
+                val thumbnailsDir = File("shared-data/thumbnails").apply { mkdirs() }
+                val thumbFile = File(thumbnailsDir, "${ytVideo.videoId}.jpg")
+                
+                val url = java.net.URL(photoUrl)
+                url.openStream().use { input ->
+                    thumbFile.outputStream().use { output -> input.copyTo(output) }
+                }
+
+                if (thumbFile.exists() && thumbFile.length() > 0) {
+                    // 4. Upload to YouTube
+                    youtubeService.setThumbnail(ytVideo.videoId, thumbFile)
+                    
+                    // 5. Update Local History if matched
+                    val localVideo = videoRepository.findAll().find { it.youtubeUrl.contains(ytVideo.videoId) }
+                    if (localVideo != null) {
+                        videoRepository.save(localVideo.copy(
+                            thumbnailPath = thumbFile.absolutePath,
+                            updatedAt = LocalDateTime.now()
+                        ))
+                    }
+
+                    updatedVideos.add("${ytVideo.videoId} ($keyword)")
+                    successCount++
+                    
+                    // Rate Limit Sleep to respect YouTube & Pexels quotas
+                    Thread.sleep(2000)
+                }
+            } catch (e: Exception) {
+                println("❌ Failed to regen thumbnail for ${ytVideo.videoId}: ${e.message}")
+                failCount++
+            }
+        }
+
+        // Trigger a sync to update the dashboad URLs immediately
+        try {
+            youtubeSyncService.syncVideos()
+        } catch (e: Exception) {
+            println("⚠️ Post-regen sync failed: ${e.message}")
+        }
+
+
+        return ResponseEntity.ok(mapOf(
+            "message" to "Thumbnail regeneration completed.",
+            "successCount" to successCount,
+            "failCount" to failCount,
+            "updatedVideos" to updatedVideos
+        ))
+    }
+
     // System Settings API
     @GetMapping("/settings")
     fun getAllSettings(): List<SystemSetting> = systemSettingRepository.findAll()
@@ -818,6 +930,17 @@ class AdminController(
             "totalChecked" to allYoutubeVideos.size,
             "updatedCount" to updateCount,
             "updatedVideos" to updatedVideos
+        ))
+    }
+
+    @PostMapping("/maintenance/growth-analysis")
+    fun analyzeGrowth(): ResponseEntity<Map<String, Any>> {
+        println("📈 Starting Channel Growth Analysis...")
+        val insights = geminiService.analyzeChannelGrowth()
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Channel growth analysis completed.",
+            "insights" to insights
         ))
     }
 }
