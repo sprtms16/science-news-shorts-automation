@@ -49,7 +49,8 @@ class ManualGenerationController(
     private val kafkaEventPublisher: KafkaEventPublisher,
     private val asyncVideoService: AsyncVideoService,
     private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler,
-    private val cleanupService: com.sciencepixel.service.CleanupService
+    private val cleanupService: com.sciencepixel.service.CleanupService,
+    @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
     @PostMapping("/scheduler/trigger")
@@ -85,6 +86,7 @@ class ManualGenerationController(
                 
                 // 히스토리 저장
                 val history = VideoHistory(
+                    channelId = channelId,
                     title = scienceNews.title,
                     summary = scienceNews.summary,
                     link = "manual-batch-${topic.hashCode()}-${System.currentTimeMillis()}",
@@ -184,6 +186,7 @@ class ManualGenerationController(
         
         // 초기 상태 저장
         val history = VideoHistory(
+            channelId = channelId,
             title = news.title,
             link = news.link,
             summary = news.summary,
@@ -245,6 +248,7 @@ class ManualGenerationController(
      */
     private fun processVideoCreationSync(news: NewsItem): String {
         val history = VideoHistory(
+            channelId = channelId,
             title = news.title,
             link = news.link,
             summary = news.summary,
@@ -271,6 +275,7 @@ class ManualGenerationController(
                 
                 if (completedVideo.id != null) {
                     kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
+                        channelId = channelId,
                         videoId = completedVideo.id!!,
                         title = completedVideo.title,
                         summary = completedVideo.summary,

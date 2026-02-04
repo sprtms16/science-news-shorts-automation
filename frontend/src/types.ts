@@ -1,5 +1,6 @@
 export interface VideoHistory {
     id: string;
+    channelId: string;
     title: string;
     summary: string;
     link: string;
@@ -19,7 +20,18 @@ export interface VideoHistory {
 
 export interface SystemPrompt {
     id: string;
+    channelId: string;
+    promptKey: string;
     content: string;
+    description: string;
+    updatedAt: string;
+}
+
+export interface SystemSetting {
+    id: string;
+    channelId: string;
+    key: string;
+    value: string;
     description: string;
     updatedAt: string;
 }

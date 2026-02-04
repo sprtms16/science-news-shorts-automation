@@ -1,17 +1,22 @@
 package com.sciencepixel.domain
 
 import org.springframework.data.annotation.Id
+import org.springframework.data.mongodb.core.index.CompoundIndex
+import org.springframework.data.mongodb.core.index.CompoundIndexes
 import org.springframework.data.mongodb.core.index.Indexed
 import org.springframework.data.mongodb.core.mapping.Document
 import java.time.LocalDateTime
 
 @Document(collection = "video_history")
+@CompoundIndexes(
+    CompoundIndex(name = "channel_link_idx", def = "{'channelId': 1, 'link': 1}", unique = true)
+)
 data class VideoHistory(
     @Id
     val id: String? = null,
+    val channelId: String = "science", // 추가: 채널 식별자 (science, horror, stocks, history)
     val title: String,
     val summary: String,
-    @Indexed(unique = true)
     val link: String,
     val status: VideoStatus = VideoStatus.CREATING,
     val failureStep: String = "", // e.g. "SCRIPT", "ASSETS", "RENDER", "UPLOAD"
@@ -70,17 +75,27 @@ data class ProductionResult(
 )
 
 @Document(collection = "system_prompt")
+@CompoundIndexes(
+    CompoundIndex(name = "channel_prompt_idx", def = "{'channelId': 1, 'promptKey': 1}", unique = true)
+)
 data class SystemPrompt(
     @Id
-    val id: String, // "script_prompt", "vision_prompt" for example
+    val id: String? = null,
+    val channelId: String = "science", // 추가: 채널 식별자
+    val promptKey: String, // e.g. "script_prompt", "vision_prompt"
     val content: String,
     val description: String = "",
     val updatedAt: LocalDateTime = LocalDateTime.now()
 )
 
 @Document(collection = "system_setting")
+@CompoundIndexes(
+    CompoundIndex(name = "channel_key_idx", def = "{'channelId': 1, 'key': 1}", unique = true)
+)
 data class SystemSetting(
     @Id
+    val id: String? = null, // 인스턴스별 설정을 위해 전용 ID 사용
+    val channelId: String = "science", // 추가: 채널 식별자
     val key: String, // e.g., "MAX_GENERATION_LIMIT", "UPLOAD_BLOCKED_UNTIL"
     val value: String,
     val description: String = "",
@@ -109,10 +124,13 @@ data class YoutubeVideoStat(
 )
 
 @Document(collection = "youtube_videos")
+@CompoundIndexes(
+    CompoundIndex(name = "channel_title_idx", def = "{'channelId': 1, 'title': 1}")
+)
 data class YoutubeVideoEntity(
     @Id
     val videoId: String,
-    @Indexed
+    val channelId: String = "science", // 추가: 채널 식별자
     val title: String,
     val description: String = "",
     val viewCount: Long,

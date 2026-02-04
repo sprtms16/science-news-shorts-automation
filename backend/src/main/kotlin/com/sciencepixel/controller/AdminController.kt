@@ -36,14 +36,15 @@ class AdminController(
     private val geminiService: GeminiService,
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher, // Renamed to avoid conflict
     private val productionService: ProductionService,
-    private val systemSettingRepository: SystemSettingRepository,
+    private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository,
     private val cleanupService: com.sciencepixel.service.CleanupService,
     private val youtubeUploadScheduler: com.sciencepixel.service.YoutubeUploadScheduler,
     private val youtubeService: com.sciencepixel.service.YoutubeService,
     private val youtubeVideoRepository: YoutubeVideoRepository,
     private val youtubeSyncService: YoutubeSyncService,
     private val quotaTracker: com.sciencepixel.service.QuotaTracker,
-    private val pexelsService: com.sciencepixel.service.PexelsService
+    private val pexelsService: com.sciencepixel.service.PexelsService,
+    @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val defaultChannelId: String
 ) {
 
     @PostMapping("/videos/upload-pending")
@@ -71,6 +72,7 @@ class AdminController(
         println("🚀 Manual Upload Triggered for: ${video.title}")
         
         kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
+            channelId = video.channelId, // video 객체에서 가져옴
             videoId = video.id!!,
             title = video.title,
             summary = video.summary,
@@ -78,19 +80,20 @@ class AdminController(
             link = video.link,
             filePath = video.filePath,
             thumbnailPath = video.thumbnailPath,
-            keywords = emptyList() // Manual trigger might not have original keywords, but consumer handles meta
+            keywords = emptyList()
         ))
 
         return ResponseEntity.ok(mapOf("message" to "Upload triggered for ${video.title}"))
     }
 
-    @GetMapping("/youtube/my-videos")
     fun getMyVideos(
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "20") size: Int
+        @RequestParam(defaultValue = "20") size: Int,
+        @RequestParam(required = false) channelId: String?
     ): ResponseEntity<com.sciencepixel.domain.YoutubeVideoResponse> {
+        val targetChannel = channelId ?: defaultChannelId
         val pageable = PageRequest.of(page, size, Sort.by("publishedAt").descending())
-        val videoPage = youtubeVideoRepository.findAllByOrderByPublishedAtDesc(pageable)
+        val videoPage = youtubeVideoRepository.findByChannelId(targetChannel, pageable)
         
         val stats = videoPage.content.map { entity ->
             com.sciencepixel.domain.YoutubeVideoStat(
@@ -110,16 +113,19 @@ class AdminController(
     }
 
     @PostMapping("/youtube/sync")
-    fun triggerYoutubeSync(): ResponseEntity<Map<String, Any>> {
-        youtubeSyncService.syncVideos()
+    fun triggerYoutubeSync(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val targetChannel = channelId ?: defaultChannelId
+        // YouTube Sync Service might need refactoring if it's not multi-instance aware
+        // In this case, we call the sync specifically for this instance's channel
+        youtubeSyncService.syncVideos() 
         return ResponseEntity.ok(mapOf(
-            "message" to "YouTube synchronization triggered successfully."
+            "message" to "YouTube synchronization for $targetChannel triggered successfully."
         ))
     }
 
     @DeleteMapping("/videos/history/uploaded")
-    fun deleteUploadedHistory(): ResponseEntity<Map<String, Any>> {
-        val uploadedOnes = videoRepository.findByStatus(VideoStatus.UPLOADED)
+    fun deleteUploadedHistory(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val uploadedOnes = videoRepository.findByChannelIdAndStatus(channelId ?: defaultChannelId, VideoStatus.UPLOADED)
         val count = uploadedOnes.size
         if (uploadedOnes.isNotEmpty()) {
             videoRepository.deleteAll(uploadedOnes)
@@ -154,7 +160,7 @@ class AdminController(
     fun regenerateMetadata(@PathVariable id: String): ResponseEntity<VideoHistory> {
         val video = videoRepository.findById(id).orElse(null) ?: return ResponseEntity.notFound().build()
         
-        val response = geminiService.regenerateMetadataOnly(video.title, video.summary)
+        val response = geminiService.regenerateMetadataOnly(video.title, video.summary, video.channelId)
         
         val updated = video.copy(
             title = response.title.ifEmpty { video.title },
@@ -168,15 +174,16 @@ class AdminController(
     }
 
     @PostMapping("/youtube/update-all-descriptions")
-    fun updateAllYoutubeDescriptions(): ResponseEntity<Map<String, Any>> {
-        val uploadedVideos = videoRepository.findByStatus(VideoStatus.UPLOADED)
+    fun updateAllYoutubeDescriptions(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val uploadedVideos = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.UPLOADED)
         var updatedCount = 0
         val failedVideos = mutableListOf<String>()
 
-        uploadedVideos.forEach { video ->
+        uploadedVideos.forEach { video: com.sciencepixel.domain.VideoHistory ->
             if (video.youtubeUrl.isNotBlank() && video.description.isNotBlank()) {
                 try {
-                    val videoId = if (video.youtubeUrl.contains("youtu.be/")) {
+                    val videoId: String? = if (video.youtubeUrl.contains("youtu.be/")) {
                         video.youtubeUrl.substringAfter("youtu.be/").substringBefore("?").trim()
                     } else if (video.youtubeUrl.contains("v=")) {
                         video.youtubeUrl.substringAfter("v=").substringBefore("&").trim()
@@ -226,10 +233,18 @@ class AdminController(
         val baseDescription = generated.description
         
         // 업로드 로직과 동일하게 해시태그 추가 (기존에 #이 없을 경우만)
+        // 채널별 기본 해시태그 설정
+        val channelTags = when(videoInDb?.channelId ?: defaultChannelId) {
+            "horror" -> "#Mystery #Horror #MysteryPixel #미스터리 #공포"
+            "stocks" -> "#Finance #ValuePixel #Investing #주식 #투자"
+            "history" -> "#History #MemoryPixel #Documentary #역사 #다큐멘터리"
+            else -> "#Science #SciencePixel #News #과학 #뉴스"
+        }
+
         val finalDescription = if (baseDescription.contains("#")) {
             baseDescription
         } else {
-            "${baseDescription}\n\n#Science #News #Shorts"
+            "${baseDescription}\n\n$channelTags"
         }
 
         youtubeService.updateVideoMetadata(videoId, description = finalDescription)
@@ -327,12 +342,13 @@ class AdminController(
         }
 
         var triggeredCount = 0
-        targetVideos.forEach { video ->
+        targetVideos.forEach { video: com.sciencepixel.domain.VideoHistory ->
             // Update status (Preserve UPLOADED status to avoid re-uploading)
             val nextStatus = if (video.status == VideoStatus.UPLOADED) VideoStatus.UPLOADED else VideoStatus.CREATING
             videoRepository.save(video.copy(status = nextStatus, updatedAt = LocalDateTime.now()))
             
             kafkaEventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
+                channelId = video.channelId,
                 videoId = video.id ?: "",
                 title = video.title,
                 summary = video.summary,
@@ -360,7 +376,7 @@ class AdminController(
 
         for (video in videosToUpdate.take(10)) {
             try {
-                val response = geminiService.regenerateMetadataOnly(video.title, video.summary)
+                val response = geminiService.regenerateMetadataOnly(video.title, video.summary, video.channelId)
                 videoRepository.save(video.copy(
                     title = response.title.ifEmpty { video.title },
                     description = response.description,
@@ -383,13 +399,14 @@ class AdminController(
         ))
     }
 
-    @GetMapping("/videos")
     fun getAllVideos(
         @RequestParam(defaultValue = "0") page: Int,
-        @RequestParam(defaultValue = "15") size: Int
+        @RequestParam(defaultValue = "15") size: Int,
+        @RequestParam(required = false) channelId: String?
     ): ResponseEntity<Map<String, Any?>> {
+        val targetChannel = channelId ?: defaultChannelId
         val pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"))
-        val videoPage = videoRepository.findAll(pageable)
+        val videoPage = videoRepository.findByChannelId(targetChannel, pageable)
         
         return ResponseEntity.ok(mapOf(
             "videos" to videoPage.content,
@@ -478,7 +495,10 @@ class AdminController(
     }
 
     @GetMapping("/prompts")
-    fun getAllPrompts(): List<SystemPrompt> = promptRepository.findAll()
+    fun getAllPrompts(@RequestParam(required = false) channelId: String?): List<SystemPrompt> {
+        val targetChannel = channelId ?: defaultChannelId
+        return promptRepository.findByChannelId(targetChannel)
+    }
 
     @GetMapping("/prompts/{id}")
     fun getPrompt(@PathVariable id: String): ResponseEntity<SystemPrompt> {
@@ -495,14 +515,14 @@ class AdminController(
             .take(20) // 최신 20개만 집중 검사 (API 429 방지)
             
         var deletedCount = 0
-        videos.forEach { video ->
-            if (!geminiService.checkSensitivity(video.title, video.summary)) {
+        videos.forEach { video: com.sciencepixel.domain.VideoHistory ->
+            if (!geminiService.checkSensitivity(video.title, video.summary, video.channelId)) {
                 if (video.filePath.isNotBlank()) {
                     cleanupService.deleteVideoFile(video.filePath)
                 }
                 videoRepository.delete(video)
                 deletedCount++
-                println("⛔ Safety Cleanup: Deleted sensitive video '${video.title}'")
+                println("⛔ Safety Cleanup: Deleted sensitive video '${video.title}' in channel '${video.channelId}'")
             }
         }
         return ResponseEntity.ok(mapOf(
@@ -557,7 +577,7 @@ class AdminController(
 
         println("🖼️ [Thumbnail Regen] Processing latest $limit videos... (Force: $force)")
 
-        allYoutubeVideos.forEach { ytVideo ->
+        allYoutubeVideos.forEach { ytVideo: com.sciencepixel.domain.YoutubeVideoEntity ->
             // Skip if it already has a "max resolution" thumbnail (often user custom), 
             // BUT user asked to "Regenerate based on title/desc", so force might be implied if they clicked the button.
             // Let's assume if 'force=true' we overwrite anytime. 
@@ -589,7 +609,7 @@ class AdminController(
 
                 if (thumbFile.exists() && thumbFile.length() > 0) {
                     // 4. Upload to YouTube
-                    youtubeService.setThumbnail(ytVideo.videoId, thumbFile)
+                    youtubeService.setThumbnail(ytVideo.videoId, thumbFile, ytVideo.channelId)
                     
                     // 5. Update Local History if matched
                     val localVideo = videoRepository.findAll().find { it.youtubeUrl.contains(ytVideo.videoId) }
@@ -630,7 +650,10 @@ class AdminController(
 
     // System Settings API
     @GetMapping("/settings")
-    fun getAllSettings(): List<SystemSetting> = systemSettingRepository.findAll()
+    fun getAllSettings(@RequestParam(required = false) channelId: String?): List<SystemSetting> {
+        val targetChannel = channelId ?: defaultChannelId
+        return systemSettingRepository.findByChannelId(targetChannel)
+    }
 
     @GetMapping("/settings/{key}")
     fun getSetting(@PathVariable key: String): ResponseEntity<SystemSetting> {
@@ -640,8 +663,9 @@ class AdminController(
     }
 
     @PostMapping("/maintenance/cleanup-deleted-youtube")
-    fun cleanupDeletedYoutubeVideos(): ResponseEntity<Map<String, Any>> {
-        val uploadedVideos = videoRepository.findByStatus(VideoStatus.UPLOADED)
+    fun cleanupDeletedYoutubeVideos(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val uploadedVideos = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.UPLOADED)
         var cleanedCount = 0
         val deletedIds = mutableListOf<String>()
 
@@ -685,8 +709,9 @@ class AdminController(
     }
 
     @PostMapping("/maintenance/sync-uploaded")
-    fun syncUploadedStatus(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findByStatusIn(listOf(
+    fun syncUploadedStatus(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val videos = videoRepository.findByChannelIdAndStatusIn(effectiveChannelId, listOf(
             VideoStatus.COMPLETED,
             VideoStatus.CREATING,
             VideoStatus.FAILED
@@ -723,11 +748,12 @@ class AdminController(
     }
 
     @PostMapping("/maintenance/deduplicate-links")
-    fun deduplicateLinks(): ResponseEntity<Map<String, Any>> {
-        val duplicateGroups = videoRepository.findDuplicateLinks()
+    fun deduplicateLinks(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val duplicateGroups = videoRepository.findDuplicateLinks(effectiveChannelId)
         var deletedCount = 0
         
-        duplicateGroups.forEach { group ->
+        duplicateGroups.forEach { group: com.sciencepixel.domain.DuplicateLinkGroup ->
             val link = group._id
             val videos = group.docs
             
@@ -795,6 +821,7 @@ class AdminController(
                     if (targetStatus == VideoStatus.FAILED && video.regenCount < 1) {
                         kafkaEventPublisher.publishRegenerationRequested(
                             com.sciencepixel.event.RegenerationRequestedEvent(
+                                channelId = video.channelId,
                                 videoId = video.id!!,
                                 title = video.title,
                                 summary = video.summary,
@@ -819,8 +846,9 @@ class AdminController(
     }
 
     @PostMapping("/maintenance/reset-creating-to-queued")
-    fun resetCreatingToQueued(): ResponseEntity<Map<String, Any>> {
-        val stuckVideos = videoRepository.findByStatus(VideoStatus.CREATING)
+    fun resetCreatingToQueued(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val stuckVideos = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.CREATING)
         var resetCount = 0
         
         stuckVideos.forEach { video ->
@@ -836,6 +864,7 @@ class AdminController(
             // So we MUST also re-publish the RssNewItemEvent for these items.
             
             kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
+                channelId = effectiveChannelId,
                 url = video.link,
                 title = video.title,
                 category = "general"
@@ -875,7 +904,7 @@ class AdminController(
 
                 try {
                     // 1. Regenerate Metadata (Korean)
-                    val newMeta = geminiService.regenerateMetadataOnly(ytVideo.title, ytVideo.description)
+                    val newMeta = geminiService.regenerateMetadataOnly(ytVideo.title, ytVideo.description, ytVideo.channelId)
 
                     // 2. Update YouTube via API
                     youtubeService.updateVideoMetadata(

@@ -18,12 +18,20 @@ import java.util.concurrent.atomic.AtomicInteger
 @Service
 class GeminiService(
     @Value("\${gemini.api-key}") private val apiKeyString: String,
+    @Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String,
     private val promptRepository: com.sciencepixel.repository.SystemPromptRepository,
     private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository,
     private val youtubeVideoRepository: com.sciencepixel.repository.YoutubeVideoRepository
 ) {
     private val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).build()
-    private val CHANNEL_NAME = "사이언스 픽셀"
+    
+    private val CHANNEL_NAME = when (channelId) {
+        "science" -> "사이언스 픽셀"
+        "horror" -> "미스터리 픽셀"
+        "stocks" -> "밸류 픽셀"
+        "history" -> "히스토리 픽셀"
+        else -> "AI 쇼츠 마스터"
+    }
 
     // Parse keys from comma-separated string
     private val apiKeys: List<String> by lazy {
@@ -260,8 +268,8 @@ class GeminiService(
      */
     fun analyzeChannelGrowth(): String {
         // 1. Fetch Top 10% Videos by View Count
-        val allVideos = youtubeVideoRepository.findAll()
-        if (allVideos.isEmpty()) return "No videos found to analyze."
+        val allVideos = youtubeVideoRepository.findByChannelId(channelId)
+        if (allVideos.isEmpty()) return "No videos found for channel $channelId to analyze."
         
         val sortedVideos = allVideos.sortedByDescending { it.viewCount }
         val topCount = (sortedVideos.size * 0.1).toInt().coerceAtLeast(3).coerceAtMost(20)
@@ -282,6 +290,7 @@ class GeminiService(
             [Goal]
             Extract 3-5 concise, actionable rules for creating future scripts and titles that will replicate this success.
             Focus on: Title keywords, Topic selection patterns, Tone, or Hook styles.
+            **IMPORTANT**: The advice must be specific to our niche: $CHANNEL_NAME.
 
             [Output]
             Return ONLY a JSON list of strings (The insights).
@@ -312,38 +321,98 @@ class GeminiService(
             
             val finalInsights = insightsList.joinToString("\n") { "- $it" }
             
-            // Save to System Settings
+            // Save to System Settings per channel
+            val settingKey = "CHANNEL_GROWTH_INSIGHTS"
+            val existing = systemSettingRepository.findByChannelIdAndKey(channelId, settingKey)
+            
             systemSettingRepository.save(com.sciencepixel.domain.SystemSetting(
-                key = "CHANNEL_GROWTH_INSIGHTS",
+                id = existing?.id,
+                channelId = channelId,
+                key = settingKey,
                 value = finalInsights,
-                description = "AI-generated success patterns from high-performing videos"
+                description = "AI-generated success patterns from high-performing videos ($channelId)"
             ))
             
-            println("📈 Channel Growth Analysis Complete:\n$finalInsights")
+            println("📈 Channel Growth Analysis Complete for $channelId:\n$finalInsights")
             finalInsights
         } catch (e: Exception) {
-            println("❌ Growth Analysis Error: ${e.message}")
+            println("❌ Growth Analysis Error for $channelId: ${e.message}")
             "Error parsing insights."
         }
     }
 
-    // 1. 한국어 대본 작성 (Updated with Insights)
-    fun writeScript(title: String, summary: String): ScriptResponse {
-        val promptId = "script_prompt_v3" 
-        var promptTemplate = promptRepository.findById(promptId).map { it.content }.orElse(null)
-        
-        if (promptTemplate == null) {
-            println("ℹ️ Prompt '$promptId' not found in DB. Saving default.")
-            promptRepository.save(com.sciencepixel.domain.SystemPrompt(
-                id = promptId,
-                content = DEFAULT_SCRIPT_PROMPT,
-                description = "Enhanced Science News Script Prompt with Metadata"
-            ))
-            promptTemplate = DEFAULT_SCRIPT_PROMPT
+    private fun getDefaultScriptPrompt(targetChannelId: String? = null): String {
+        val effectiveChannelId = targetChannelId ?: channelId
+        val nicheContext = when (effectiveChannelId) {
+            "science" -> "You explain recent scientific breakthroughs, space exploration, and high-tech news in an engaging but accurate way."
+            "horror" -> "You tell eerie Reddit-style ghost stories and urban legends. Use a dark, suspenseful tone and focus on atmosphere."
+            "stocks" -> "You analyze current stock market trends and popular stocks. Focus on numbers, analysis, and financial insights."
+            "history" -> "You tell fascinating historical facts and stories from the past. Use a narrative and educational tone."
+            else -> "You are a creative content creator."
         }
         
-        // Inject Growth Insights if available
-        val insights = systemSettingRepository.findById("CHANNEL_GROWTH_INSIGHTS").map { it.value }.orElse("")
+        val effectiveChannelName = when (effectiveChannelId) {
+            "science" -> "사이언스 픽셀"
+            "horror" -> "미스터리 픽셀"
+            "stocks" -> "밸류 픽셀"
+            "history" -> "메모리 픽셀"
+            else -> "AI 쇼츠 마스터"
+        }
+
+        return """
+            [Role]
+            You are '$effectiveChannelName', a famous Korean YouTuber.
+            $nicheContext
+            Your task is to explain the following English news/topic in **KOREAN** (`한국어`).
+
+            [Input]
+            Title: {title}
+            Summary: {summary}
+
+            [Rules]
+            1. **Language:** MUST BE KOREAN (한국어). Do not output English sentences in the script/title/description (except keywords).
+            2. **Format:** Optimized for YouTube Shorts (~60 seconds, 13-14 sentences).
+            3. **Tone:** Appropriate for $CHANNEL_NAME audience. 
+            4. **Intro/Outro:** Greeting as $CHANNEL_NAME, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
+            5. **Sources:** List names (e.g., "Nature", "Reddit", "Reuters").
+            6. **Keywords:** Scenes' keywords MUST be visual, common English terms for stock footage extraction.
+
+            [Output Format - JSON Only]
+            Return ONLY a valid JSON object with this exact structure:
+            {
+                "title": "Korean Title (Catchy, <40 chars)",
+                "description": "Korean Description for YouTube",
+                "tags": ["tag1", "tag2", "tag3"],
+                "sources": ["source1", "source2"],
+                "scenes": [
+                    {"sentence": "Korean Sentence 1", "keyword": "visual english keyword"},
+                    ...
+                ],
+                "mood": "calm|exciting|tech|epic|dark"
+            }
+        """.trimIndent()
+    }
+
+    // 1. 한국어 대본 작성
+    fun writeScript(title: String, summary: String, targetChannelId: String? = null): ScriptResponse {
+        val effectiveChannelId = targetChannelId ?: channelId
+        val promptId = "script_prompt_v4" 
+        var promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
+        
+        if (promptTemplate == null) {
+            println("ℹ️ Prompt '$promptId' for $effectiveChannelId not found in DB. Saving default.")
+            val newPrompt = com.sciencepixel.domain.SystemPrompt(
+                channelId = effectiveChannelId,
+                promptKey = promptId,
+                content = getDefaultScriptPrompt(effectiveChannelId),
+                description = "Niche-aware Script Prompt for $effectiveChannelId"
+            )
+            promptRepository.save(newPrompt)
+            promptTemplate = newPrompt.content
+        }
+        
+        // Inject Growth Insights
+        val insights = systemSettingRepository.findByChannelIdAndKey(effectiveChannelId, "CHANNEL_GROWTH_INSIGHTS")?.value ?: ""
         val insightsSection = if (insights.isNotBlank()) {
             "\n\n[Current Channel Success Insights (APPLY THESE)]\n$insights\n"
         } else ""
@@ -508,10 +577,19 @@ class GeminiService(
     }
 
     // 3. Metadata Renewal (Metadata Only)
-    fun regenerateMetadataOnly(currentTitle: String, currentSummary: String): ScriptResponse {
+    fun regenerateMetadataOnly(currentTitle: String, currentSummary: String, targetChannelId: String? = null): ScriptResponse {
+        val effectiveChannelId = targetChannelId ?: channelId
+        val effectiveChannelName = when (effectiveChannelId) {
+            "science" -> "사이언스 픽셀"
+            "horror" -> "미스터리 픽셀"
+            "stocks" -> "밸류 픽셀"
+            "history" -> "메모리 픽셀"
+            else -> "AI 쇼츠 마스터"
+        }
+        
         val prompt = """
             [Task]
-            You are '$CHANNEL_NAME'. Update the metadata for this existing science news video into **KOREAN**.
+            You are '$effectiveChannelName'. Update the metadata for this existing science news video into **KOREAN**.
             The video is already made, so just generate the Title, Description, Tags, and Sources.
 
             [Input Info]
@@ -722,15 +800,15 @@ class GeminiService(
 
         val prompt = """
             [Task]
-            Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos".
+            Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos" for the channel '$CHANNEL_NAME'.
             Ignore minor differences in wording, source, or catchy AI titles. 
-            If they cover the same core scientific discovery, event, or research, it IS a duplicate.
+            If they cover the same core event, story, or research, it IS a duplicate.
             
             [New News Item]
             Title: $newTitle
             Summary: $newSummary
             
-            [Recent Videos]
+            [Recent Videos from $CHANNEL_NAME]
             $historyText
             
             [Output]
@@ -742,7 +820,7 @@ class GeminiService(
         val responseText = callGeminiWithRetry(prompt) ?: return false
         
         return try {
-            val answer = JSONObject(responseText)
+            val candidateText = JSONObject(responseText)
                 .getJSONArray("candidates")
                 .getJSONObject(0)
                 .getJSONObject("content")
@@ -752,14 +830,14 @@ class GeminiService(
                 .trim()
                 .uppercase()
             
-            val isDuplicate = answer.contains("YES")
+            val isDuplicate = candidateText.contains("YES")
             if (isDuplicate) {
-                println("🤖 Gemini Semantic Check: DUPLICATE detected for '$newTitle'")
+                println("🤖 Gemini Semantic Check ($channelId): DUPLICATE detected for '$newTitle'")
             }
             isDuplicate
         } catch (e: Exception) {
-            println("❌ Similarity Check Error: ${e.message}")
-            false // Default to not duplicate if error
+            println("❌ Similarity Check Error for $channelId: ${e.message}")
+            false 
         }
     }
 
@@ -767,21 +845,24 @@ class GeminiService(
      * 5. Safety & Sensitivity Check
      * Detects Politics, Religion, Ideology, or Social Conflicts.
      */
-    fun checkSensitivity(title: String, summary: String): Boolean {
+    fun checkSensitivity(title: String, summary: String, channelId: String): Boolean {
+        val nicheAvoidance = when (channelId) {
+            "science" -> "Politics, Religion, Ideology, or Social Conflicts unrelated to science."
+            "horror" -> "Real-life trauma, sensitive criminal cases still in court, or hate speech."
+            "stocks" -> "Illegal financial advice, market manipulation, or non-financial political agenda."
+            "history" -> "Promotion of hate groups, modern political propaganda, or sensitive religious conflicts."
+            else -> "General controversial topics."
+        }
+
         val prompt = """
             [Task]
-            Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for a pure science channel.
+            Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for the channel '$CHANNEL_NAME'.
             
-            [Topics to Avoid]
-            1. Politics (Elections, Parties, Legislation, Diplomatic conflicts)
-            2. Religion (Doctrines, Figures, Conflicts)
-            3. Ideology (Feminism, Anti-feminism, Racism, Nationalism, Social Movements)
-            4. Social Conflict (War, Terrorism, Protests, Abortion, Death Penalty)
-            5. General Lifestyle/Consumer Advice (Phone plans, Travel guides, Personal finance)
-            6. Non-science Business (Executive drama, Stock market unless technical/scientific)
+            [Topics to Avoid for $CHANNEL_NAME]
+            $nicheAvoidance
             
-            [Exception]
-            - Purely scientific/technological news (e.g., "New Mars rover", "Cancer research breakthrough") is SAFE.
+            [General Rule]
+            - Stay within the core niche.
             
             [Input News]
             Title: $title
@@ -794,7 +875,7 @@ class GeminiService(
         val responseText = callGeminiWithRetry(prompt) ?: return true 
 
         return try {
-            val answer = JSONObject(responseText)
+            val candidateText = JSONObject(responseText)
                 .getJSONArray("candidates")
                 .getJSONObject(0)
                 .getJSONObject("content")
@@ -804,13 +885,13 @@ class GeminiService(
                 .trim()
                 .uppercase()
             
-            val isUnsafe = answer.contains("UNSAFE")
+            val isUnsafe = candidateText.contains("UNSAFE")
             if (isUnsafe) {
-                println("⛔ Safety Filter: UNSAFE topic detected for '$title'")
+                println("⛔ Safety Filter ($channelId): UNSAFE topic detected for '$title'")
             }
             !isUnsafe // Return TRUE if SAFE
         } catch (e: Exception) {
-            println("❌ Safety Check Error: ${e.message}")
+            println("❌ Safety Check Error for $channelId: ${e.message}")
             true // Default to SAFE
         }
     }

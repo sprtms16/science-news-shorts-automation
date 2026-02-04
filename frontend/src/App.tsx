@@ -13,14 +13,16 @@ import { ToolsPanel } from './components/dashboard/ToolsPanel';
 import { SettingsPanel } from './components/dashboard/SettingsPanel';
 import { LogViewer } from './components/dashboard/LogViewer';
 import YoutubeVideoList from './components/dashboard/YoutubeVideoList';
+import BgmManager from './components/BgmManager';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube' | 'bgm'>('videos');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<string>(() => localStorage.getItem('selected-channel') || 'science');
   const [videos, setVideos] = useState<VideoHistory[]>([]);
   const [prompts, setPrompts] = useState<SystemPrompt[]>([]);
   const [settings, setSettings] = useState<any[]>([]);
@@ -42,6 +44,13 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
     return (localStorage.getItem('app-theme') as any) || 'system';
   });
+
+  const channels = [
+    { id: 'science', name: language === 'ko' ? '사이언스 픽셀' : 'Science Pixel', color: 'text-blue-400' },
+    { id: 'horror', name: language === 'ko' ? '미스터리 픽셀' : 'Mystery Pixel', color: 'text-purple-400' },
+    { id: 'stocks', name: language === 'ko' ? '밸류 픽셀' : 'Value Pixel', color: 'text-green-400' },
+    { id: 'history', name: language === 'ko' ? '메모리 픽셀' : 'Memory Pixel', color: 'text-amber-400' },
+  ];
 
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
@@ -79,8 +88,9 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    localStorage.setItem('selected-channel', selectedChannel);
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, selectedChannel]);
 
   const fetchData = async (page: number = 0) => {
     const isInitial = page === 0;
@@ -92,7 +102,7 @@ function App() {
 
     try {
       if (activeTab === 'videos') {
-        const res = await axios.get(`/admin/videos?page=${page}&size=15`);
+        const res = await axios.get(`/admin/videos?page=${page}&size=15&channelId=${selectedChannel}`);
         if (isInitial) {
           setVideos(res.data.videos);
         } else {
@@ -101,11 +111,11 @@ function App() {
         setNextPage(res.data.nextPage);
         setTotalCount(res.data.totalCount);
       } else if (activeTab === 'prompts') {
-        const res = await axios.get('/admin/prompts');
+        const res = await axios.get(`/admin/prompts?channelId=${selectedChannel}`);
         setPrompts(res.data);
       } else if (activeTab === 'settings') {
         try {
-          const res = await axios.get('/admin/settings');
+          const res = await axios.get(`/admin/settings?channelId=${selectedChannel}`);
           setSettings(res.data);
         } catch (e) { console.error(e); }
       }
@@ -208,9 +218,19 @@ function App() {
     }
   };
 
+  const savePrompt = async (prompt: SystemPrompt) => {
+    try {
+      await axios.post('/admin/prompts', prompt);
+      alert("Prompt saved!");
+      fetchData();
+    } catch (e) {
+      alert("Failed to save prompt");
+    }
+  };
+
   const saveSetting = async (key: string, value: string, desc: string) => {
     try {
-      await axios.post('/admin/settings', { key, value, description: desc });
+      await axios.post('/admin/settings', { channelId: selectedChannel, key, value, description: desc });
       alert("Setting saved!");
       fetchData();
     } catch (e) {
@@ -249,24 +269,48 @@ function App() {
                 activeTab === 'prompts' ? t.prompts :
                   activeTab === 'settings' ? t.settings :
                     activeTab === 'logs' ? t.logs :
-                      activeTab === 'youtube' ? t.youtubeVideos : t.tools}
+                      activeTab === 'youtube' ? t.youtubeVideos :
+                        activeTab === 'bgm' ? (language === 'ko' ? 'BGM 관리' : 'AI BGM Manager') : t.tools}
             </h2>
             <p className="text-sm text-[var(--text-secondary)] font-medium italic">
               {activeTab === 'videos' ? (language === 'ko' ? `AI 영상 생성 파이프라인 실시간 관리 (총 ${totalCount}개)` : `Manage AI video pipeline (Total ${totalCount})`) :
                 activeTab === 'prompts' ? (language === 'ko' ? '콘텐츠 품질 향상을 위한 LLM 지침 설정' : 'Configure LLM instructions.') :
                   activeTab === 'settings' ? (language === 'ko' ? '전역 시스템 파라미터 및 제한값 설정' : 'Global params and limits.') :
                     activeTab === 'logs' ? (language === 'ko' ? '시스템 전체 이벤트 실시간 모니터링' : 'Real-time system events monitoring.') :
-                      activeTab === 'youtube' ? (language === 'ko' ? '내 유튜브 채널의 실제 업로드 영상 및 실시간 통계' : 'Real-time YouTube channel statistics.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
+                      activeTab === 'youtube' ? (language === 'ko' ? '내 유튜브 채널의 실제 업로드 영상 및 실시간 통계' : 'Real-time YouTube channel statistics.') :
+                        activeTab === 'bgm' ? (language === 'ko' ? 'AI가 음악을 분석하여 자동 분류합니다.' : 'Upload music, AI will listen and sort it.') : (language === 'ko' ? '인프라 점검 및 유지보수 도구' : 'Infrastructure tasks.')}
             </p>
           </div>
-          <button
-            onClick={() => fetchData(0)}
-            disabled={loading}
-            className="group flex items-center gap-2 px-5 py-2.5 bg-[var(--input-bg)] hover:bg-white/10 text-sm font-semibold rounded-xl border border-[var(--input-border)] transition-all active:scale-95 disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
-            {t.syncData}
-          </button>
+
+          <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 w-full md:w-auto">
+            {/* Channel Selector */}
+            <div className="flex bg-[var(--input-bg)] p-1 rounded-2xl border border-[var(--input-border)] backdrop-blur-md">
+              {channels.map((ch) => (
+                <button
+                  key={ch.id}
+                  onClick={() => setSelectedChannel(ch.id)}
+                  className={cn(
+                    "px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300",
+                    selectedChannel === ch.id
+                      ? "bg-white/10 text-white shadow-lg ring-1 ring-white/20"
+                      : "text-[var(--text-secondary)] hover:text-white"
+                  )}
+                >
+                  <span className={cn("mr-1.5", selectedChannel === ch.id ? ch.color : "text-gray-500")}>●</span>
+                  {ch.name}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => fetchData(0)}
+              disabled={loading}
+              className="group flex items-center justify-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-xl shadow-lg shadow-purple-500/20 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={cn("transition-transform duration-700", loading ? "animate-spin" : "group-hover:rotate-180")} />
+              {t.syncData}
+            </button>
+          </div>
         </header>
 
         {activeTab === 'videos' && (
@@ -332,7 +376,7 @@ function App() {
 
         {/* Prompt editor */}
         {activeTab === 'prompts' && (
-          <PromptEditor prompts={prompts} t={t} />
+          <PromptEditor prompts={prompts} t={t} onSave={savePrompt} />
         )}
 
         {activeTab === 'tools' && (
@@ -357,7 +401,11 @@ function App() {
         )}
 
         {activeTab === 'youtube' && (
-          <YoutubeVideoList t={t} language={language} />
+          <YoutubeVideoList t={t} language={language} selectedChannel={selectedChannel} />
+        )}
+
+        {activeTab === 'bgm' && (
+          <BgmManager />
         )}
       </main>
     </div >

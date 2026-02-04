@@ -41,6 +41,35 @@ export function SettingsPanel({ t, settings, saveSetting }: SettingsPanelProps) 
                         </div>
                     </div>
 
+                    <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)]">
+                        <div className="flex-1">
+                            <h4 className="text-base font-bold text-[var(--text-primary)] mb-1">
+                                {t.uploadInterval}
+                            </h4>
+                            <p className="text-xs text-[var(--text-secondary)]">
+                                {t.uploadIntervalDescription}
+                            </p>
+                        </div>
+                        <div className="flex gap-3 shrink-0">
+                            <input
+                                type="number"
+                                step="0.1"
+                                className="bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2 text-[var(--text-primary)] w-24 focus:border-purple-500/50 outline-none font-mono font-bold transition-all text-center"
+                                defaultValue={settings.find(s => s.key === 'UPLOAD_INTERVAL_HOURS')?.value || '1'}
+                                id="intervalInput"
+                            />
+                            <button
+                                onClick={() => {
+                                    const val = (document.getElementById('intervalInput') as HTMLInputElement).value;
+                                    saveSetting('UPLOAD_INTERVAL_HOURS', val, 'Hours between automated uploads');
+                                }}
+                                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all active:scale-95"
+                            >
+                                {t.commit}
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="pt-10 border-t border-[var(--glass-border)]">
                         <h4 className="text-base font-bold text-[var(--text-primary)] mb-4">{t.youtubeQuotaShield}</h4>
                         {settings.find(s => s.key === 'UPLOAD_BLOCKED_UNTIL') ? (

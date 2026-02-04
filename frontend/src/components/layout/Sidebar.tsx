@@ -14,7 +14,8 @@ import {
     ShieldCheck,
     ChevronRight,
     Download,
-    Terminal
+    Terminal,
+    Music
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -24,8 +25,8 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 interface SidebarProps {
-    activeTab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube';
-    setActiveTab: (tab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube') => void;
+    activeTab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube' | 'bgm';
+    setActiveTab: (tab: 'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube' | 'bgm') => void;
     isMobileMenuOpen: boolean;
     setIsMobileMenuOpen: (isOpen: boolean) => void;
     language: 'ko' | 'en';
@@ -108,6 +109,12 @@ export function Sidebar({
                         label={t.prompts}
                         active={activeTab === 'prompts'}
                         onClick={() => { setActiveTab('prompts'); setIsMobileMenuOpen(false); }}
+                    />
+                    <NavItem
+                        icon={<Music size={18} />}
+                        label={language === 'ko' ? 'BGM 관리' : 'AI BGM Manager'}
+                        active={activeTab === 'bgm'}
+                        onClick={() => { setActiveTab('bgm'); setIsMobileMenuOpen(false); }}
                     />
                     <NavItem
                         icon={<RefreshCw size={18} />}

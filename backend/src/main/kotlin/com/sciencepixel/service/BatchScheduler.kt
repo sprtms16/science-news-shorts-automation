@@ -17,7 +17,8 @@ class BatchScheduler(
     private val videoHistoryRepository: VideoHistoryRepository,
     private val systemSettingRepository: SystemSettingRepository,
     private val cleanupService: CleanupService,
-    private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher
+    private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher,
+    @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
     // 매 10분마다 실행 (0, 10, 20, 30, 40, 50분)
@@ -33,16 +34,15 @@ class BatchScheduler(
         }
 
         // 2. Get Limit from Settings (Default 10)
-        val limit = systemSettingRepository.findById("MAX_GENERATION_LIMIT")
-            .map { it.value.toIntOrNull() ?: 10 }
-            .orElse(10)
+        val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
+            ?.value?.toIntOrNull() ?: 10
 
-        // 3. Count Active/Pending videos (Include COMPLETED but exclude UPLOADED and permanent failures)
+        // 3. Count Active/Pending videos
         val excludedStatuses = listOf(
             VideoStatus.UPLOADED, 
             VideoStatus.FAILED
         )
-        val activeCount = videoHistoryRepository.findByStatusNotIn(excludedStatuses).size
+        val activeCount = videoHistoryRepository.findByChannelIdAndStatusNotIn(channelId, excludedStatuses).size
 
         println("📊 Active/Pending Video Buffer: $activeCount / $limit")
 
@@ -69,7 +69,7 @@ class BatchScheduler(
     fun retryFailedGenerations() {
         println("⏰ Batch Scheduler: Checking for FAILED videos to retry at ${Date()}")
         
-        val failedVideos = videoHistoryRepository.findByStatus(VideoStatus.FAILED)
+        val failedVideos = videoHistoryRepository.findByChannelIdAndStatus(channelId, VideoStatus.FAILED)
             .filter { it.regenCount < 1 } // 재생성 시도 안 한 것만
         
         if (failedVideos.isNotEmpty()) {
@@ -91,9 +91,10 @@ class BatchScheduler(
                 }
                 
                 // Default: Full Regeneration
-                println("🔄 [Auto-Recovery] Triggering full regeneration for: ${video.title} (Step: ${video.failureStep})")
+                println("🔄 [$channelId] [Auto-Recovery] Triggering full regeneration for: ${video.title}")
                 kafkaEventPublisher.publishRegenerationRequested(
                     com.sciencepixel.event.RegenerationRequestedEvent(
+                        channelId = channelId, // 추가
                         videoId = video.id!!,
                         title = video.title,
                         summary = video.summary,

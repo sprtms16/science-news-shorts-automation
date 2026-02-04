@@ -46,6 +46,7 @@ services:
 
   ai-media-service:
     build: ./backend/ai-media-service
+    image: shorts-ai-service:latest
     container_name: shorts-ai-service
     ports:
       - "8000:8000"
@@ -76,11 +77,12 @@ services:
       - mongo-data:/data/db
     restart: unless-stopped
 
-  shorts-controller:
+  shorts-science:
     build:
       context: ./backend
-      dockerfile: Dockerfile.kotlin
-    container_name: shorts-controller
+      dockerfile: shorts-api/Dockerfile
+    image: science-pixel-controller:latest
+    container_name: shorts-science-controller
     ports:
       - "8080:8080"
       - "8888:8888" # YouTube OAuth Callback
@@ -90,25 +92,124 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret/SciencePixel/client_secret.json:/app/client_secret.json
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
     environment:
+      - SHORTS_CHANNEL_ID=science
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - YOUTUBE_CLIENT_SECRET_JSON_B64=${YOUTUBE_CLIENT_SECRET_JSON_B64}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 0 * * * *
       - TZ=Asia/Seoul
-      # 알림 설정 (선택사항)
-      - NOTIFICATION_DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL:-}
-      - NOTIFICATION_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
+
+  shorts-horror:
+    build:
+      context: ./backend
+      dockerfile: shorts-api/Dockerfile
+    image: mystery-pixel-controller:latest
+    container_name: shorts-horror-controller
+    ports:
+      - "8081:8080"
+    depends_on:
+      - ai-media-service
+      - mongo
+      - kafka
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret/MysteryPixel/client_secret.json:/app/client_secret.json
+      - ./backend/tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=horror
+      - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 15 * * * *
+      - TZ=Asia/Seoul
+      - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback
+
+  shorts-stocks:
+    build:
+      context: ./backend
+      dockerfile: shorts-api/Dockerfile
+    image: value-pixel-controller:latest
+    container_name: shorts-stocks-controller
+    ports:
+      - "8083:8080"
+    depends_on:
+      - ai-media-service
+      - mongo
+      - kafka
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret/ValuePixel/client_secret.json:/app/client_secret.json
+      - ./backend/tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=stocks
+      - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 45 * * * *
+      - TZ=Asia/Seoul
+      - YOUTUBE_REDIRECT_URI=http://localhost:8083/callback
+
+  shorts-history:
+    build:
+      context: ./backend
+      dockerfile: shorts-api/Dockerfile
+    image: history-pixel-controller:latest
+    container_name: shorts-history-controller
+    ports:
+      - "8084:8080"
+    depends_on:
+      - ai-media-service
+      - mongo
+      - kafka
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret/MemoryPixel/client_secret.json:/app/client_secret.json
+      - ./backend/tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=history
+      - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 30 * * * *
+      - TZ=Asia/Seoul
+      - YOUTUBE_REDIRECT_URI=http://localhost:8084/callback
 
   shorts-log-service:
     build:
       context: ./backend/shorts-log-service
+    image: shorts-log-service:latest
     container_name: shorts-log-service
     ports:
       - "8082:8082"
@@ -121,13 +222,42 @@ services:
       - TZ=Asia/Seoul
     restart: unless-stopped
 
+  shorts-renderer:
+    build:
+      context: ./backend
+      dockerfile: shorts-worker/Dockerfile
+    image: shorts-worker:latest
+    container_name: shorts-renderer
+    depends_on:
+      - ai-media-service
+      - mongo
+      - kafka
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret # Keep generic folder or remove if not needed. Worker likely needs specific refactoring if it uploads.
+      - ./backend/tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=renderer
+      - PYTHON_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - APP_FEATURE_REMOTE_RENDERING=false
+      - APP_FEATURE_CONSUMER_SCRIPT=false
+      - APP_FEATURE_CONSUMER_SCENE=true
+      - APP_FEATURE_CONSUMER_RENDER=true
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - TZ=Asia/Seoul
+
   frontend-server:
     build: ./frontend
+    image: shorts-frontend:latest
     container_name: shorts-frontend
     network_mode: "service:tailscale"
     depends_on:
       - tailscale
-      - shorts-controller
+      - shorts-science
     restart: unless-stopped
 
   tailscale:
@@ -151,5 +281,3 @@ services:
 volumes:
   mongo-data:
   shorts-shared-data:
-
-

@@ -16,23 +16,32 @@ import java.time.LocalDateTime
 import java.util.*
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = ["app.feature.consumer-script"],
+    havingValue = "true",
+    matchIfMissing = true
+)
 class ScriptConsumer(
     private val geminiService: GeminiService,
     private val videoHistoryRepository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
     private val logPublisher: LogPublisher,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
     @KafkaListener(
         topics = [KafkaConfig.TOPIC_RSS_NEW_ITEM],
-        groupId = KafkaConfig.GROUP_MAIN
+        groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-group}"
     )
     fun consumeRssItem(message: String) {
         try {
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
-            logPublisher.info("shorts-controller", "Process Started: ${event.title}", "URL: ${event.url}")
-            println("▶️ [ScriptConsumer] Received RSS item: ${event.title}")
+            
+            // Channel Filter
+            if (event.channelId != channelId) {
+                return
+            }
 
             // 1. Create or Get History (Idempotency)
             val history = getOrCreateHistory(event)
@@ -84,7 +93,8 @@ class ScriptConsumer(
 
             // 2. Call Gemini
             println("🤖 generating script for: ${event.title}...")
-            val scriptResponse = geminiService.writeScript(event.title, event.title) // RSS summary might be null, use title or fetch content if needed
+            val content = event.summary ?: event.title
+            val scriptResponse = geminiService.writeScript(event.title, content)
 
             if (scriptResponse.scenes.isEmpty()) {
                 println("⚠️ Empty script generated. Marking as FAILED.")
@@ -109,24 +119,25 @@ class ScriptConsumer(
 
             // 4. Publish next event
             eventPublisher.publishScriptCreated(ScriptCreatedEvent(
+                channelId = channelId, // 추가
                 videoId = updatedHistory.id!!,
                 title = scriptResponse.title,
-                script = objectMapper.writeValueAsString(scriptResponse.scenes), // Serialize scenes to string to pass along
+                script = objectMapper.writeValueAsString(scriptResponse.scenes),
                 summary = scriptResponse.description,
                 sourceLink = event.url,
                 keywords = scriptResponse.tags
             ))
 
             logPublisher.info("shorts-controller", "Script Generated: ${scriptResponse.title}", "Scenes: ${scriptResponse.scenes.size}ea", traceId = updatedHistory.id)
-            println("✅ [ScriptConsumer] Script created & event published: ${event.title}")
+            println("✅ [$channelId] Script created & event published: ${event.title}")
 
         } catch (e: Exception) {
             logPublisher.error("shorts-controller", "Script Generation Failed", "Error: ${e.message}")
-            println("❌ [ScriptConsumer] Error: ${e.message}")
+            println("❌ [$channelId] Error: ${e.message}")
             e.printStackTrace()
             // Mark as FAILED in DB
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
-            videoHistoryRepository.findByLink(event.url)?.let { 
+            videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)?.let { 
                 videoHistoryRepository.save(it.copy(
                     status = VideoStatus.FAILED, 
                     failureStep = "SCRIPT",
@@ -138,14 +149,15 @@ class ScriptConsumer(
     }
 
     private fun getOrCreateHistory(event: RssNewItemEvent): VideoHistory {
-        // Simple check by link (assuming unique per news)
-        val existing = videoHistoryRepository.findByLink(event.url)
+        // Simple check by link (assuming unique per news per channel)
+        val existing = videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)
         if (existing != null) return existing
 
         val initialVideo = VideoHistory(
             id = UUID.randomUUID().toString(),
+            channelId = channelId, // 추가
             title = event.title,
-            summary = "", // Initial summary
+            summary = "", 
             link = event.url,
             status = VideoStatus.QUEUED,
             createdAt = LocalDateTime.now(),
@@ -154,11 +166,10 @@ class ScriptConsumer(
         return try {
             videoHistoryRepository.save(initialVideo)
         } catch (e: org.springframework.dao.DuplicateKeyException) {
-            println("⚠️ Race condition detected for link: ${event.url}. Returning existing record.")
-            videoHistoryRepository.findByLink(event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url}")
+            println("⚠️ Race condition detected for link: ${event.url} in channel $channelId. Returning existing record.")
+            videoHistoryRepository.findByChannelIdAndLink(channelId, event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url}")
         } catch (e: Exception) {
-             // Fallback for other potential race conditions or DB errors
-             val checkAgain = videoHistoryRepository.findByLink(event.url)
+             val checkAgain = videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)
              if (checkAgain != null) return checkAgain
              throw e
         }
