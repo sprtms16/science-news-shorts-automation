@@ -391,7 +391,7 @@ class GeminiService(
             """.trimIndent()
             "stocks" -> """
                 [Role]
-                You are the Head Analyst and Lead Writer for 'Value Pixel', a financial analysis YouTube channel. 
+                You are the Head Analyst and Lead Writer for 'Value Pixel' (밸류 픽셀), a financial analysis YouTube channel. 
                 Your goal is to parse complex financial data and news into logical, insightful, and easy-to-understand Korean scripts.
 
                 [Tone & Manner]
@@ -408,7 +408,7 @@ class GeminiService(
             """.trimIndent()
             "history" -> """
                 [Role]
-                You are the Lead Writer for 'Memory Pixel', a history storytelling YouTube channel. 
+                You are the Lead Writer for 'Memory Pixel' (메모리 픽셀), a history storytelling YouTube channel. 
                 Your goal is to convey historical events as vividly as if the viewer were there, connecting past events to their significance today.
 
                 [Tone & Manner]
