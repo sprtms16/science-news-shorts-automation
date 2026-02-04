@@ -15,20 +15,27 @@ jobs:
       - name: Generate .env file
         env:
           JSON_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
+          SECRET_SCIENCE: ${{ secrets.YOUTUBE_CLIENT_SECRET_SCIENCE }}
+          SECRET_HORROR: ${{ secrets.YOUTUBE_CLIENT_SECRET_HORROR }}
+          SECRET_STOCKS: ${{ secrets.YOUTUBE_CLIENT_SECRET_STOCKS }}
+          SECRET_HISTORY: ${{ secrets.YOUTUBE_CLIENT_SECRET_HISTORY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-          echo "PEXELS_API_KEY=${{ secrets.PEXELS_API_KEY }}" >> .env
-          echo "TAILSCALE_AUTHKEY=${{ secrets.TAILSCALE_AUTHKEY }}" >> .env
-          echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
+          echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
+          echo "PEXELS_API_KEY=$PEXELS_API_KEY" >> .env
+          echo "TAILSCALE_AUTHKEY=$TAILSCALE_AUTHKEY" >> .env
+          echo "DISCORD_WEBHOOK_URL=$DISCORD_WEBHOOK_URL" >> .env
           
           echo "YOUTUBE_CLIENT_SECRET_JSON_B64=$(echo -n "$JSON_SECRET" | base64 -w 0)" >> .env
           
-          
           # Inject Channel Specific Secrets into .env (Base64 Encoded to prevent JSON Quote issues)
-          echo "SECRET_SCIENCE_B64=$(echo -n "${{ secrets.YOUTUBE_CLIENT_SECRET_SCIENCE }}" | base64 -w 0)" >> .env
-          echo "SECRET_HORROR_B64=$(echo -n "${{ secrets.YOUTUBE_CLIENT_SECRET_HORROR }}" | base64 -w 0)" >> .env
-          echo "SECRET_STOCKS_B64=$(echo -n "${{ secrets.YOUTUBE_CLIENT_SECRET_STOCKS }}" | base64 -w 0)" >> .env
-          echo "SECRET_HISTORY_B64=$(echo -n "${{ secrets.YOUTUBE_CLIENT_SECRET_HISTORY }}" | base64 -w 0)" >> .env
+          echo "SECRET_SCIENCE_B64=$(echo -n "$SECRET_SCIENCE" | base64 -w 0)" >> .env
+          echo "SECRET_HORROR_B64=$(echo -n "$SECRET_HORROR" | base64 -w 0)" >> .env
+          echo "SECRET_STOCKS_B64=$(echo -n "$SECRET_STOCKS" | base64 -w 0)" >> .env
+          echo "SECRET_HISTORY_B64=$(echo -n "$SECRET_HISTORY" | base64 -w 0)" >> .env
 
       - name: Deploy to Docker Compose
         run: |
