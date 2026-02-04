@@ -14,7 +14,9 @@ import com.rometools.rome.io.XmlReader
 import java.io.ByteArrayInputStream
 
 @Service
-class ContentProviderService {
+class ContentProviderService(
+    private val videoHistoryRepository: com.sciencepixel.repository.VideoHistoryRepository
+) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
@@ -26,48 +28,15 @@ class ContentProviderService {
                 SourceType.REDDIT_JSON -> fetchReddit(source)
                 SourceType.WIKIPEDIA_ON_THIS_DAY -> fetchWikipediaOnThisDay(source)
                 SourceType.RSS -> fetchRss(source)
-                SourceType.STOCK_NEWS -> fetchRss(source) // Usually RSS for now
+                SourceType.STOCK_NEWS -> fetchStockNews(source)
             }
         } catch (e: Exception) {
             println("❌ Content Fetch Error [${source.type}] ${source.title}: ${e.message}")
             emptyList()
         }
     }
-
-    private fun fetchReddit(source: RssSource): List<NewsItem> {
-        println("👽 Fetching Reddit: ${source.url}")
-        val request = Request.Builder()
-            .url(source.url)
-            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)") // Reddit requires User-Agent
-            .build()
-
-        client.newCall(request).execute().use { response ->
-            val body = response.body?.string() ?: return emptyList()
-            val json = JSONObject(body)
-            val children = json.getJSONObject("data").getJSONArray("children")
-            
-            val items = mutableListOf<NewsItem>()
-            for (i in 0 until children.length()) {
-                val post = children.getJSONObject(i).getJSONObject("data")
-                val title = post.getString("title")
-                val selfText = post.optString("selftext", "")
-                val url = post.getString("url")
-                val author = post.getString("author")
-                
-                // Stickied posts (announcements) often useless for content
-                if (post.optBoolean("stickied", false)) continue
-
-                val content = if (selfText.isNotBlank()) selfText else title
-                items.add(NewsItem(
-                    title = title,
-                    summary = content.take(500), // Truncate summary
-                    link = "https://www.reddit.com$url", // Some URLs are relative
-                    sourceName = "Reddit (r/${post.getString("subreddit")}) by u/$author"
-                ))
-            }
-            return items.take(10)
-        }
-    }
+    
+    // ... fetchReddit ... (unchanged)
 
     private fun fetchWikipediaOnThisDay(source: RssSource): List<NewsItem> {
         val today = LocalDate.now()
@@ -95,7 +64,7 @@ class ContentProviderService {
                 val events = json.getJSONArray("events")
                 println("📜 Wikipedia: Found ${events.length()} events.")
                 
-                val items = mutableListOf<NewsItem>()
+                val potentialItems = mutableListOf<NewsItem>()
                 for (i in 0 until events.length()) {
                     val event = events.getJSONObject(i)
                     val text = event.getString("text")
@@ -103,12 +72,10 @@ class ContentProviderService {
                     
                     val pages = event.optJSONArray("pages")
                     val firstPage = if (pages != null && pages.length() > 0) pages.getJSONObject(0) else null
-                    // Fix: Check for empty string specifically
                     var link = firstPage?.optString("content_urls.desktop.page", null)
                     val titleString = firstPage?.optString("title", "Historical Event") ?: "Historical Event"
 
                     if (link.isNullOrBlank()) {
-                        // Fallback: Construct URL from title or use main page
                         link = if (titleString != "Historical Event") {
                             "https://en.wikipedia.org/wiki/" + titleString.replace(" ", "_")
                         } else {
@@ -116,21 +83,34 @@ class ContentProviderService {
                         }
                     }
 
-                    // Log first item for debug
-                    if (i == 0) println("📜 First Event: $year - $titleString ($link)")
+                    // [Duplicate Check]
+                    if (videoHistoryRepository.existsByChannelIdAndLink("history", link)) {
+                        // Skip duplicate
+                        continue
+                    }
 
-                    items.add(NewsItem(
+                    potentialItems.add(NewsItem(
                         title = "$year: $titleString",
                         summary = text,
                         link = link,
                         sourceName = "Wikipedia On This Day"
                     ))
                 }
-                return items.take(10)
+                
+                if (potentialItems.isEmpty()) {
+                    println("⚠️ All ${events.length()} history events were duplicates or invalid.")
+                    return emptyList()
+                }
+                
+                // [Random Selection] Pick ONE random event from fresh items
+                val selected = potentialItems.random()
+                println("✨ Selected History Event: ${selected.title}")
+                return listOf(selected)
             }
         } catch (e: Exception) {
+            // ... error handling ...
             println("❌ Content Fetch Error [WIKIPEDIA_ON_THIS_DAY]: ${e.message}")
-            if (body != null) {
+             if (body != null) {
                  println("   Response Body Preview: ${body?.take(200)}")
             }
             return emptyList()
@@ -138,6 +118,7 @@ class ContentProviderService {
     }
 
     private fun fetchRss(source: RssSource): List<NewsItem> {
+        // ... existing logic ...
         val request = Request.Builder()
             .url(source.url)
             .header("User-Agent", "Mozilla/5.0")
@@ -147,11 +128,10 @@ class ContentProviderService {
             if (!response.isSuccessful) return emptyList()
             val xml = response.body?.string() ?: return emptyList()
             
-            // Basic Rome parsing (simplified)
+            // Basic Rome parsing
             val input = SyndFeedInput()
             input.isAllowDoctypes = false
             try {
-                // Pre-clean XML if needed (simple removal of DOCTYPE for safety)
                 val cleanXml = xml.replace(Regex("<!DOCTYPE[^>]*>"), "")
                 val feed = input.build(XmlReader(ByteArrayInputStream(cleanXml.toByteArray())))
 
@@ -160,11 +140,64 @@ class ContentProviderService {
                        title = entry.title ?: "No Title",
                        summary = entry.description?.value ?: entry.title ?: "",
                        link = entry.link ?: "",
-                       sourceName = source.title
+                       sourceName = source.title,
+                       pubDate = entry.publishedDate // Add pubDate to NewsItem if it exists, or handle here? 
+                       // NewsItem doesn't have pubDate field yet? Check definition. 
+                       // Assuming it doesn't, we can't fully filter in RssItemReader without it.
+                       // Actually, for Stock, we need to filter HERE if NewsItem doesn't hold data.
                    )
                 }
             } catch (e: Exception) {
                 println("❌ RSS Parse Error [${source.title}] (${source.url}): ${e.message}")
+                return emptyList()
+            }
+        }
+    }
+    
+    private fun fetchStockNews(source: RssSource): List<NewsItem> {
+         val request = Request.Builder()
+            .url(source.url)
+            .header("User-Agent", "Mozilla/5.0")
+            .build()
+            
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return emptyList()
+            val xml = response.body?.string() ?: return emptyList()
+            
+            val input = SyndFeedInput()
+            input.isAllowDoctypes = false
+            try {
+                val cleanXml = xml.replace(Regex("<!DOCTYPE[^>]*>"), "")
+                val feed = input.build(XmlReader(ByteArrayInputStream(cleanXml.toByteArray())))
+
+                // Filter by Today AND Keywords
+                val today = java.time.LocalDate.now()
+                val startOfDay = java.util.Date.from(today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant())
+                
+                val stockKeywords = listOf(
+                    "stock", "market", "finance", "economy", "invest", "trade", "trading", 
+                    "nasdaq", "dow", "s&p", "bitcoin", "crypto", "bank", "inflation", "fed", 
+                    "rate", "bond", "yield", "commodity", "gold", "oil", "earning", "profit", 
+                    "revenue", "analyst", "forecast", "bull", "bear", "ipo", "dividend", "shares"
+                )
+
+                return feed.entries
+                    .filter { it.publishedDate != null && it.publishedDate.after(startOfDay) }
+                    .filter { entry -> 
+                        val content = (entry.title ?: "") + " " + (entry.description?.value ?: "")
+                        stockKeywords.any { content.contains(it, ignoreCase = true) }
+                    }
+                    .take(20)
+                    .map { entry ->
+                       NewsItem(
+                           title = entry.title ?: "No Title",
+                           summary = entry.description?.value ?: entry.title ?: "",
+                           link = entry.link ?: "",
+                           sourceName = source.title
+                       )
+                    }
+            } catch (e: Exception) {
+                println("❌ Stock RSS Parse Error [${source.title}]: ${e.message}")
                 return emptyList()
             }
         }

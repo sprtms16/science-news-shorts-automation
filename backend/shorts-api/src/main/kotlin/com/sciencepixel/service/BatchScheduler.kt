@@ -37,6 +37,18 @@ class BatchScheduler(
         // 2. Get Limit from Settings (Default 10)
         val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
             ?.value?.toIntOrNull() ?: 10
+        
+        // [New] Strict Daily Limit for History/Stocks
+        if (channelId == "history" || channelId == "stocks") {
+            val startOfDay = java.time.LocalDate.now().atStartOfDay()
+            val todayCount = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(channelId, org.springframework.data.domain.PageRequest.of(0, 100))
+                .count { it.createdAt.isAfter(startOfDay) }
+            
+            if (todayCount >= 1) {
+                println("🛑 [$channelId] Daily Limit Reached (Generated: $todayCount). Strict 1-per-day rule applied.")
+                return
+            }
+        }
 
         // 3. Count Active and Failed separately
         val activeStatuses = listOf(

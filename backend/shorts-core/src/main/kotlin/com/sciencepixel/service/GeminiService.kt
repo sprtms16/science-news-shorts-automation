@@ -453,7 +453,12 @@ class GeminiService(
             4. **Intro/Outro:** Greeting as $CHANNEL_NAME, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
             5. **Sources:** List names (e.g., "Nature", "Reddit", "Reuters").
             6. **Keywords:** Scenes' keywords MUST be visual, common English terms for stock footage extraction.
-            ${if (effectiveChannelId == "history") "7. **Date Requirement:** You MUST explicitly mention the Year/Date of the event in the script and description (e.g., '1920년 5월 1일')." else ""}
+            ${
+                val todayParam = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
+                if (effectiveChannelId == "history") "7. **Date Requirement:** Today is $todayParam. You MUST create a script about a historical event that happened on THIS DATE ($todayParam). Explicitly mention the Date in the intro." 
+                else if (effectiveChannelId == "stocks") "7. **Date Context:** Today is $todayParam. Focus on the LATEST market news for this date." 
+                else ""
+            }
 
             [Output Format - JSON Only]
             Return ONLY a valid JSON object with this exact structure:

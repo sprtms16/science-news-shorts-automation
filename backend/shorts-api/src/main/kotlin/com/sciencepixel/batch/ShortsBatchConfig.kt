@@ -64,6 +64,6 @@ class ShortsBatchConfig(
         }
         
         println("📡 Loaded ${activeSources.size} active sources from DB for Batch.")
-        return RssItemReader(activeSources, contentProviderService, remainingSlots?.toInt() ?: 10)
+        return RssItemReader(activeSources, contentProviderService, remainingSlots?.toInt() ?: 10, channelId)
     }
 }

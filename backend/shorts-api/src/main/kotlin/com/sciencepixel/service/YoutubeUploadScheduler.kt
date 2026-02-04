@@ -55,6 +55,19 @@ class YoutubeUploadScheduler(
         // 2. Fetch target videos
         val pendingVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.COMPLETED)
             .sortedBy { it.createdAt }
+            .filter { 
+                // [New] Strict Date Rule for History/Stocks: Only upload videos created TODAY
+                if (channelId == "history" || channelId == "stocks") {
+                    val startOfDay = java.time.LocalDate.now().atStartOfDay()
+                    val isToday = it.createdAt.isAfter(startOfDay)
+                    if (!isToday) {
+                        println("⏳ [$channelId] Skipping old video (Created: ${it.createdAt}) due to strict 'Today's News' policy.")
+                    }
+                    isToday
+                } else {
+                    true
+                }
+            }
         
         println("📦 [$channelId] Found ${pendingVideos.size} videos ready for upload.")
 
