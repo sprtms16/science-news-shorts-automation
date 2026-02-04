@@ -33,7 +33,9 @@ data class VideoHistory(
     val youtubeUrl: String = "",
     val thumbnailPath: String = "", // Local path to thumbnail image
     val rssTitle: String? = null, // Original RSS title for deduplication
-    val scenes: List<Scene> = emptyList() // Persisted script content
+    val scenes: List<Scene> = emptyList(), // Persisted script content
+    val progress: Int = 0, // 렌더링 진행률 (0-100)
+    val currentStep: String = "" // 현재 작업 단계 (e.g. "TTS 생성", "클립 다운로드", "영상 병합")
 )
 
 enum class VideoStatus {
