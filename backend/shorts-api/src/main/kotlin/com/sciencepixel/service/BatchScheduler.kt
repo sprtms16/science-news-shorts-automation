@@ -80,6 +80,16 @@ class BatchScheduler(
 
         if (activeCount < limit) {
             println("🚀 Active buffer has space. Triggering Batch Job...")
+
+            // [New] Async Flow for Stocks
+            if (channelId == "stocks") {
+                println("📡 [BatchScheduler] Triggering Async Stock Discovery via Kafka...")
+                kafkaEventPublisher.publishStockDiscoveryRequested(
+                    com.sciencepixel.event.StockDiscoveryRequestedEvent(channelId)
+                )
+                return 
+            }
+
             try {
                 val params = JobParametersBuilder()
                     .addLong("time", System.currentTimeMillis())

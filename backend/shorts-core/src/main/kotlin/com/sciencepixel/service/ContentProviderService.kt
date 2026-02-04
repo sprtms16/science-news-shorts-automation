@@ -188,7 +188,7 @@ class ContentProviderService(
         }
     }
     
-    private fun fetchStockNews(source: RssSource): List<NewsItem> {
+    fun fetchStockNews(source: RssSource): List<NewsItem> {
         println("🔍 Fetching Dynamic Stock News...")
         
         // 1. Fetch General Business News (Base)

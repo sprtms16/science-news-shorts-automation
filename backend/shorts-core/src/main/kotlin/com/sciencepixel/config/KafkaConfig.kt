@@ -26,6 +26,7 @@ class KafkaConfig(
         const val TOPIC_SCRIPT_CREATED = "script-created"
         const val TOPIC_AUDIO_CREATED = "audio-created"
         const val TOPIC_ASSETS_READY = "assets-ready"
+        const val TOPIC_STOCK_DISCOVERY_REQUESTED = "stock-discovery-requested" // New
         const val TOPIC_VIDEO_READY = "video-ready"
         const val TOPIC_BGM_UPLOAD = "bgm-upload"
         

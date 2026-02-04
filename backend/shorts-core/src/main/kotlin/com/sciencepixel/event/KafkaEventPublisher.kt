@@ -53,6 +53,12 @@ class KafkaEventPublisher(
         kafkaTemplate.send(KafkaConfig.TOPIC_RSS_NEW_ITEM, event.url, json) // URL as Key to prevent duplicate processing if needed
     }
 
+    fun publishStockDiscoveryRequested(event: StockDiscoveryRequestedEvent) {
+        println("📤 Publishing StockDiscoveryRequestedEvent: ${event.channelId}")
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_STOCK_DISCOVERY_REQUESTED, event.channelId, json)
+    }
+
     fun publishBgmUpload(event: BgmUploadEvent) {
         println("📤 Publishing BgmUploadEvent: ${event.filename}")
         val json = objectMapper.writeValueAsString(event)
