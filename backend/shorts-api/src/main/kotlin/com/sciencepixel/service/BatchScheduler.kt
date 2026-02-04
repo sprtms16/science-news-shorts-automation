@@ -92,9 +92,9 @@ class BatchScheduler(
             .filter { it.regenCount < 1 } // 재생성 시도 안 한 것만
         
         if (failedVideos.isNotEmpty()) {
-            println("🔄 Found ${failedVideos.size} FAILED videos. Analyzing failure steps...")
+            println("🔄 Found ${failedVideos.size} FAILED videos. Processing 1 item to avoid burst load...")
             
-            failedVideos.take(5).forEach { video ->
+            failedVideos.take(1).forEach { video ->
                 // Skip safety issues for auto-retry? 
                 // Better: if it failed for SAFETY, don't auto-retry the SAME title/link.
                 if (video.failureStep == "SAFETY") {
