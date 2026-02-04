@@ -78,6 +78,7 @@ class SceneConsumer(
                 durations = assetResult.durations,
                 subtitles = assetResult.subtitles,
                 keywords = event.keywords,
+                silenceTime = assetResult.silenceTime,
                 scriptEvent = event
             ))
 

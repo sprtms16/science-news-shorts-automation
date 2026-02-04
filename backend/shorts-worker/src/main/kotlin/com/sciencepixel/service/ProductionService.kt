@@ -22,7 +22,8 @@ class ProductionService(
         val mood: String,
         val clipPaths: List<String>,
         val durations: List<Double>,
-        val subtitles: List<String>
+        val subtitles: List<String>,
+        val silenceTime: Double? = null
     )
 
     fun produceAssetsOnly(title: String, scenes: List<Scene>, videoId: String, mood: String): AssetsResult {
@@ -33,13 +34,23 @@ class ProductionService(
         val durations = mutableListOf<Double>()
         val subtitles = mutableListOf<String>()
 
+        var totalDuration = 0.0
+        var silenceAt: Double? = null
+
         println("📹 [SAGA] Phase 1: Processing scenes for $videoId")
         scenes.forEachIndexed { i, scene ->
             val videoFile = File(workspace, "raw_$i.mp4")
             val audioFile = File(workspace, "audio_$i.mp3")
             val clipFile = File(workspace, "clip_$i.mp4")
 
-            if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: ${scene.sentence}", videoFile)) {
+            var cleanSentence = scene.sentence
+            if (cleanSentence.contains("[BGM_SILENCE]")) {
+                silenceAt = totalDuration
+                cleanSentence = cleanSentence.replace("[BGM_SILENCE]", "").trim()
+                println("🔇 BGM Silence requested at $silenceAt seconds (Scene $i)")
+            }
+
+            if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: $cleanSentence", videoFile)) {
                 println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
                 if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
                     return@forEachIndexed
@@ -47,7 +58,7 @@ class ProductionService(
             }
 
             val duration = try {
-                 audioService.generateAudio(scene.sentence, audioFile)
+                 audioService.generateAudio(cleanSentence, audioFile)
             } catch (e: Exception) {
                 5.0
             }
@@ -56,7 +67,8 @@ class ProductionService(
             
             clipFiles.add(clipFile)
             durations.add(duration)
-            subtitles.add(scene.sentence)
+            subtitles.add(cleanSentence)
+            totalDuration += duration
         }
         
         // Return absolute paths
@@ -64,11 +76,12 @@ class ProductionService(
             mood = mood, 
             clipPaths = clipFiles.map { it.absolutePath },
             durations = durations,
-            subtitles = subtitles
+            subtitles = subtitles,
+            silenceTime = silenceAt
         )
     }
 
-    fun finalizeVideo(videoId: String, title: String, clipPaths: List<String>, durations: List<Double>, subtitles: List<String>, mood: String): String {
+    fun finalizeVideo(videoId: String, title: String, clipPaths: List<String>, durations: List<Double>, subtitles: List<String>, mood: String, silenceTime: Double? = null): String {
         val workspace = File("shared-data/workspace/$channelId/$videoId")
         if (!workspace.exists()) workspace.mkdirs()
         
@@ -87,7 +100,7 @@ class ProductionService(
         // Use videoId for deterministic filename to avoid duplicates
         val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_$videoId.mp4")
         
-        burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace)
+        burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceTime)
         
         logPublisher.info("shorts-controller", "Production Completed: $title", "Path: ${finalOutput.name}", traceId = videoId)
         return finalOutput.absolutePath
@@ -305,7 +318,7 @@ class ProductionService(
     }
 
     // Phase 3b: Burn subtitles and Mix BGM into final video
-    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File) {
+    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File, silenceTime: Double? = null) {
         // Regex-based escaping for FFmpeg filter path:
         // 1. \ -> / (Windows separator Fix)
         // 2. : -> \: (FFmpeg key:val separator escape)
@@ -348,13 +361,16 @@ class ProductionService(
             println("🎵 Mixing BGM: ${bgmFile.name} (Mood: $mood)")
             cmd.addAll(listOf("-stream_loop", "-1", "-i", bgmFile.absolutePath))
             
-            // Filter complex: mix voice and bgm (volume 0.30)
-            // [0:v] is video from input 0
-            // [0:a] is audio from input 0 (TTS)
-            // [1:a] is audio from input 1 (BGM)
-            // mix voice(1.2) and bgm(0.20) -> duration=first (matches TTS length)
+            // Filter complex: mix voice and bgm
+            // volume filter on bgm: if silenceTime is provided, set volume to 0 after that time
+            val bgmVolumeFilter = if (silenceTime != null) {
+                "volume=0.20:enable='lt(t,$silenceTime)'"
+            } else {
+                "volume=0.20"
+            }
+
             cmd.addAll(listOf(
-                "-filter_complex", "[0:a]volume=1.2[v];[1:a]volume=0.20[bgm];[v][bgm]amix=inputs=2:duration=first[aout];[0:v]$subtitleFilter[vout]",
+                "-filter_complex", "[0:a]volume=1.2[v];[1:a]$bgmVolumeFilter[bgm];[v][bgm]amix=inputs=2:duration=first[aout];[0:v]$subtitleFilter[vout]",
                 "-map", "[vout]", "-map", "[aout]"
             ))
         } else {

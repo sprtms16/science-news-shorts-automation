@@ -102,6 +102,7 @@ data class VideoAssetsReadyEvent(
     val durations: List<Double>,
     val subtitles: List<String>,
     val keywords: List<String>,
+    val silenceTime: Double? = null,
     val scriptEvent: ScriptCreatedEvent?, 
     val timestamp: Long = Instant.now().toEpochMilli()
 )

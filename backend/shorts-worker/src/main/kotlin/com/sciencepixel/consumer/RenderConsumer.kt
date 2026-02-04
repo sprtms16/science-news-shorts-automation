@@ -53,7 +53,8 @@ class RenderConsumer(
                 clipPaths = event.clipPaths,
                 durations = event.durations,
                 subtitles = event.subtitles,
-                mood = event.mood
+                mood = event.mood,
+                silenceTime = event.silenceTime
             )
 
             if (finalPath.isEmpty()) {

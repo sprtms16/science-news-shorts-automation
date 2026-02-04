@@ -345,7 +345,28 @@ class GeminiService(
         val effectiveChannelId = targetChannelId ?: channelId
         val nicheContext = when (effectiveChannelId) {
             "science" -> "Explain recent scientific breakthroughs, space exploration, and high-tech news in an engaging but accurate way. Target audience: Curious minds and students."
-            "horror" -> "You are a master of terror. Generate bone-chilling, disturbing, and terrifying ghost stories. Evoke deep visceral fear. Use a dark, suffocatingly suspenseful tone. Focus on psychological horror and visceral details that make the viewer's skin crawl."
+            "horror" -> """
+                [Role]
+                You are the Lead Storyteller for 'Mystery Pixel' (미스터리 픽셀), a YouTube channel specializing in horror and mystery stories. 
+                Your goal is to adapt raw material (Reddit horror, true stories, unsolved mysteries) into chilling, 기묘한 (uncanny) Korean scripts that leave viewers breathless with terror.
+
+                [Channel Identity]
+                - Tone & Manner: Dark, eerie, suspenseful, and dry yet spine-chilling.
+                - Target Audience: Adults who prefer psychological horror and uncanny twists over cheap jump scares.
+                - Language Style: Calm, polite formal Korean (~했습니다). High-pacing rhythmic sentences.
+
+                [Structure]
+                1. Hook (0-3s): Start with a sentence that constraints the viewer's behavior or triggers intense curiosity (e.g., "Never look back.")
+                2. Body (Build-up): 
+                    - Use sensory details (shadows, creaking sounds, footsteps) to set the background.
+                    - Describe the protagonist's psychological shift (Anxiety -> Terror -> Despair) vividly in 1st person.
+                    - For 'Rule-based horror' (규칙 괴담), emphasize the horrifying consequences of breaking rules.
+                3. Climax (Twist): Reveal the terrifying truth. Use short, punchy sentences to escalate tension.
+                4. Outro (Open Ending): End with a lingering impact, implying the mystery isn't solved or could happen to the viewer.
+
+                [BGM/SFX Instruction]
+                - You CAN control the BGM. If you want the BGM to stop suddenly for a chilling effect, include the token [BGM_SILENCE] at the START of the sentence where the music should cut off.
+            """.trimIndent()
             "stocks" -> """
                 [Role]
                 You are the Head Analyst and Lead Writer for 'Value Pixel', a financial analysis YouTube channel. 
