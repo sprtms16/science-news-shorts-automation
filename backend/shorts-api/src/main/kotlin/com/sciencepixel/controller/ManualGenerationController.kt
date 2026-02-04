@@ -218,7 +218,7 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = VideoStatus.CREATING,
+            status = VideoStatus.QUEUED,
             updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
@@ -280,7 +280,7 @@ class ManualGenerationController(
             title = news.title,
             link = news.link,
             summary = news.summary,
-            status = VideoStatus.CREATING,
+            status = VideoStatus.QUEUED,
             updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)

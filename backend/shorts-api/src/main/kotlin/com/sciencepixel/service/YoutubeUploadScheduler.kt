@@ -31,6 +31,8 @@ class YoutubeUploadScheduler(
     @Scheduled(cron = "0 0/5 * * * *") // 매 5분마다 체크
     @Async
     fun uploadPendingVideos() {
+        if (channelId == "renderer") return // Renderer should not upload or check schedule
+
         println("⏰ [$channelId] Scheduler Triggered: Checking for pending videos at ${java.time.LocalDateTime.now()}")
 
         if (!quotaTracker.canUpload()) {

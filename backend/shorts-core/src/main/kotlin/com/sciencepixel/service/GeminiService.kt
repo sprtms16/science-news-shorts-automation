@@ -1104,6 +1104,9 @@ class GeminiService(
      * Detects Politics, Religion, Ideology, or Social Conflicts.
      */
     fun checkSensitivity(title: String, summary: String, channelId: String): Boolean {
+        // [Policy] Stocks channel deals with politics/economy naturally. Disable filter.
+        if (channelId == "stocks") return true
+
         val nicheAvoidance = when (channelId) {
             "science" -> "Politics, Religion, Ideology, or Social Conflicts unrelated to science."
             "horror" -> "Real-life trauma, sensitive criminal cases still in court, or hate speech."
