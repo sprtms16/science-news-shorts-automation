@@ -6,7 +6,6 @@ import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
-import com.sciencepixel.service.ProductionService
 import com.sciencepixel.service.LogPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -25,7 +24,7 @@ class RegenerationConsumer(
 ) {
 
     companion object {
-        private const val MAX_REGEN_COUNT = 1
+        private const val MAX_REGEN_COUNT = 3
     }
 
     @KafkaListener(
