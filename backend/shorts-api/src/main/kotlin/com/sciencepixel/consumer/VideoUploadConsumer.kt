@@ -33,14 +33,14 @@ class VideoUploadConsumer(
     }
 
     @KafkaListener(
-        topics = [KafkaConfig.TOPIC_UPLOAD_REQUESTED], // Changed from VIDEO_CREATED
+        topics = [KafkaConfig.TOPIC_UPLOAD_REQUESTED],
         groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-upload-group}"
     )
     fun handleUploadRequested(message: String) {
         val event = objectMapper.readValue(message, UploadRequestedEvent::class.java)
         if (event.channelId != channelId) return
         
-        println("📥 [$channelId] Received VideoCreatedEvent: ${event.videoId}")
+        println("📥 [$channelId] Received UploadRequestedEvent: ${event.videoId}")
 
         try {
             val videoOpt = repository.findById(event.videoId)
@@ -68,30 +68,24 @@ class VideoUploadConsumer(
                     status = VideoStatus.UPLOADING,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
-                println("🔒 Claimed upload (COMPLETED -> UPLOADING): ${event.title}")
-            } else {
-                println("⚠️ Video record ${event.videoId} not found in DB. Skipping.")
-                return
-            }
+                println("🔒 Claimed upload (COMPLETED -> UPLOADING): ${video.title}")
 
-            val file = File(event.filePath)
-            
-            if (file.exists()) {
-                // 검증 로직: 업로드 전 데이터 무결성 체크
-                println("🔍 Verifying Upload Data for: ${event.title}")
+                val file = File(video.filePath)
                 
-                // 1. 영상 파일 크기 체크 (1MB 이하 경고)
-                if (file.length() < 1024 * 1024) {
-                     println("⚠️ Warning: Video file size is startlingly small (${file.length()} bytes). Verify content.")
-                }
-                
-                // 2. 제목 한글 포함 여부 체크 (한국어 채널)
-                val hasKorean = event.title.any { it in '\uAC00'..'\uD7A3' }
-                if (!hasKorean) {
-                    println("⛔ Upload BLOCKED: Title contains no Korean characters. (${event.title})")
+                if (file.exists()) {
+                    // 검증 로직: 업로드 전 데이터 무결성 체크
+                    println("🔍 Verifying Upload Data for: ${video.title}")
                     
-                    // FAILED 상태와 함께 validationErrors 저장
-                    repository.findById(event.videoId).ifPresent { video ->
+                    // 1. 영상 파일 크기 체크 (1MB 이하 경고)
+                    if (file.length() < 1024 * 1024) {
+                         println("⚠️ Warning: Video file size is startlingly small (${file.length()} bytes). Verify content.")
+                    }
+                    
+                    // 2. 제목 한글 포함 여부 체크 (한국어 채널)
+                    val hasKorean = video.title.any { it in '\uAC00'..'\uD7A3' }
+                    if (!hasKorean) {
+                        println("⛔ Upload BLOCKED: Title contains no Korean characters. (${video.title})")
+                        
                         repository.save(video.copy(
                             status = VideoStatus.FAILED,
                             failureStep = "VALIDATION",
@@ -99,86 +93,87 @@ class VideoUploadConsumer(
                             validationErrors = listOf("TITLE_ENGLISH"),
                             updatedAt = java.time.LocalDateTime.now()
                         ))
+                        return
                     }
-                    return // 업로드 중단
-                }
 
-                // 3. 태그 검증
-                val defaultTags = listOf("Science", "News", "Shorts", "SciencePixel")
-                // Use video.tags instead of event.keywords
-                val keywords = video.tags
-                val combinedTags = (defaultTags + keywords)
-                    .map { it.trim().take(30) }
-                    .distinct()
-                    .filter { it.isNotBlank() && it.length > 1 } // 한 글자 태그 제외
-                    .take(20)
+                    // 3. 태그 검증
+                    val defaultTags = listOf("Science", "News", "Shorts", "SciencePixel")
+                    // Use video.tags instead of event.keywords (which doesn't exist on UploadRequestedEvent)
+                    val keywords = video.tags
+                    val combinedTags = (defaultTags + keywords)
+                        .map { it.trim().take(30) }
+                        .distinct()
+                        .filter { it.isNotBlank() && it.length > 1 }
+                        .take(20)
 
-                println("✅ Verification Passed. Meta: Title='${video.title}' (${if(hasKorean) "KR" else "NON-KR"}), Tags=${combinedTags.size}ea")
+                    println("✅ Verification Passed. Meta: Title='${video.title}' (${if(hasKorean) "KR" else "NON-KR"}), Tags=${combinedTags.size}ea")
 
-                
-                val baseDescription = if (video.description.isNotBlank()) video.description else video.summary
-                
-                // Only append default hashtags if none are present in the base description
-                val finalDescription = if (baseDescription.contains("#")) {
-                    baseDescription
+                    
+                    val baseDescription = if (video.description.isNotBlank()) video.description else video.summary
+                    
+                    val finalDescription = if (baseDescription.contains("#")) {
+                        baseDescription
+                    } else {
+                        "${baseDescription}\n\n#Science #News #Shorts"
+                    }
+
+                    val thumbnailFile = if (video.thumbnailPath.isNotBlank()) {
+                        File(video.thumbnailPath)
+                    } else null
+
+                    val youtubeUrl = youtubeService.uploadVideo(
+                        file,
+                        video.title,
+                        finalDescription,
+                        combinedTags,
+                        thumbnailFile
+                    )
+
+                    // Update DB - Fetch again to avoid stale object? Or just use video.id
+                    repository.findById(video.id!!).ifPresent { v ->
+                        repository.save(v.copy(
+                            status = VideoStatus.UPLOADED,
+                            youtubeUrl = youtubeUrl,
+                            updatedAt = java.time.LocalDateTime.now()
+                        ))
+                    }
+
+                    // Publish success event
+                    eventPublisher.publishVideoUploaded(VideoUploadedEvent(
+                        channelId = channelId,
+                        videoId = video.id!!,
+                        youtubeUrl = youtubeUrl
+                    ))
+
+                    // Discord 알림 전송
+                    notificationService.notifyUploadComplete(video.title, youtubeUrl)
+
+                    logPublisher.info("shorts-controller", "YouTube Upload Success: ${video.title}", "URL: $youtubeUrl", traceId = video.id!!)
+                    println("✅ [$channelId] Upload Success via Kafka: $youtubeUrl")
                 } else {
-                    "${baseDescription}\n\n#Science #News #Shorts"
-                }
-
-                // Use video.thumbnailPath
-                val thumbnailFile = if (video.thumbnailPath.isNotBlank()) {
-                    File(video.thumbnailPath)
-                } else null
-
-                val youtubeUrl = youtubeService.uploadVideo(
-                    file,
-                    video.title,
-                    finalDescription,
-                    combinedTags,
-                    thumbnailFile
-                )
-
-                // Update DB
-                repository.findById(event.videoId).ifPresent { v ->
-                    repository.save(v.copy(
-                        status = VideoStatus.UPLOADED,
-                        youtubeUrl = youtubeUrl,
-                        updatedAt = java.time.LocalDateTime.now()
+                    println("⚠️ [$channelId] File not found: ${video.filePath}")
+                    eventPublisher.publishUploadFailed(UploadFailedEvent(
+                        channelId = channelId,
+                        videoId = video.id!!,
+                        title = video.title,
+                        filePath = video.filePath,
+                        reason = "File not found",
+                        retryCount = 0,
+                        thumbnailPath = video.thumbnailPath
                     ))
                 }
-
-                // Publish success event
-                eventPublisher.publishVideoUploaded(VideoUploadedEvent(
-                    channelId = channelId, // 추가
-                    videoId = event.videoId,
-                    youtubeUrl = youtubeUrl
-                ))
-
-                // Discord 알림 전송 (업로드 정보 최우선)
-                notificationService.notifyUploadComplete(video.title, youtubeUrl)
-
-                logPublisher.info("shorts-controller", "YouTube Upload Success: ${video.title}", "URL: $youtubeUrl", traceId = event.videoId)
-                println("✅ [$channelId] Upload Success via Kafka: $youtubeUrl")
             } else {
-                println("⚠️ [$channelId] File not found: ${event.filePath}")
-                // Publish failure event for retry
-                eventPublisher.publishUploadFailed(UploadFailedEvent(
-                    channelId = channelId, // 추가
-                    videoId = event.videoId,
-                    title = event.title,
-                    filePath = event.filePath,
-                    reason = "File not found",
-                    retryCount = 0,
-                    thumbnailPath = "" // No thumbnail path in event, can fetch from DB if needed but maybe overkill for failure
-                ))
+                println("⚠️ Video record ${event.videoId} not found in DB. Skipping.")
+                return
             }
         } catch (e: Exception) {
-            logPublisher.error("shorts-controller", "YouTube Upload Failed: ${event.title}", "Error: ${e.message}", traceId = event.videoId)
+            logPublisher.error("shorts-controller", "YouTube Upload Failed: ${event.videoId}", "Error: ${e.message}", traceId = event.videoId)
             
             eventPublisher.publishUploadFailed(UploadFailedEvent(
-                channelId = channelId, // 추가
+                channelId = channelId,
                 videoId = event.videoId,
-                title = event.title,
+                title = "Unknown Title", // We might not have video object here if findById failed? Accessing event is safer for basic info if available, but event only has limited fields.
+                // UploadRequestedEvent has title.
                 filePath = event.filePath,
                 reason = e.message ?: "Unknown error",
                 retryCount = 0,
