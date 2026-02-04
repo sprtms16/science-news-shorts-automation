@@ -42,8 +42,11 @@ jobs:
           # Clean up old images
           docker image prune -f
           
+          # Build images in parallel first
+          docker-compose build --parallel
+
           # Start app services with forced recreation (Excluding github-runner to avoid build interruption)
-          docker-compose up -d --build --force-recreate --parallel \
+          docker-compose up -d --force-recreate \
             zookeeper kafka mongo ai-media-service \
             shorts-science shorts-horror shorts-stocks shorts-history \
             shorts-log-service shorts-renderer renderer-autoscaler \

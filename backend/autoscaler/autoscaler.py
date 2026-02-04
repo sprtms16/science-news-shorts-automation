@@ -115,13 +115,19 @@ class DockerAutoscaler:
 
         try:
             print(f"🔍 Checking for image updates: {IMAGE_NAME}")
-            latest_image = self.docker_client.images.pull(IMAGE_NAME)
-            latest_id = latest_image.id
+            try:
+                latest_image = self.docker_client.images.pull(IMAGE_NAME)
+                latest_id = latest_image.id
+            except Exception as pull_err:
+                print(f"   ℹ️ Pull skipped/failed (likely local image): {pull_err}")
+                latest_image = self.docker_client.images.get(IMAGE_NAME)
+                latest_id = latest_image.id
+
             self.last_pull_time = time.time()
 
             containers = self.docker_client.containers.list(filters={"status": "running"})
             for c in containers:
-                if TARGET_SERVICE in c.name:
+                if TARGET_SERVICE in c.name and c.name != "shorts-autoscaler":
                     if c.image.id != latest_id:
                         print(f"🔄 Container {c.name} is outdated. Restarting with latest image...")
                         self._recreate_container(c, latest_id)
@@ -193,7 +199,13 @@ class DockerAutoscaler:
                         break
 
                 for i in range(containers_to_add):
-                    new_name = f"{TARGET_SERVICE}_replica_{int(time.time())}_{i}"
+                    # Find the next available index for naming
+                    existing_names = [c.name for c in self.docker_client.containers.list(all=True)]
+                    idx = 2
+                    while f"{TARGET_SERVICE}_{idx}" in existing_names:
+                        idx += 1
+                    
+                    new_name = f"{TARGET_SERVICE}_{idx}"
                     print(f"   Starting replica: {new_name}")
                     
                     self.docker_client.containers.run(
@@ -218,8 +230,9 @@ class DockerAutoscaler:
                 
                 containers_to_stop = containers[:(self.current_replicas - desired_replicas)]
                 for container in containers_to_stop:
-                    # Never stop the main one if possible (the one named -1 or shortest name)
-                    if len(containers) > 1 and "_replica_" not in container.name and "shorts-renderer-1" in container.name:
+                    # Never stop the main one if possible (the one created by docker-compose)
+                    is_main = "shorts-renderer-1" in container.name or container.name.endswith("_shorts-renderer_1")
+                    if len(containers) > 1 and is_main:
                         continue
 
                     print(f"   Stopping container: {container.name}")
