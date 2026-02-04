@@ -22,4 +22,5 @@ dependencies {
     implementation("org.jsoup:jsoup:1.17.2")
     
     testImplementation("org.springframework.batch:spring-batch-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
