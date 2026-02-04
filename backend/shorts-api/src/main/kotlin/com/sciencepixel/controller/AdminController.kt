@@ -561,6 +561,28 @@ class AdminController(
         }
     }
 
+    @PostMapping("/videos/history/clear-failed")
+    fun clearFailedHistory(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val failedOnes = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.FAILED)
+        val count = failedOnes.size
+        
+        failedOnes.forEach { video ->
+            if (video.filePath.isNotBlank()) {
+                cleanupService.deleteVideoFile(video.filePath)
+            }
+        }
+        
+        if (failedOnes.isNotEmpty()) {
+            videoRepository.deleteAll(failedOnes)
+        }
+        
+        return ResponseEntity.ok(mapOf(
+            "deletedCount" to count,
+            "message" to "Successfully deleted $count failed records and their files for channel $effectiveChannelId."
+        ))
+    }
+
     @PostMapping("/maintenance/deep-cleanup")
     fun deepCleanup(): ResponseEntity<Map<String, Any>> {
         val allVideos = videoRepository.findAll()

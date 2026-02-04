@@ -87,7 +87,10 @@ export const translations = {
         regenThumbnailsTitle: "썸네일 자동 재생성",
         regenThumbnailsDesc: "기존 영상의 제목과 설명을 분석하여 Pexels에서 고화질 썸네일을 찾아 자동으로 업데이트합니다.",
         runRegenThumbnails: "썸네일 재생성 실행",
-        manualUpload: "유튜브 업로드"
+        manualUpload: "유튜브 업로드",
+        clearFailedTitle: "실패 기록 일괄 삭제",
+        clearFailedDesc: "현재 채널의 '생성 실패' 상태인 모든 기록을 삭제하고 관련 파일을 서버에서 제거합니다.",
+        runClearFailed: "실패 기록 삭제 실행"
     },
     en: {
         dashboard: 'Dashboard',
@@ -175,6 +178,9 @@ export const translations = {
         regenThumbnailsTitle: "Auto-Regenerate Thumbnails",
         regenThumbnailsDesc: "Analyzes existing video titles/descriptions to find and update high-quality thumbnails from Pexels.",
         runRegenThumbnails: "Run Regeneration",
-        manualUpload: "Upload to YouTube"
+        manualUpload: "Upload to YouTube",
+        clearFailedTitle: "Clear Failed History",
+        clearFailedDesc: "Permanently delete all 'Failed' records and their associated files for the current channel.",
+        runClearFailed: "Clear Failed Records"
     }
 };

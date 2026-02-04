@@ -168,7 +168,7 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails') => {
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
@@ -179,7 +179,8 @@ function App() {
             action === 'translate-uploaded' ? `/admin/maintenance/translate-uploaded-videos` :
               action === 'growth-analysis' ? `/admin/maintenance/growth-analysis` :
                 action === 'regenerate-thumbnails' ? `/admin/maintenance/regenerate-thumbnails` :
-                  `/admin/videos/${action}`;
+                  action === 'clear-failed' ? `/admin/videos/history/clear-failed?channelId=${selectedChannel}` :
+                    `/admin/videos/${action}`;
       const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");
