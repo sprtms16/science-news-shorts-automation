@@ -144,7 +144,8 @@ class DockerAutoscaler:
 
             # Fix volumes mapping
             volumes = {
-                'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'}
+                'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'},
+                'science-news-shorts-automation_shorts-tokens': {'bind': '/app/tokens', 'mode': 'rw'}
             }
             
             self.docker_client.containers.run(
@@ -202,7 +203,8 @@ class DockerAutoscaler:
                         network="science-news-shorts-automation_default",
                         environment=env_dict,
                         volumes={
-                            'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'}
+                            'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'},
+                            'science-news-shorts-automation_shorts-tokens': {'bind': '/app/tokens', 'mode': 'rw'}
                         },
                         restart_policy={"Name": "unless-stopped"}
                     )

@@ -92,7 +92,8 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/tokens:/app/tokens
+      - ./backend/tokens:/app/tokens # [LEGACY] Keep bind for local dev debugging if needed, but primary is named volume
+      - shorts-tokens:/app/tokens
     env_file:
       - .env
     environment:
@@ -124,7 +125,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/tokens:/app/tokens
+      - shorts-tokens:/app/tokens
     env_file:
       - .env
     environment:
@@ -156,7 +157,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/tokens:/app/tokens
+      - shorts-tokens:/app/tokens
     env_file:
       - .env
     environment:
@@ -189,7 +190,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/tokens:/app/tokens
+      - shorts-tokens:/app/tokens
     env_file:
       - .env
     environment:
@@ -236,8 +237,8 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret:/app/client_secret # Keep generic folder or remove if not needed. Worker likely needs specific refactoring if it uploads.
-      - ./backend/tokens:/app/tokens
+      - ./backend/client_secret:/app/client_secret
+      - shorts-tokens:/app/tokens
     env_file:
       - .env
     environment:
@@ -306,3 +307,4 @@ services:
 volumes:
   mongo-data:
   shorts-shared-data:
+  shorts-tokens: # 신규 추가: YouTube 인증 토큰 저장용 영구 볼륨
