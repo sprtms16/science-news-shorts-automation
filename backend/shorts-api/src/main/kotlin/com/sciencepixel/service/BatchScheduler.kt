@@ -24,8 +24,12 @@ class BatchScheduler(
 
     // 매 10분마다 실행 (0, 10, 20, 30, 40, 50분)
     @Scheduled(cron = "\${app.scheduling.batch-cron:0 0/10 * * * *}")
-    fun runBatchJobIfNeeded() {
-        println("⏰ Batch Scheduler: Checking generation buffer at ${Date()}")
+    fun runScheduledBatch() {
+        triggerBatchJob(force = false)
+    }
+
+    fun triggerBatchJob(force: Boolean = false) {
+        println("⏰ Batch Scheduler: Checking generation buffer at ${Date()} (Force: $force)")
 
         // 1. Pre-Cleanup: 1시간 이상 경과한 '작업 중' 레코드 삭제
         try {
@@ -39,13 +43,14 @@ class BatchScheduler(
             ?.value?.toIntOrNull() ?: 10
         
         // [New] Strict Daily Limit for History/Stocks
-        if (channelId == "history" || channelId == "stocks") {
+        // Limit Check: Skip if FORCE is true
+        if (!force && (channelId == "history" || channelId == "stocks")) {
             val startOfDay = java.time.LocalDate.now().atStartOfDay()
             val todayCount = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(channelId, org.springframework.data.domain.PageRequest.of(0, 100))
                 .count { it.createdAt.isAfter(startOfDay) }
             
             if (todayCount >= 1) {
-                println("🛑 [$channelId] Daily Limit Reached (Generated: $todayCount). Strict 1-per-day rule applied.")
+                println("🛑 [$channelId] Daily Limit Reached (Generated: $todayCount). Strict 1-per-day rule applied. (Use /manual/trigger to bypass)")
                 return
             }
         }
@@ -66,7 +71,7 @@ class BatchScheduler(
 
         // Notification if too many failures (Buffered capacity alert)
         // User Request: Failure buffer should be same size as Active buffer to prevent waste.
-        if (failedCount >= limit) {
+        if (!force && failedCount >= limit) {
             println("⚠️ FAILED jobs buffer reached limit ($failedCount / $limit). Sending alert & Pausing generation.")
             notificationService.sendDiscordNotification(
                 title = "🚨 [Buffer Full] $channelId 채널 실패 가득 참",

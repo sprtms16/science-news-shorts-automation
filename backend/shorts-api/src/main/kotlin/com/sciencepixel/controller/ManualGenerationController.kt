@@ -11,6 +11,7 @@ import com.sciencepixel.service.AsyncVideoService
 import com.sciencepixel.service.GeminiService
 import com.sciencepixel.service.ProductionService
 import org.springframework.web.bind.annotation.*
+import org.springframework.http.ResponseEntity
 
 // 기존 방식: 제목/요약 직접 입력
 data class ManualRequest(
@@ -92,10 +93,10 @@ class ManualGenerationController(
     }
 
     @PostMapping("/batch/trigger")
-    fun triggerBatchManually(): String {
-        println("🔧 Manually triggering Batch Job...")
-        batchScheduler.runBatchJobIfNeeded()
-        return "✅ Batch Job triggered manually. Check logs." 
+    fun triggerBatchJob(): ResponseEntity<String> {
+        // Force trigger (Bypass daily limit)
+        batchScheduler.triggerBatchJob(force = true)
+        return ResponseEntity.ok("✅ Batch Job triggered manually. Check logs.")
     }
 
     /**
