@@ -229,7 +229,7 @@ services:
       context: ./backend
       dockerfile: shorts-worker/Dockerfile
     image: shorts-worker:latest
-    container_name: shorts-renderer
+    # container_name removed to allow scaling with multiple replicas
     depends_on:
       - ai-media-service
       - mongo
@@ -251,6 +251,29 @@ services:
       - APP_FEATURE_CONSUMER_RENDER=true
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - TZ=Asia/Seoul
+
+  renderer-autoscaler:
+    build: ./backend/autoscaler
+    image: shorts-autoscaler:latest
+    container_name: shorts-autoscaler
+    depends_on:
+      - kafka
+      - shorts-renderer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/compose # docker-compose.yml location
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - CONSUMER_GROUP=renderer-group
+      - TARGET_SERVICE=shorts-renderer
+      - MIN_REPLICAS=1
+      - MAX_REPLICAS=5
+      - SCALE_UP_THRESHOLD=5
+      - SCALE_DOWN_THRESHOLD=2
+      - CHECK_INTERVAL=30
+      - COOLDOWN_PERIOD=60
+      - TZ=Asia/Seoul
+    restart: unless-stopped
 
   frontend-server:
     build: ./frontend
