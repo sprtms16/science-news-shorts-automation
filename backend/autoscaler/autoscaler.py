@@ -230,8 +230,11 @@ class DockerAutoscaler:
                 
                 containers_to_stop = containers[:(self.current_replicas - desired_replicas)]
                 for container in containers_to_stop:
-                    # Never stop the main one if possible (the one created by docker-compose)
-                    is_main = "shorts-renderer-1" in container.name or container.name.endswith("_shorts-renderer_1")
+                    # Never stop the main one (the one created by docker-compose with fixed name or default index)
+                    is_main = container.name == TARGET_SERVICE or \
+                              container.name == f"{TARGET_SERVICE}-1" or \
+                              container.name.endswith(f"_{TARGET_SERVICE}_1")
+                    
                     if len(containers) > 1 and is_main:
                         continue
 

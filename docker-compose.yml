@@ -221,7 +221,7 @@ services:
       context: ./backend
       dockerfile: shorts-worker/Dockerfile
     image: shorts-worker:latest
-    # container_name removed to allow scaling with multiple replicas
+    container_name: shorts-renderer
     depends_on:
       - ai-media-service
       - mongo
