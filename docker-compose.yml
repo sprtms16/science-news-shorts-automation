@@ -92,7 +92,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/SciencePixel/client_secret.json:/app/client_secret.json
+      - ./backend/client_secret/SciencePixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
@@ -124,7 +124,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/MysteryPixel/client_secret.json:/app/client_secret.json
+      - ./backend/client_secret/MysteryPixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
@@ -156,7 +156,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/ValuePixel/client_secret.json:/app/client_secret.json
+      - ./backend/client_secret/ValuePixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
@@ -188,7 +188,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/MemoryPixel/client_secret.json:/app/client_secret.json
+      - ./backend/client_secret/MemoryPixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env

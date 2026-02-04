@@ -23,4 +23,4 @@ RUN apt-get update && apt-get install -y ffmpeg fonts-nanum && rm -rf /var/lib/a
 COPY --from=build /app/shorts-api/build/libs/*.jar /app/app.jar
 
 # Run the application
-ENTRYPOINT ["sh", "-c", "if [ ! -f /app/client_secret.json ]; then if [ -n \"$YOUTUBE_CLIENT_SECRET_JSON_B64\" ]; then echo \"$YOUTUBE_CLIENT_SECRET_JSON_B64\" | base64 -d > /app/client_secret.json; elif [ -n \"$YOUTUBE_CLIENT_SECRET_JSON\" ]; then echo \"$YOUTUBE_CLIENT_SECRET_JSON\" > /app/client_secret.json; fi; fi && exec java -jar /app/app.jar"]
+ENTRYPOINT ["sh", "-c", "if [ -f /app/secrets/client_secret.json ]; then cp /app/secrets/client_secret.json /app/client_secret.json; elif [ -n \"$YOUTUBE_CLIENT_SECRET_JSON_B64\" ]; then echo \"$YOUTUBE_CLIENT_SECRET_JSON_B64\" | base64 -d > /app/client_secret.json; elif [ -n \"$YOUTUBE_CLIENT_SECRET_JSON\" ]; then echo \"$YOUTUBE_CLIENT_SECRET_JSON\" > /app/client_secret.json; fi && exec java -jar /app/app.jar"]
