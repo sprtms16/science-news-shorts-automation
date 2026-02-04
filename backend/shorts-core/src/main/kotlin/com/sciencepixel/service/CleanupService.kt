@@ -257,8 +257,8 @@ class CleanupService(
      * Identify and delete video files that have no corresponding record in the database
      */
     fun cleanupOrphanedVideos() {
-        println("🧹 [$channelId] Scanning for orphaned video files in shared-data/videos...")
-        val videoDir = File(sharedDataPath, "videos")
+        println("🧹 [$channelId] Scanning for orphaned video files in shared-data/videos/$channelId...")
+        val videoDir = File(sharedDataPath, "videos/$channelId")
         if (!videoDir.exists() || !videoDir.isDirectory) return
 
         val allVideos = repository.findByChannelId(channelId)
@@ -274,6 +274,6 @@ class CleanupService(
                 }
             }
         }
-        println("✅ Orphaned Video Cleanup: Deleted $count files.")
+        println("✅ Orphaned Video Cleanup: Deleted $count files from $channelId folder.")
     }
 }
