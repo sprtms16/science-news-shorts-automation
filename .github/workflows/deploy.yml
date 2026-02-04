@@ -21,9 +21,11 @@ jobs:
           echo "TAILSCALE_AUTHKEY=${{ secrets.TAILSCALE_AUTHKEY }}" >> .env
           echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
           
-          # Base64 Encode JSON Secret to avoid quote parsing issues
           echo "YOUTUBE_CLIENT_SECRET_JSON_B64=$(echo -n "$JSON_SECRET" | base64 -w 0)" >> .env
 
+          # Remove existing directory to preventing 'Is a directory' error if Docker created it wrongly
+          rm -rf backend/client_secret
+          
           # Create Client Secret Directories
           mkdir -p backend/client_secret/SciencePixel
           mkdir -p backend/client_secret/MysteryPixel
