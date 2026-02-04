@@ -105,16 +105,18 @@ class VideoUploadConsumer(
 
                 // 3. 태그 검증
                 val defaultTags = listOf("Science", "News", "Shorts", "SciencePixel")
-                val combinedTags = (defaultTags + event.keywords)
+                // Use video.tags instead of event.keywords
+                val keywords = video.tags
+                val combinedTags = (defaultTags + keywords)
                     .map { it.trim().take(30) }
                     .distinct()
                     .filter { it.isNotBlank() && it.length > 1 } // 한 글자 태그 제외
                     .take(20)
 
-                println("✅ Verification Passed. Meta: Title='${event.title}' (${if(hasKorean) "KR" else "NON-KR"}), Tags=${combinedTags.size}ea")
+                println("✅ Verification Passed. Meta: Title='${video.title}' (${if(hasKorean) "KR" else "NON-KR"}), Tags=${combinedTags.size}ea")
 
                 
-                val baseDescription = if (event.description.isNotBlank()) event.description else event.summary
+                val baseDescription = if (video.description.isNotBlank()) video.description else video.summary
                 
                 // Only append default hashtags if none are present in the base description
                 val finalDescription = if (baseDescription.contains("#")) {
@@ -123,21 +125,22 @@ class VideoUploadConsumer(
                     "${baseDescription}\n\n#Science #News #Shorts"
                 }
 
-                val thumbnailFile = if (event.thumbnailPath.isNotBlank()) {
-                    File(event.thumbnailPath)
+                // Use video.thumbnailPath
+                val thumbnailFile = if (video.thumbnailPath.isNotBlank()) {
+                    File(video.thumbnailPath)
                 } else null
 
                 val youtubeUrl = youtubeService.uploadVideo(
                     file,
-                    event.title,
+                    video.title,
                     finalDescription,
                     combinedTags,
                     thumbnailFile
                 )
 
                 // Update DB
-                repository.findById(event.videoId).ifPresent { video ->
-                    repository.save(video.copy(
+                repository.findById(event.videoId).ifPresent { v ->
+                    repository.save(v.copy(
                         status = VideoStatus.UPLOADED,
                         youtubeUrl = youtubeUrl,
                         updatedAt = java.time.LocalDateTime.now()
@@ -152,9 +155,9 @@ class VideoUploadConsumer(
                 ))
 
                 // Discord 알림 전송 (업로드 정보 최우선)
-                notificationService.notifyUploadComplete(event.title, youtubeUrl)
+                notificationService.notifyUploadComplete(video.title, youtubeUrl)
 
-                logPublisher.info("shorts-controller", "YouTube Upload Success: ${event.title}", "URL: $youtubeUrl", traceId = event.videoId)
+                logPublisher.info("shorts-controller", "YouTube Upload Success: ${video.title}", "URL: $youtubeUrl", traceId = event.videoId)
                 println("✅ [$channelId] Upload Success via Kafka: $youtubeUrl")
             } else {
                 println("⚠️ [$channelId] File not found: ${event.filePath}")
@@ -166,7 +169,7 @@ class VideoUploadConsumer(
                     filePath = event.filePath,
                     reason = "File not found",
                     retryCount = 0,
-                    thumbnailPath = event.thumbnailPath
+                    thumbnailPath = "" // No thumbnail path in event, can fetch from DB if needed but maybe overkill for failure
                 ))
             }
         } catch (e: Exception) {
@@ -179,7 +182,7 @@ class VideoUploadConsumer(
                 filePath = event.filePath,
                 reason = e.message ?: "Unknown error",
                 retryCount = 0,
-                thumbnailPath = event.thumbnailPath
+                thumbnailPath = "" 
             ))
         }
     }
