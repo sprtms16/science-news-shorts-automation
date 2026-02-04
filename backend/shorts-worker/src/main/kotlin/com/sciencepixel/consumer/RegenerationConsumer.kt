@@ -3,7 +3,6 @@ package com.sciencepixel.consumer
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.domain.NewsItem
-import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
@@ -19,7 +18,6 @@ import org.springframework.stereotype.Service
 @Service
 class RegenerationConsumer(
     private val repository: VideoHistoryRepository,
-    private val productionService: ProductionService,
     private val eventPublisher: KafkaEventPublisher,
     private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper,
@@ -83,64 +81,38 @@ class RegenerationConsumer(
                 return
             }
 
+            // Since we removed the monolithic produceVideo, we'll re-trigger the pipeline flow
+            // instead of calling ProductionService directly.
+            // 1. Reset Status to CREATING
+            // 2. Publish RssNewItemEvent (treat as new, but update regen count)
+            
             repository.findById(event.videoId).ifPresent { video ->
                 repository.save(video.copy(
-                    status = VideoStatus.CREATING,
+                    status = VideoStatus.QUEUED, // Reset to QUEUED to be picked up by ScriptConsumer again
                     regenCount = event.regenCount + 1,
                     retryCount = 0,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
 
-            val newsItem = NewsItem(
+            // Re-publish as RSS Event to restart the flow
+            val rssEvent = RssNewItemEvent(
+                channelId = channelId,
                 title = event.title,
                 summary = event.summary,
-                link = event.link
+                url = event.link,
+                publishedAt = java.time.LocalDateTime.now().toString()
             )
+            
+            // Wait, ScriptConsumer checks history "getOrCreateHistory". 
+            // If history exists, it uses it.
+            // So if we reset status to QUEUED, ScriptConsumer will pick it up and confirm it as QUEUED and process it.
+            
+            eventPublisher.publishRssNewItem(rssEvent)
+            
+            println("✅ Regeneration trigger re-queued via RSS Event: ${event.title}")
+            logPublisher.info("shorts-controller", "Regeneration Re-queued", "Title: ${event.title}", traceId = event.videoId)
 
-            val result = productionService.produceVideo(newsItem, event.videoId)
-            val newFilePath = result.filePath
-
-            if (newFilePath.isNotBlank()) {
-                logPublisher.info("shorts-controller", "Regeneration Successful: ${event.title}", "Path: $newFilePath", traceId = event.videoId)
-                println("✅ Regeneration successful: $newFilePath")
-                
-                repository.findById(event.videoId).ifPresent { video ->
-                    repository.save(video.copy(
-                        status = VideoStatus.COMPLETED,
-                        filePath = newFilePath,
-                        title = result.title.ifBlank { video.title },
-                        description = result.description.ifBlank { video.description },
-                        tags = if (result.tags.isNotEmpty()) result.tags else video.tags,
-                        sources = if (result.sources.isNotEmpty()) result.sources else video.sources,
-                        retryCount = 0,
-                        regenCount = event.regenCount + 1,
-                        updatedAt = java.time.LocalDateTime.now()
-                    ))
-                    
-                    // 새로운 VideoCreatedEvent 발행 (키워드 포함)
-                    eventPublisher.publishVideoCreated(VideoCreatedEvent(
-                        channelId = channelId, // 추가
-                        videoId = event.videoId,
-                        title = event.title,
-                        summary = event.summary,
-                        description = result.description,
-                        link = event.link,
-                        filePath = newFilePath,
-                        keywords = result.keywords
-                    ))
-                }
-            } else {
-                println("❌ [$channelId] Regeneration failed: Empty file path")
-                repository.findById(event.videoId).ifPresent { video ->
-                    repository.save(video.copy(
-                        status = VideoStatus.FAILED,
-                        failureStep = "REGEN",
-                        errorMessage = "Regeneration produced empty file path",
-                        updatedAt = java.time.LocalDateTime.now()
-                    ))
-                }
-            }
         } catch (e: Exception) {
             logPublisher.error("shorts-controller", "Regeneration Error: ${event.title}", "Error: ${e.message}", traceId = event.videoId)
             println("❌ Regeneration error: ${e.message}")

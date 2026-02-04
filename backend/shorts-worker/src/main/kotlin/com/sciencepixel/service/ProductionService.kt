@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service
 import java.io.File
 
 @Service
-@Service
+
 class ProductionService(
     private val pexelsService: PexelsService,
     private val audioService: AudioService,
