@@ -83,10 +83,12 @@ class StockDiscoveryConsumer(
             }
 
             // 4. Create History
+            val today = java.time.LocalDate.now().toString()
             val history = VideoHistory(
                 channelId = channelId,
                 title = scriptResponse.title.ifBlank { "오늘의 모닝 브리핑" },
                 summary = "간밤의 미 증시 요약 및 오늘 국장 관전 포인트",
+                link = "https://finance.yahoo.com/morning-briefing-$today", // 필수 파라미터 추가 및 일별 고유값 부여
                 status = VideoStatus.QUEUED,
                 description = scriptResponse.description,
                 tags = scriptResponse.tags,
