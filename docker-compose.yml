@@ -242,6 +242,7 @@ services:
       - APP_FEATURE_CONSUMER_SCENE=true
       - APP_FEATURE_CONSUMER_RENDER=true
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PEXELS_API_KEY=${PEXELS_API_KEY}
       - TZ=Asia/Seoul
 
   renderer-autoscaler:
