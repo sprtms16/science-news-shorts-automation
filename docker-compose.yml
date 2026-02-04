@@ -267,6 +267,8 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - CONSUMER_GROUP=renderer-group
       - TARGET_SERVICE=shorts-renderer
+      - IMAGE_NAME=shorts-worker:latest # 모니터링 및 업데이트할 이미지 명시
+      - AUTO_UPGRADE=true # 새 이미지 감지 시 자동 컨테이너 교체 활성화
       - MIN_REPLICAS=1
       - MAX_REPLICAS=5
       - SCALE_UP_THRESHOLD=5
