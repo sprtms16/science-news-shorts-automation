@@ -6,9 +6,18 @@ import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.annotation.EnableScheduling
 import java.util.TimeZone
 
-@SpringBootApplication(
-    scanBasePackages = ["com.sciencepixel"],
-    excludeName = ["com.sciencepixel.service.YoutubeService"]
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.FilterType
+
+@SpringBootApplication
+@ComponentScan(
+    basePackages = ["com.sciencepixel"],
+    excludeFilters = [
+        ComponentScan.Filter(
+            type = FilterType.ASSIGNABLE_TYPE,
+            classes = [com.sciencepixel.service.YoutubeService::class]
+        )
+    ]
 )
 @EnableAsync
 @EnableScheduling
