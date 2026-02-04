@@ -27,7 +27,13 @@ class ProductionService(
         val silenceTime: Double? = null
     )
 
-    fun produceAssetsOnly(title: String, scenes: List<Scene>, videoId: String, mood: String): AssetsResult {
+    fun produceAssetsOnly(
+        title: String, 
+        scenes: List<Scene>, 
+        videoId: String, 
+        mood: String,
+        onProgress: ((progress: Int, step: String) -> Unit)? = null
+    ): AssetsResult {
         logPublisher.info("shorts-controller", "Rendering Started: $title", "Scenes: ${scenes.size}ea", traceId = videoId)
         // Organize workspace by channel
         val workspace = File("shared-data/workspace/$channelId/$videoId").apply { mkdirs() }
@@ -38,8 +44,16 @@ class ProductionService(
         var totalDuration = 0.0
         var silenceAt: Double? = null
 
-        println("📹 [SAGA] Phase 1: Processing scenes for $videoId")
+        val totalScenes = scenes.size
+        println("📹 [SAGA] Phase 1: Processing scenes for $videoId (${totalScenes}개 씬)")
+        
         scenes.forEachIndexed { i, scene ->
+            // Calculate progress: 10% to 60% based on scene completion
+            val sceneProgress = 10 + ((i.toDouble() / totalScenes) * 50).toInt()
+            val step = "씬 ${i + 1}/${totalScenes} 생성 중 (${scene.keyword})"
+            println("📊 [$title] 진행률: $sceneProgress% - $step")
+            onProgress?.invoke(sceneProgress, step)
+            
             val videoFile = File(workspace, "raw_$i.mp4")
             val audioFile = File(workspace, "audio_$i.mp3")
             val clipFile = File(workspace, "clip_$i.mp4")
