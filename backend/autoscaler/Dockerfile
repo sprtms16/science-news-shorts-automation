@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY autoscaler_new.py ./autoscaler.py
+COPY autoscaler.py .
 
 # Run autoscaler
 CMD ["python", "-u", "autoscaler.py"]
