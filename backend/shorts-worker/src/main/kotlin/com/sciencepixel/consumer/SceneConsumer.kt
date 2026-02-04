@@ -60,6 +60,7 @@ class SceneConsumer(
                 scenes = scenes, 
                 videoId = event.videoId, 
                 mood = event.mood,
+                reportImagePath = event.reportImagePath, // 추가
                 onProgress = { progress, step ->
                     videoHistoryRepository.findById(event.videoId).ifPresent { v ->
                         videoHistoryRepository.save(v.copy(
@@ -99,11 +100,12 @@ class SceneConsumer(
                 channelId = channelId, // 추가
                 videoId = event.videoId,
                 title = event.title,
-                mood = assetResult.mood,
                 clipPaths = assetResult.clipPaths,
                 durations = assetResult.durations,
                 subtitles = assetResult.subtitles,
                 keywords = event.keywords,
+                mood = event.mood,
+                reportImagePath = event.reportImagePath, // 경로 전달 추가
                 silenceTime = assetResult.silenceTime,
                 scriptEvent = event
             ))

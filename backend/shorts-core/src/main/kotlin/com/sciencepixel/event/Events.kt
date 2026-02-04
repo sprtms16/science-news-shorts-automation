@@ -81,6 +81,7 @@ data class ScriptCreatedEvent(
     val sourceLink: String,
     val mood: String = "neutral",
     val keywords: List<String> = emptyList(),
+    val reportImagePath: String? = null, // 추가: 모닝 브리핑용 리포트 이미지 경로
     val timestamp: Long = Instant.now().toEpochMilli()
 )
 
@@ -89,6 +90,7 @@ data class AudioCreatedEvent(
     val videoId: String,
     val audioPath: String,
     val bgmPath: String? = null,
+    val reportImagePath: String? = null, // 전달
     val scriptEvent: ScriptCreatedEvent, // Carry over previous context
     val timestamp: Long = Instant.now().toEpochMilli()
 )
@@ -103,6 +105,7 @@ data class VideoAssetsReadyEvent(
     val subtitles: List<String>,
     val keywords: List<String>,
     val silenceTime: Double? = null,
+    val reportImagePath: String? = null, // 최종 전달
     val scriptEvent: ScriptCreatedEvent?, 
     val timestamp: Long = Instant.now().toEpochMilli()
 )

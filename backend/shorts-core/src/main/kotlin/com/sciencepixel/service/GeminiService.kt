@@ -622,6 +622,83 @@ class GeminiService(
         }
     }
 
+    /**
+     * 모닝 브리핑 전용 대본 작성
+     * @param marketDataJson 수집된 시장 데이터 (JSON 형식)
+     */
+    fun writeMorningBriefingScript(marketDataJson: String): ScriptResponse {
+        val todayParam = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
+        
+        val prompt = """
+            [Role]
+            당신은 '밸류 픽셀'의 수석 애널리스트입니다. 
+            간밤의 미국 시장 데이터를 보고 한국의 2040 투자자들이 출근길에 가볍게 들을 수 있는 핵심 브리핑 스크립트를 작성하세요.
+
+            [Input Data (JSON)]
+            $marketDataJson
+
+            [Rules]
+            1. **Tone:** 신뢰감 있고 침착하며 단호한 어조 (~했습니다, ~입니다).
+            2. **Structure:**
+               - 오프닝: "안녕하세요, 밸류 픽셀입니다. $todayParam 간밤의 미 증시 마감 요약해 드립니다."
+               - 본문 1 (미 증시): 지수 등락과 핵심 원인 (예: 국채 금리, 고용 지표 등) 언급.
+               - 본문 2 (빅테크): 엔비디아, 테슬라 등 주요 종목 등락과 이유.
+               - 본문 3 (국내 시장 포인트): 미국 장 결과를 봤을 때 오늘 삼성전자나 하이닉스 등 한국 반도체/2차전지 주가 어떻게 될지 예측.
+               - 아웃트로: "내용이 도움 되셨다면 구독과 좋아요 부탁드립니다. 투자의 책임은 본인에게 있습니다."
+            3. **Time:** 약 60초 분량 (총 12~14문장).
+            4. **Visual Keywords:** 씬별 키워드는 픽셀이나 영상 소스 추출을 위해 'Stock Market', 'Business Chart', 'New York City', 'Semiconductor' 등 영어로 작성하세요.
+
+            [Output Format - JSON Only]
+            Return ONLY a valid JSON object with this exact structure:
+            {
+                "title": "Korean Title (Catchy, <40 chars)",
+                "description": "Korean Description for YouTube",
+                "tags": ["미국상황", "나스닥", "삼성전자", "주식쇼츠", "모닝리포트"],
+                "sources": ["Investing.com", "yfinance"],
+                "scenes": [
+                    {"sentence": "KOREAN_SENTENCE", "keyword": "ENGLISH_VISUAL_KEYWORD"},
+                    ...
+                ],
+                "mood": "finance"
+            }
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return ScriptResponse(emptyList(), "finance")
+
+        return try {
+            val content = JSONObject(responseText)
+                .getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .removePrefix("```json")
+                .removeSuffix("```")
+                .trim()
+
+            val parsedContent = JSONObject(content)
+            val scenesArray = parsedContent.getJSONArray("scenes")
+            val scenes = (0 until scenesArray.length()).map { i ->
+                val scene = scenesArray.getJSONObject(i)
+                Scene(scene.getString("sentence"), scene.getString("keyword"))
+            }
+
+            ScriptResponse(
+                scenes = scenes,
+                mood = parsedContent.optString("mood", "finance"),
+                title = parsedContent.optString("title", "모닝 브리핑"),
+                description = parsedContent.optString("description", ""),
+                tags = parsedContent.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList(),
+                sources = parsedContent.optJSONArray("sources")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList()
+            )
+        } catch (e: Exception) {
+            println("❌ Morning Script Parse Error: ${e.message}")
+            ScriptResponse(emptyList(), "finance")
+        }
+    }
+
     // 2. Vision API - 영상 관련성 체크
     fun checkVideoRelevance(thumbnailUrl: String, keyword: String): Boolean {
         // AI 품질 검수 로직 활성화

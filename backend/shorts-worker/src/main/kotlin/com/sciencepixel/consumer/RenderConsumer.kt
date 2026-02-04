@@ -59,7 +59,8 @@ class RenderConsumer(
                 durations = event.durations,
                 subtitles = event.subtitles,
                 mood = event.mood,
-                silenceTime = event.silenceTime
+                silenceTime = event.silenceTime,
+                reportImagePath = event.reportImagePath // 경로 추가
             )
 
             if (finalPath.isEmpty()) {

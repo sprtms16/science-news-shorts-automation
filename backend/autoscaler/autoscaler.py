@@ -18,12 +18,14 @@ from kafka.structs import TopicPartition
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 CONSUMER_GROUP = os.getenv("CONSUMER_GROUP", "renderer-group")
 TARGET_SERVICE = os.getenv("TARGET_SERVICE", "shorts-renderer")
+IMAGE_NAME = os.getenv("IMAGE_NAME", "shorts-worker:latest") # Explicit image name
 MIN_REPLICAS = int(os.getenv("MIN_REPLICAS", "1"))
 MAX_REPLICAS = int(os.getenv("MAX_REPLICAS", "5"))
 SCALE_UP_THRESHOLD = int(os.getenv("SCALE_UP_THRESHOLD", "5"))
 SCALE_DOWN_THRESHOLD = int(os.getenv("SCALE_DOWN_THRESHOLD", "2"))
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))
 COOLDOWN_PERIOD = int(os.getenv("COOLDOWN_PERIOD", "60"))
+AUTO_UPGRADE = os.getenv("AUTO_UPGRADE", "true").lower() == "true"
 
 # Topics to monitor
 MONITORED_TOPICS = ["script-created", "assets-ready"]
@@ -33,9 +35,11 @@ class DockerAutoscaler:
     def __init__(self):
         self.docker_client = docker.from_env()
         self.last_scale_time = 0
+        self.last_pull_time = 0
         self.current_replicas = self._get_current_replicas()
         print(f"🚀 Autoscaler initialized")
         print(f"   Target: {TARGET_SERVICE}")
+        print(f"   Image: {IMAGE_NAME}")
         print(f"   Consumer Group: {CONSUMER_GROUP}")
         print(f"   Replicas: {MIN_REPLICAS}-{MAX_REPLICAS}")
         print(f"   Thresholds: up>{SCALE_UP_THRESHOLD}, down<{SCALE_DOWN_THRESHOLD}")
@@ -43,10 +47,15 @@ class DockerAutoscaler:
     def _get_current_replicas(self) -> int:
         """Get current number of running containers for target service."""
         try:
+            # Match both standalone and docker-compose named containers
             containers = self.docker_client.containers.list(
-                filters={"name": TARGET_SERVICE, "status": "running"}
+                filters={"status": "running"}
             )
-            return len(containers)
+            count = 0
+            for c in containers:
+                if TARGET_SERVICE in c.name:
+                    count += 1
+            return count
         except Exception as e:
             print(f"❌ Error getting replicas: {e}")
             return 1
@@ -95,80 +104,124 @@ class DockerAutoscaler:
         
         return total_lag
 
+    def refresh_image(self):
+        """Pull the latest image and upgrade outdated containers."""
+        if not AUTO_UPGRADE:
+            return
+
+        # Pull every 5 minutes or so
+        if time.time() - self.last_pull_time < 300:
+            return
+
+        try:
+            print(f"🔍 Checking for image updates: {IMAGE_NAME}")
+            latest_image = self.docker_client.images.pull(IMAGE_NAME)
+            latest_id = latest_image.id
+            self.last_pull_time = time.time()
+
+            containers = self.docker_client.containers.list(filters={"status": "running"})
+            for c in containers:
+                if TARGET_SERVICE in c.name:
+                    if c.image.id != latest_id:
+                        print(f"🔄 Container {c.name} is outdated. Restarting with latest image...")
+                        self._recreate_container(c, latest_id)
+        except Exception as e:
+            print(f"⚠️ Image refresh error: {e}")
+
+    def _recreate_container(self, old_container, image_id):
+        """Stop and recreate a container with the new image ID."""
+        try:
+            name = old_container.name
+            env = old_container.attrs['Config']['Env']
+            env_dict = {}
+            for e in env:
+                if '=' in e:
+                    k, v = e.split('=', 1)
+                    env_dict[k] = v
+            
+            old_container.stop(timeout=10)
+            old_container.remove()
+
+            # Fix volumes mapping
+            volumes = {
+                'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'}
+            }
+            
+            self.docker_client.containers.run(
+                image=image_id,
+                detach=True,
+                name=name,
+                network="science-news-shorts-automation_default",
+                environment=env_dict,
+                volumes=volumes,
+                restart_policy={"Name": "unless-stopped"}
+            )
+            print(f"   ✅ {name} recreated.")
+        except Exception as e:
+            print(f"❌ Failed to recreate {old_container.name}: {e}")
+
     def scale_service(self, desired_replicas: int):
-        """Scale the target service to desired replicas using Docker SDK."""
+        """Scale the target service to desired replicas."""
         if desired_replicas == self.current_replicas:
             return
         
-        # Check cooldown
         if time.time() - self.last_scale_time < COOLDOWN_PERIOD:
-            print(f"⏳ Cooldown active, skipping scale")
             return
         
-        # Clamp to min/max
         desired_replicas = max(MIN_REPLICAS, min(MAX_REPLICAS, desired_replicas))
-        
         if desired_replicas == self.current_replicas:
             return
         
         direction = "⬆️ UP" if desired_replicas > self.current_replicas else "⬇️ DOWN"
-        print(f"{direction}: Scaling {TARGET_SERVICE} from {self.current_replicas} to {desired_replicas}")
+        print(f"{direction}: Scaling from {self.current_replicas} to {desired_replicas}")
         
         try:
             if desired_replicas > self.current_replicas:
-                # Scale UP: Start additional containers
                 containers_to_add = desired_replicas - self.current_replicas
                 
-                # Get existing container config from running container
-                existing_containers = self.docker_client.containers.list(
-                    filters={"name": TARGET_SERVICE, "status": "running"}
-                )
-                
-                if existing_containers:
-                    template = existing_containers[0]
-                    image = template.image.tags[0] if template.image.tags else template.image.id
-                    
-                    for i in range(containers_to_add):
-                        new_name = f"{TARGET_SERVICE}_{self.current_replicas + i + 1}"
-                        print(f"   Starting container: {new_name}")
-                        
-                        # Parse environment variables (list of "KEY=VALUE" strings to dict)
-                        env_list = template.attrs['Config']['Env'] or []
-                        env_dict = {}
+                # Get env from any existing container if possible
+                existing = self.docker_client.containers.list()
+                env_dict = {}
+                for c in existing:
+                    if TARGET_SERVICE in c.name:
+                        env_list = c.attrs['Config']['Env'] or []
                         for env_str in env_list:
                             if '=' in env_str:
-                                key, value = env_str.split('=', 1)
-                                env_dict[key] = value
-                        
-                        # Create new container with same config
-                        self.docker_client.containers.run(
-                            image=image,
-                            detach=True,
-                            name=new_name,
-                            network="science-news-shorts-automation_default",
-                            environment=env_dict,
-                            volumes={
-                                'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'}
-                            },
-                            restart_policy={"Name": "unless-stopped"}
-                        )
+                                k, v = env_str.split('=', 1)
+                                env_dict[k] = v
+                        break
+
+                for i in range(containers_to_add):
+                    new_name = f"{TARGET_SERVICE}_replica_{int(time.time())}_{i}"
+                    print(f"   Starting replica: {new_name}")
                     
-                    self.current_replicas = desired_replicas
-                    self.last_scale_time = time.time()
-                    print(f"✅ Scaled UP to {desired_replicas} replicas")
+                    self.docker_client.containers.run(
+                        image=IMAGE_NAME,
+                        detach=True,
+                        name=new_name,
+                        network="science-news-shorts-automation_default",
+                        environment=env_dict,
+                        volumes={
+                            'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'}
+                        },
+                        restart_policy={"Name": "unless-stopped"}
+                    )
+                
+                self.current_replicas = desired_replicas
+                self.last_scale_time = time.time()
+                print(f"✅ Scaled UP to {desired_replicas} replicas")
             else:
-                # Scale DOWN: Stop excess containers
-                containers = self.docker_client.containers.list(
-                    filters={"name": TARGET_SERVICE, "status": "running"}
-                )
+                containers = [c for c in self.docker_client.containers.list() if TARGET_SERVICE in c.name]
+                containers.sort(key=lambda c: c.name, reverse=True) # Remove replicas first
                 
-                # Sort by name to keep the first ones
-                containers.sort(key=lambda c: c.name)
-                containers_to_stop = containers[desired_replicas:]
-                
+                containers_to_stop = containers[:(self.current_replicas - desired_replicas)]
                 for container in containers_to_stop:
+                    # Never stop the main one if possible (the one named -1 or shortest name)
+                    if len(containers) > 1 and "_replica_" not in container.name and "shorts-renderer-1" in container.name:
+                        continue
+
                     print(f"   Stopping container: {container.name}")
-                    container.stop(timeout=30)
+                    container.stop(timeout=10)
                     container.remove()
                 
                 self.current_replicas = desired_replicas
@@ -179,8 +232,7 @@ class DockerAutoscaler:
             print(f"❌ Scale error: {e}")
 
     def calculate_desired_replicas(self, lag: int) -> int:
-        """Calculate desired replicas based on lag."""
-        if lag > SCALE_UP_THRESHOLD * 3:
+        if lag > SCALE_UP_THRESHOLD * 2:
             return min(MAX_REPLICAS, self.current_replicas + 2)
         elif lag > SCALE_UP_THRESHOLD:
             return min(MAX_REPLICAS, self.current_replicas + 1)
@@ -189,11 +241,10 @@ class DockerAutoscaler:
         return self.current_replicas
 
     def run(self):
-        """Main loop."""
         print(f"🔄 Starting autoscaler loop (every {CHECK_INTERVAL}s)")
-        
         while True:
             try:
+                self.refresh_image()
                 lag = self.get_consumer_lag()
                 self.current_replicas = self._get_current_replicas()
                 

@@ -32,6 +32,7 @@ class ProductionService(
         scenes: List<Scene>, 
         videoId: String, 
         mood: String,
+        reportImagePath: String? = null, // 추가
         onProgress: ((progress: Int, step: String) -> Unit)? = null
     ): AssetsResult {
         logPublisher.info("shorts-controller", "Rendering Started: $title", "Scenes: ${scenes.size}ea", traceId = videoId)
@@ -65,10 +66,23 @@ class ProductionService(
                 println("🔇 BGM Silence requested at $silenceAt seconds (Scene $i)")
             }
 
-            if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: $cleanSentence", videoFile)) {
-                println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
-                if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
-                    return@forEachIndexed
+            // [Morning Briefing Optimization] Use report image for first 5 scenes if provided
+            val useReportImage = reportImagePath != null && i < 5
+            
+            if (useReportImage) {
+                println("🖼️ Using report image for scene $i")
+                // Copy or link report image to videoFile (FFMPEG handles image as input)
+                java.nio.file.Files.copy(
+                    java.io.File(reportImagePath!!).toPath(),
+                    videoFile.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                )
+            } else {
+                if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: $cleanSentence", videoFile)) {
+                    println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
+                    if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
+                        return@forEachIndexed
+                    }
                 }
             }
 
@@ -96,7 +110,7 @@ class ProductionService(
         )
     }
 
-    fun finalizeVideo(videoId: String, title: String, clipPaths: List<String>, durations: List<Double>, subtitles: List<String>, mood: String, silenceTime: Double? = null): String {
+    fun finalizeVideo(videoId: String, title: String, clipPaths: List<String>, durations: List<Double>, subtitles: List<String>, mood: String, silenceTime: Double? = null, reportImagePath: String? = null): String {
         val workspace = File("shared-data/workspace/$channelId/$videoId")
         if (!workspace.exists()) workspace.mkdirs()
         
@@ -244,10 +258,24 @@ class ProductionService(
 
     // Phase 1: Edit scene WITHOUT subtitles
     private fun editSceneWithoutSubtitle(video: File, audio: File, duration: Double, output: File) {
-        val cmd = mutableListOf(
-            "ffmpeg", "-y",
-            "-stream_loop", "-1", "-i", video.absolutePath
-        )
+        val isImage = video.extension.lowercase() in listOf("jpg", "jpeg", "png")
+        
+        val cmd = if (isImage) {
+            // Special handling for image background
+            mutableListOf(
+                "ffmpeg", "-y",
+                "-loop", "1", "-i", video.absolutePath,
+                "-i", audio.absolutePath,
+                "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1",
+                "-c:v", "libx264", "-t", duration.toString(),
+                "-pix_fmt", "yuv420p", output.absolutePath
+            )
+        } else {
+            mutableListOf(
+                "ffmpeg", "-y",
+                "-stream_loop", "-1", "-i", video.absolutePath
+            )
+        }
         
         if (audio.exists()) {
             cmd.add("-i")
