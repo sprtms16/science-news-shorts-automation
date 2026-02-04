@@ -9,7 +9,7 @@ import java.util.TimeZone
 import org.springframework.context.annotation.ComponentScan
 import org.springframework.context.annotation.FilterType
 
-@SpringBootApplication
+@SpringBootApplication(exclude = [org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration::class])
 @ComponentScan(
     basePackages = ["com.sciencepixel"],
     excludeFilters = [
