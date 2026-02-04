@@ -149,15 +149,17 @@ class ScriptConsumer(
             println("✅ [$channelId] Script created & event published: ${event.title}")
 
         } catch (e: Exception) {
-            logPublisher.error("shorts-controller", "Script Generation Failed", "Error: ${e.message}")
+            val isSafety = e.message?.contains("GEMINI_SAFETY_BLOCKED") == true
+            
+            logPublisher.error("shorts-controller", if (isSafety) "Safety Blocked" else "Script Generation Failed", "Error: ${e.message}")
             println("❌ [$channelId] Error: ${e.message}")
-            e.printStackTrace()
+            
             // Mark as FAILED in DB
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
             videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)?.let { 
                 videoHistoryRepository.save(it.copy(
                     status = VideoStatus.FAILED, 
-                    failureStep = "SCRIPT",
+                    failureStep = if (isSafety) "SAFETY" else "SCRIPT",
                     errorMessage = e.message ?: "Unknown Script Generation Error",
                     updatedAt = LocalDateTime.now()
                 ))

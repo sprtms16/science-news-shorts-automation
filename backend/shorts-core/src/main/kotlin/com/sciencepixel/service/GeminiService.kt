@@ -543,8 +543,28 @@ class GeminiService(
         
         return try {
             val jsonResponse = JSONObject(responseText)
-            val content = jsonResponse.getJSONArray("candidates")
-                .getJSONObject(0)
+            val candidates = jsonResponse.optJSONArray("candidates")
+            
+            if (candidates == null || candidates.length() == 0) {
+                // Check if blocked by safety
+                val promptFeedback = jsonResponse.optJSONObject("promptFeedback")
+                val blockReason = promptFeedback?.optString("blockReason")
+                if (blockReason != null) {
+                    println("🛡️ Gemini Blocked by Safety: $blockReason")
+                    throw Exception("GEMINI_SAFETY_BLOCKED: $blockReason")
+                }
+                println("⚠️ No candidates in Gemini response. Possible safety block without detail.")
+                throw Exception("GEMINI_NO_CANDIDATES")
+            }
+
+            val candidate = candidates.getJSONObject(0)
+            val finishReason = candidate.optString("finishReason")
+            if (finishReason == "SAFETY") {
+                println("🛡️ Gemini Candidate blocked by SAFETY")
+                throw Exception("GEMINI_SAFETY_BLOCKED")
+            }
+
+            val content = candidate
                 .getJSONObject("content")
                 .getJSONArray("parts")
                 .getJSONObject(0)

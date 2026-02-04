@@ -607,6 +607,47 @@ class AdminController(
         ))
     }
 
+    @PostMapping("/videos/{id}/retry")
+    fun retryVideo(@PathVariable id: String): ResponseEntity<Map<String, Any>> {
+        val video = videoRepository.findById(id).orElse(null) 
+            ?: return ResponseEntity.notFound().build()
+            
+        // Reset and Trigger
+        val retriedVideo = videoRepository.save(video.copy(
+            status = VideoStatus.QUEUED,
+            regenCount = 0,
+            failureStep = "",
+            errorMessage = "Manual retry triggered",
+            updatedAt = java.time.LocalDateTime.now()
+        ))
+        
+        // Publish event to ensure immediate processing if buffer allows
+        kafkaEventPublisher.publishRegenerationRequested(
+            com.sciencepixel.event.RegenerationRequestedEvent(
+                channelId = video.channelId,
+                videoId = video.id!!,
+                title = video.title,
+                summary = video.summary,
+                link = video.link,
+                regenCount = 0
+            )
+        )
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Video '${video.title}' has been reset for manual retry.",
+            "status" to retriedVideo.status
+        ))
+    }
+
+    @PostMapping("/maintenance/cleanup-workspaces")
+    fun cleanupWorkspaces(): ResponseEntity<Map<String, Any>> {
+        val deletedCount = cleanupService.cleanupAllTemporaryFiles()
+        return ResponseEntity.ok(mapOf(
+            "deletedCount" to deletedCount,
+            "message" to "Successfully cleaned up $deletedCount temporary workspace directories."
+        ))
+    }
+
     @PostMapping("/maintenance/regenerate-thumbnails")
     fun regenerateThumbnails(
         @RequestParam(defaultValue = "10") limit: Int,

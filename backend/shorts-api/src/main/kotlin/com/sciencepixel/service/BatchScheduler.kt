@@ -18,6 +18,7 @@ class BatchScheduler(
     private val systemSettingRepository: SystemSettingRepository,
     private val cleanupService: CleanupService,
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher,
+    private val notificationService: com.sciencepixel.service.NotificationService, // Added
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -37,25 +38,40 @@ class BatchScheduler(
         val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
             ?.value?.toIntOrNull() ?: 10
 
-        // 3. Count Active/Pending videos
-        val excludedStatuses = listOf(
-            VideoStatus.UPLOADED, 
-            VideoStatus.FAILED
+        // 3. Count Active and Failed separately
+        val activeStatuses = listOf(
+            VideoStatus.QUEUED,
+            VideoStatus.CREATING,
+            VideoStatus.COMPLETED,
+            VideoStatus.UPLOADING
         )
-        val activeCount = videoHistoryRepository.findByChannelIdAndStatusNotIn(channelId, excludedStatuses).size
+        val activeCount = videoHistoryRepository.findByChannelIdAndStatusIn(channelId, activeStatuses).size
+        val failedCount = videoHistoryRepository.findByChannelIdAndStatus(channelId, VideoStatus.FAILED).size
 
-        println("📊 Active/Pending Video Buffer: $activeCount / $limit")
+        println("📊 Video Buffer Strategy [$channelId]:")
+        println("   - Active/Pending: $activeCount / $limit")
+        println("   - Failed History: $failedCount")
+
+        // Notification if too many failures (Buffered capacity alert)
+        // User Request: Failure buffer should be same size as Active buffer to prevent waste.
+        if (failedCount >= limit) {
+            println("⚠️ FAILED jobs buffer reached limit ($failedCount / $limit). Sending alert & Pausing generation.")
+            notificationService.sendDiscordNotification(
+                title = "🚨 [Buffer Full] $channelId 채널 실패 가득 참",
+                description = "실패한 영상이 한도($limit)에 도달했습니다. 추가 리소스 낭비를 막기 위해 생성을 일시 중지합니다. 확인 후 정리해주세요.",
+                color = 0xFF0000
+            )
+            // Stop generation to prevent waste
+            println("🛑 Failure Buffer Full. Skipping new generation.")
+            return
+        }
 
         if (activeCount < limit) {
-            println("🚀 Buffer low. Triggering Batch Job (Throttled to 1 item)...")
+            println("🚀 Active buffer has space. Triggering Batch Job...")
             try {
-                // User requested 1 generation per cycle (10 min)
-                // Even if we have many slots, we only schedule 1.
-                val remaining = 1L 
-                
                 val params = JobParametersBuilder()
                     .addLong("time", System.currentTimeMillis())
-                    .addLong("remainingSlots", remaining)
+                    .addLong("remainingSlots", 1L)
                     .toJobParameters()
                 
                 jobLauncher.run(shortsJob, params)
@@ -63,7 +79,7 @@ class BatchScheduler(
                 println("❌ Batch Job Launch Failed: ${e.message}")
             }
         } else {
-            println("🛑 Buffer Full (>= $limit). Skipping generation.")
+            println("🛑 Active Buffer Full ($activeCount >= $limit). Skipping generation.")
         }
     }
 
@@ -79,6 +95,18 @@ class BatchScheduler(
             println("🔄 Found ${failedVideos.size} FAILED videos. Analyzing failure steps...")
             
             failedVideos.take(5).forEach { video ->
+                // Skip safety issues for auto-retry? 
+                // Better: if it failed for SAFETY, don't auto-retry the SAME title/link.
+                if (video.failureStep == "SAFETY") {
+                    println("🛡️ Skipping auto-retry for safety-blocked item: ${video.title}")
+                    return@forEach
+                }
+
+                if (video.regenCount >= 3) {
+                    println("🛑 Max retries (3) reached for: ${video.title}. Requires manual intervention.")
+                    return@forEach
+                }
+
                 if (video.failureStep == "UPLOAD") {
                     val file = java.io.File(video.filePath)
                     if (file.exists() && file.length() > 0) {
@@ -94,17 +122,24 @@ class BatchScheduler(
                 }
                 
                 // Default: Full Regeneration
-                println("🔄 [$channelId] [Auto-Recovery] Triggering full regeneration for: ${video.title}")
+                println("🔄 [$channelId] [Auto-Recovery] Triggering regeneration (${video.regenCount + 1}/3) for: ${video.title}")
                 kafkaEventPublisher.publishRegenerationRequested(
                     com.sciencepixel.event.RegenerationRequestedEvent(
-                        channelId = channelId, // 추가
+                        channelId = channelId,
                         videoId = video.id!!,
                         title = video.title,
                         summary = video.summary,
                         link = video.link,
-                        regenCount = video.regenCount
+                        regenCount = video.regenCount + 1 // Increment count
                     )
                 )
+                
+                // Update DB immediately to avoid duplicate triggers
+                videoHistoryRepository.save(video.copy(
+                    regenCount = video.regenCount + 1,
+                    status = VideoStatus.QUEUED, // Set to QUEUED to show it's being retried
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
             }
         }
     }
