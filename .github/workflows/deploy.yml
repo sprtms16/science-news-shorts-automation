@@ -43,7 +43,7 @@ jobs:
           docker image prune -f
           
           # Start app services with forced recreation (Excluding github-runner to avoid build interruption)
-          docker-compose up -d --build --force-recreate \
+          docker-compose up -d --build --force-recreate --parallel \
             zookeeper kafka mongo ai-media-service \
             shorts-science shorts-horror shorts-stocks shorts-history \
             shorts-log-service shorts-renderer renderer-autoscaler \

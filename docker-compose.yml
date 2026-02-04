@@ -81,7 +81,7 @@ services:
     build:
       context: ./backend
       dockerfile: shorts-api/Dockerfile
-    image: science-pixel-controller:latest
+    image: shorts-api:latest
     container_name: shorts-science-controller
     ports:
       - "8080:8080"
@@ -112,10 +112,7 @@ services:
       - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
 
   shorts-horror:
-    build:
-      context: ./backend
-      dockerfile: shorts-api/Dockerfile
-    image: mystery-pixel-controller:latest
+    image: shorts-api:latest
     container_name: shorts-horror-controller
     ports:
       - "8081:8080"
@@ -144,10 +141,7 @@ services:
       - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback
 
   shorts-stocks:
-    build:
-      context: ./backend
-      dockerfile: shorts-api/Dockerfile
-    image: value-pixel-controller:latest
+    image: shorts-api:latest
     container_name: shorts-stocks-controller
     ports:
       - "8083:8080"
@@ -177,10 +171,7 @@ services:
       - YOUTUBE_REDIRECT_URI=http://localhost:8083/callback
 
   shorts-history:
-    build:
-      context: ./backend
-      dockerfile: shorts-api/Dockerfile
-    image: history-pixel-controller:latest
+    image: shorts-api:latest
     container_name: shorts-history-controller
     ports:
       - "8084:8080"
