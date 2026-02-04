@@ -6,7 +6,10 @@ import org.springframework.scheduling.annotation.EnableAsync
 import org.springframework.scheduling.annotation.EnableScheduling
 import java.util.TimeZone
 
-@SpringBootApplication(scanBasePackages = ["com.sciencepixel"])
+@SpringBootApplication(
+    scanBasePackages = ["com.sciencepixel"],
+    excludeName = ["com.sciencepixel.service.YoutubeService"]
+)
 @EnableAsync
 @EnableScheduling
 class WorkerApplication
