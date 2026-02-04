@@ -123,75 +123,116 @@ class CleanupService(
 
     fun cleanupOldWorkspaces() {
         println("🧹 Starting cleanup of old workspace directories...")
-        val sharedDir = File(sharedDataPath)
+        val workspaceRoot = File(sharedDataPath, "workspace")
         
-        if (!sharedDir.exists() || !sharedDir.isDirectory) {
-            println("⚠️ Shared data directory not found: $sharedDataPath")
+        if (!workspaceRoot.exists() || !workspaceRoot.isDirectory) {
+            println("ℹ️ Workspace directory not found or empty: ${workspaceRoot.path}")
             return
         }
 
-        val cleanupThreshold = System.currentTimeMillis() - (1 * 60 * 60 * 1000) // 1 hour ago
+        val cleanupThreshold = System.currentTimeMillis() - (2 * 60 * 60 * 1000) // 2 hours ago
         var deletedCount = 0
 
-        sharedDir.listFiles()?.forEach { file ->
-            if (file.isDirectory && file.name.startsWith("workspace_")) {
-                if (file.lastModified() < cleanupThreshold) {
+        // Traverse: workspace -> channelId -> videoId
+        workspaceRoot.listFiles()?.filter { it.isDirectory }?.forEach { channelDir ->
+            channelDir.listFiles()?.filter { it.isDirectory }?.forEach { videoDir ->
+                if (videoDir.lastModified() < cleanupThreshold) {
                     try {
-                        println("🗑️ Deleting old workspace: ${file.name}")
-                        if (file.deleteRecursively()) {
+                        println("🗑️ Deleting old workspace: ${channelDir.name}/${videoDir.name}")
+                        if (videoDir.deleteRecursively()) {
                             deletedCount++
-                        } else {
-                            println("⚠️ Failed to delete workspace: ${file.name}")
                         }
                     } catch (e: Exception) {
-                        println("❌ Error deleting workspace ${file.name}: ${e.message}")
+                        println("❌ Error deleting workspace ${videoDir.name}: ${e.message}")
+                    }
+                }
+            }
+            
+            // Clean up empty channel directories
+            if (channelDir.listFiles()?.isEmpty() == true) {
+                channelDir.delete()
+            }
+        }
+        
+        // Also clean up legacy workspace_ folders in root just in case
+        File(sharedDataPath).listFiles()?.forEach { file ->
+            if (file.isDirectory && file.name.startsWith("workspace_") && file.lastModified() < cleanupThreshold) {
+                file.deleteRecursively()
+            }
+        }
+        
+        println("✅ Workspace cleanup complete. Removed $deletedCount old directories.")
+    }
+
+    /**
+     * More aggressive cleanup that deletes ALL folders in workspace/ regardless of age.
+     * Use with caution.
+     */
+    fun cleanupAllTemporaryFiles(): Int {
+        println("🧹 AGGRESSIVE: Cleaning up ALL temporary workspaces...")
+        val workspaceRoot = File(sharedDataPath, "workspace")
+        var count = 0
+        if (workspaceRoot.exists()) {
+            workspaceRoot.listFiles()?.forEach { channelDir ->
+                if (channelDir.isDirectory) {
+                    channelDir.listFiles()?.forEach { videoDir ->
+                        if (videoDir.deleteRecursively()) count++
                     }
                 }
             }
         }
-        println("✅ Workspace cleanup complete. Removed $deletedCount old directories.")
+        return count
     }
 
     fun cleanupStaleJobs() {
-        println("🧹 [$channelId] Starting cleanup of STALE jobs (Processing for > 1 hour)...")
-        val threshold = LocalDateTime.now().minusHours(1)
+        println("🧹 [$channelId] Starting cleanup of STALE jobs (Processing or Uploading for too long)...")
+        val now = LocalDateTime.now()
         
-        val staleVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.CREATING).filter { 
-            it.updatedAt.isBefore(threshold) 
+        // 1. Stuck in CREATING (Renderer/Worker issue)
+        val creatingThreshold = now.minusMinutes(30)
+        val staleCreating = repository.findByChannelIdAndStatus(channelId, VideoStatus.CREATING).filter { 
+            it.updatedAt.isBefore(creatingThreshold) 
         }
 
-        if (staleVideos.isEmpty()) {
+        // 2. Stuck in UPLOADING (YouTube API/Network issue)
+        val uploadingThreshold = now.minusHours(1) // Reduced to 1 hour
+        val staleUploading = repository.findByChannelIdAndStatus(channelId, VideoStatus.UPLOADING).filter {
+            it.updatedAt.isBefore(uploadingThreshold)
+        }
+
+        val totalStale = staleCreating + staleUploading
+
+        if (totalStale.isEmpty()) {
             println("✅ No stale jobs found.")
             return
         }
 
         var deletedCount = 0
-        staleVideos.forEach { video ->
+        totalStale.forEach { video ->
             try {
-                // Delete file if exists
+                // Determine if we should delete file (only if it exists and is potentially corrupted/stuck)
                 if (video.filePath.isNotBlank()) {
                     val file = File(video.filePath)
-                    if (file.exists()) {
+                    if (file.exists() && video.status == VideoStatus.CREATING) {
                         file.delete()
-                        // Try to delete workspace folder too if possible
-                        file.parentFile?.let { if (it.name.startsWith("workspace_")) it.deleteRecursively() }
                     }
                 }
                 
-                // Update status instead of deleting the record
+                // Mark as FAILED so it can be retried or inspected manually
+                val reason = if (video.status == VideoStatus.CREATING) "CREATING_TIMEOUT" else "UPLOADING_TIMEOUT"
                 repository.save(video.copy(
                     status = VideoStatus.FAILED,
-                    failureStep = "STALE_CLEANUP",
-                    errorMessage = "Job abandoned due to inactivity (>1h in CREATING state)",
+                    failureStep = "STALE_JOB",
+                    errorMessage = "Job abandoned due to inactivity (>$reason). Original status: ${video.status}",
                     updatedAt = LocalDateTime.now()
                 ))
-                println("🚩 Marked stale job as FAILED: ${video.title} (Updated: ${video.updatedAt})")
+                println("🚩 Marked stale job (${video.status}) as FAILED: ${video.title}")
                 deletedCount++
             } catch (e: Exception) {
                 println("❌ Error cleaning up stale job '${video.title}': ${e.message}")
             }
         }
-        println("✅ Stale job cleanup complete. Removed $deletedCount items.")
+        println("✅ Stale job cleanup complete. Processed $deletedCount items.")
     }
 
     /**
