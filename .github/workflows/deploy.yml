@@ -24,6 +24,18 @@ jobs:
           # Base64 Encode JSON Secret to avoid quote parsing issues
           echo "YOUTUBE_CLIENT_SECRET_JSON_B64=$(echo -n "$JSON_SECRET" | base64 -w 0)" >> .env
 
+          # Create Client Secret Directories
+          mkdir -p backend/client_secret/SciencePixel
+          mkdir -p backend/client_secret/MysteryPixel
+          mkdir -p backend/client_secret/ValuePixel
+          mkdir -p backend/client_secret/MemoryPixel
+
+          # Generate Client Secret Files from Secrets
+          echo "${{ secrets.YOUTUBE_CLIENT_SECRET_SCIENCE }}" > backend/client_secret/SciencePixel/client_secret.json
+          echo "${{ secrets.YOUTUBE_CLIENT_SECRET_HORROR }}" > backend/client_secret/MysteryPixel/client_secret.json
+          echo "${{ secrets.YOUTUBE_CLIENT_SECRET_STOCKS }}" > backend/client_secret/ValuePixel/client_secret.json
+          echo "${{ secrets.YOUTUBE_CLIENT_SECRET_HISTORY }}" > backend/client_secret/MemoryPixel/client_secret.json
+
       - name: Deploy to Docker Compose
         run: |
           # Clean up old images
