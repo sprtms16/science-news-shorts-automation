@@ -172,4 +172,26 @@ class NotificationService(
         )
         sendTelegramNotification(message)
     }
+
+    /**
+     * YouTube 인증 요청 알림
+     */
+    fun notifyAuthRequired(channelId: String, authUrl: String) {
+        val message = """
+            🔑 YouTube 인증 요청 ($channelId)
+            
+            서버의 YouTube API 권한이 만료되었거나 초기화되었습니다.
+            아래 링크를 통해 인증을 완료해 주세요.
+            
+            🔗 $authUrl
+        """.trimIndent()
+
+        sendDiscordNotification(
+            title = "🔑 YouTube 인증 요청 ($channelId)",
+            description = "서버의 YouTube API 권한이 만료되었거나 초기화되었습니다.\n아래 링크를 통해 인증을 완료해 주세요.\n\n🔗 [인증하기]($authUrl)",
+            youtubeUrl = authUrl,
+            color = 0x3498DB  // 파란색 (정보 요청)
+        )
+        sendTelegramNotification(message)
+    }
 }

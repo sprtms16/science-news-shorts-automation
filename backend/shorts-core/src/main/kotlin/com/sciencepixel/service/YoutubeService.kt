@@ -25,6 +25,7 @@ import java.util.concurrent.CountDownLatch
 class YoutubeService(
     private val quotaTracker: QuotaTracker,
     private val youtubeVideoRepository: com.sciencepixel.repository.YoutubeVideoRepository,
+    private val notificationService: NotificationService, // 추가: 알림 서비스 주입
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String,
     @org.springframework.beans.factory.annotation.Value("\${YOUTUBE_REDIRECT_URI:http://localhost:8080/callback}") private val redirectUri: String
 ) {
@@ -242,6 +243,9 @@ class YoutubeService(
         println("👉 [$effectiveChannelId] Please open the following URL to authorize:")
         println(authUrl)
         println("Waiting for callback on $redirectUri ...")
+
+        // 🔔 Discord/Telegram 알림 전송
+        notificationService.notifyAuthRequired(effectiveChannelId, authUrl)
         
         throw RuntimeException("YouTube Auth Required for $effectiveChannelId. Visit URL in logs or call /api/youtube/auth-url and retry.")
     }
