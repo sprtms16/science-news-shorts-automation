@@ -170,7 +170,8 @@ services:
       - APP_FEATURE_CONSUMER_SCRIPT=true
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
-      - APP_SCHEDULING_BATCH_CRON=0 45 * * * *
+      - APP_SCHEDULING_BATCH_CRON=0 30 5 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 6 * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8083/callback
 

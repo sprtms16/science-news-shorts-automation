@@ -108,8 +108,8 @@ class BatchScheduler(
             }
         }
     }
-    // 매시 0분에 업로드 체크 (0 0 * * * *)
-    @Scheduled(cron = "0 0 * * * *")
+    // 매시 0분에 업로드 체크 (0 0 * * * *) - 설정 가능하도록 변경
+    @Scheduled(cron = "\${app.scheduling.upload-cron:0 0 * * * *}")
     fun scheduleUploads() {
         println("⏰ Batch Scheduler: Checking Upload Schedule for [$channelId] at ${Date()}")
 
