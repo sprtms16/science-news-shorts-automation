@@ -45,20 +45,34 @@ class DockerAutoscaler:
         print(f"   Thresholds: up>{SCALE_UP_THRESHOLD}, down<{SCALE_DOWN_THRESHOLD}")
 
     def _get_current_replicas(self) -> int:
-        """Get current number of running containers for target service."""
+        """Get current number of running/starting containers for target service."""
         try:
-            # Match both standalone and docker-compose named containers
+            # Count containers that are running, restarting, or just created (starting up)
             containers = self.docker_client.containers.list(
+                all=True,  # Include all states
                 filters={"status": "running"}
             )
+            # Also get restarting containers
+            restarting = self.docker_client.containers.list(
+                all=True,
+                filters={"status": "restarting"}
+            )
+            # And created (about to start)
+            created = self.docker_client.containers.list(
+                all=True,
+                filters={"status": "created"}
+            )
+            
+            all_active = list(containers) + list(restarting) + list(created)
             count = 0
-            for c in containers:
-                if TARGET_SERVICE in c.name:
+            for c in all_active:
+                # Match both 'shorts-renderer' and 'shorts-renderer_X' but not 'shorts-autoscaler'
+                if TARGET_SERVICE in c.name and 'autoscaler' not in c.name:
                     count += 1
             return count
         except Exception as e:
             print(f"❌ Error getting replicas: {e}")
-            return 1
+            return 1  # Assume at least 1 to prevent unnecessary scaling
 
     def get_consumer_lag(self) -> int:
         """Get total consumer lag for the monitored topics."""
@@ -172,8 +186,18 @@ class DockerAutoscaler:
         if desired_replicas == self.current_replicas:
             return
         
+        # Cooldown check
         if time.time() - self.last_scale_time < COOLDOWN_PERIOD:
             return
+        
+        # CRITICAL: Re-fetch current replica count right before scaling to avoid race conditions
+        fresh_count = self._get_current_replicas()
+        if fresh_count != self.current_replicas:
+            print(f"   ⚠️ Stale count detected: cached={self.current_replicas}, fresh={fresh_count}. Updating...")
+            self.current_replicas = fresh_count
+            # Re-evaluate after updating
+            if desired_replicas == self.current_replicas:
+                return
         
         desired_replicas = max(MIN_REPLICAS, min(MAX_REPLICAS, desired_replicas))
         if desired_replicas == self.current_replicas:
