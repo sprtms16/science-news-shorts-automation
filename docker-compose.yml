@@ -92,12 +92,12 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/SciencePixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=science
+      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_SCIENCE}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -124,12 +124,12 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/MysteryPixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=horror
+      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_HORROR}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -156,12 +156,12 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/ValuePixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=stocks
+      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_STOCKS}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -188,12 +188,12 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/client_secret/MemoryPixel:/app/secrets
       - ./backend/tokens:/app/tokens
     env_file:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=history
+      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_HISTORY}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
