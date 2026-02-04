@@ -16,6 +16,9 @@ import org.springframework.kafka.core.*
 class KafkaConfig(
     @Value("\${spring.kafka.bootstrap-servers:kafka:29092}") private val bootstrapServers: String
 ) {
+    init {
+        println("🔧 [KafkaConfig] Initialized with Bootstrap Servers: '$bootstrapServers'")
+    }
 
 
     companion object {
