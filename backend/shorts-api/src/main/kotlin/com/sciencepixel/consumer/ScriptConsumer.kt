@@ -58,6 +58,20 @@ class ScriptConsumer(
 
             // 이미 파이프라인 진행 중인 경우 건너뜀
             // 1.5 Safety Check & Claim (Locking)
+            
+            // Daily Limit Check for 'stocks' and 'history'
+            // One successful video per day guarantee (Rate Limit)
+            if (channelId == "stocks" || channelId == "history") {
+                val startOfDay = java.time.LocalDate.now().atStartOfDay()
+                val successStatuses = listOf(VideoStatus.CREATING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
+                val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
+                
+                if (dailyCount >= 1) {
+                    println("🛑 [$channelId] Daily limit reached (Count: $dailyCount). Skipping execution for today.")
+                    return
+                }
+            }
+
             // 오직 QUEUED 상태인 경우에만 작업을 시작하고 CREATING으로 상태를 변경하여 선점함
             if (history.status != VideoStatus.QUEUED && history.status != VideoStatus.CREATING) {
                  println("⏭️ Skipping: Video is in terminal state (${history.status}) for: ${event.title}")

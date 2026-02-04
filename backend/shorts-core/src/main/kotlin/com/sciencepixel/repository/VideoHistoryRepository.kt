@@ -31,4 +31,7 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
         "{ \$match: { count: { \$gt: 1 } } }"
     ])
     fun findDuplicateLinks(channelId: String): List<DuplicateLinkGroup>
+
+    // Daily Limit Check
+    fun countByChannelIdAndStatusInAndCreatedAtAfter(channelId: String, statuses: Collection<VideoStatus>, date: java.time.LocalDateTime): Long
 }
