@@ -9,6 +9,7 @@ import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.service.ProductionService
+import com.sciencepixel.service.NotificationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Component
@@ -24,6 +25,7 @@ class RenderConsumer(
     private val videoHistoryRepository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val notificationService: NotificationService,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -42,8 +44,11 @@ class RenderConsumer(
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
                     status = VideoStatus.CREATING,
+                    progress = 70,
+                    currentStep = "영상 렌더링 중",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
+                println("📊 [${event.title}] 진행률: 70% - 영상 렌더링 시작")
             }
 
             // Call Production Service to finalize video (Merge & Burn)
@@ -63,6 +68,8 @@ class RenderConsumer(
                     videoHistoryRepository.save(it.copy(
                         status = VideoStatus.FAILED,
                         failureStep = "RENDER",
+                        progress = 0,
+                        currentStep = "렌더링 실패",
                         errorMessage = "Rendering produced empty file path",
                         updatedAt = java.time.LocalDateTime.now()
                     ))
@@ -70,14 +77,24 @@ class RenderConsumer(
                 return
             }
 
-            // Update History to COMPLETED (Ready for Upload)
+            // Update History to COMPLETED (Ready for Upload) - 100%
             val completedHistory = if (history != null) {
                 videoHistoryRepository.save(history.copy(
                     status = VideoStatus.COMPLETED,
                     filePath = finalPath,
+                    progress = 100,
+                    currentStep = "렌더링 완료",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             } else null
+
+            println("📊 [${event.title}] 진행률: 100% - 렌더링 완료")
+
+            // 🔔 Discord 알림: 영상 생성 완료
+            notificationService.notifyVideoCreated(
+                title = event.title,
+                filePath = finalPath
+            )
 
             // Publish 'video.created' -> This triggers the existing VideoUploadConsumer!
             // We bridge the new SAGA pipeline to the existing Upload pipeline here.

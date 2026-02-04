@@ -42,18 +42,34 @@ class SceneConsumer(
             // Deserialize script (List<Scene>)
             val scenes: List<Scene> = objectMapper.readValue(event.script)
 
-            // Update Status
+            // Update Status + Progress (10%: 시작)
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
                     status = VideoStatus.CREATING,
+                    progress = 10,
+                    currentStep = "에셋 생성 시작",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
+                println("📊 [${event.title}] 진행률: 10% - 에셋 생성 시작")
             }
 
-            // Call Production Service to generate assets (Clips)
-            // We need to refactor ProductionService to expose a method that returns clip paths
-            val assetResult = productionService.produceAssetsOnly(event.title, scenes, event.videoId, event.mood)
+            // Call Production Service to generate assets (Clips) with progress callback
+            val assetResult = productionService.produceAssetsOnly(
+                title = event.title, 
+                scenes = scenes, 
+                videoId = event.videoId, 
+                mood = event.mood,
+                onProgress = { progress, step ->
+                    videoHistoryRepository.findById(event.videoId).ifPresent { v ->
+                        videoHistoryRepository.save(v.copy(
+                            progress = progress,
+                            currentStep = step,
+                            updatedAt = java.time.LocalDateTime.now()
+                        ))
+                    }
+                }
+            )
 
             if (assetResult.clipPaths.isEmpty()) {
                 println("❌ Assets generation failed (empty clips).")
@@ -66,6 +82,16 @@ class SceneConsumer(
                     ))
                 }
                 return
+            }
+
+            // Progress update (60%: 에셋 생성 완료)
+            videoHistoryRepository.findById(event.videoId).ifPresent { v ->
+                videoHistoryRepository.save(v.copy(
+                    progress = 60,
+                    currentStep = "에셋 생성 완료, 렌더링 대기",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+                println("📊 [${event.title}] 진행률: 60% - 에셋 생성 완료")
             }
 
             // Publish Next Event
