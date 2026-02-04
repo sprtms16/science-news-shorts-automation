@@ -7,10 +7,10 @@ import org.springframework.stereotype.Service
 import java.io.File
 
 @Service
+@Service
 class ProductionService(
     private val pexelsService: PexelsService,
     private val audioService: AudioService,
-    private val geminiService: GeminiService,
     private val logPublisher: LogPublisher,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
@@ -95,48 +95,7 @@ class ProductionService(
 
 
 
-    // Entry point for Batch Job (Legacy - Deprecated)
-    fun produceVideo(news: NewsItem, videoId: String): ProductionResult {
-        println("🎬 Producing video for: ${news.title} (ID: $videoId)")
-        
-        // 1. Script Generation (Gemini)
-        val response = geminiService.writeScript(news.title, news.summary)
-        if (response.scenes.isEmpty()) {
-            println("⚠️ No script generated for ${news.title}")
-            return ProductionResult("", emptyList())
-        }
-        
-        
-        val keywords = response.scenes.map { it.keyword }.distinct()
-        val filePath = produceVideoFromScenes(news.title, response.scenes, response.mood, videoId)
-        
-        // Phase 4: Thumbnail Selection
-        val thumbnailPath = try {
-            val thumbKeyword = keywords.firstOrNull() ?: news.title
-            val thumbUrl = pexelsService.searchPhoto(thumbKeyword)
-            if (thumbUrl != null) {
-                val thumbFile = File("shared-data/workspace/$channelId/$videoId/thumbnail.jpeg")
-                // Download
-                java.net.URL(thumbUrl).openStream().use { input ->
-                    thumbFile.outputStream().use { output -> input.copyTo(output) }
-                }
-                thumbFile.absolutePath
-            } else ""
-        } catch (e: Exception) {
-            println("❌ Thumbnail download failed: ${e.message}")
-            ""
-        }
-        
-        return ProductionResult(
-            filePath = filePath,
-            keywords = keywords,
-            title = response.title,
-            description = response.description,
-            tags = response.tags,
-            sources = response.sources,
-            thumbnailPath = thumbnailPath
-        )
-    }
+
 
     // Core Logic - 3 Phase Pipeline
     private fun produceVideoFromScenes(title: String, scenes: List<Scene>, mood: String, videoId: String): String {
