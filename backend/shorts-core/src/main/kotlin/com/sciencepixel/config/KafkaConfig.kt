@@ -13,10 +13,9 @@ import org.springframework.kafka.config.TopicBuilder
 import org.springframework.kafka.core.*
 
 @Configuration
-class KafkaConfig {
-
-    @Value("\${spring.kafka.bootstrap-servers:kafka:29092}")
-    private lateinit var bootstrapServers: String
+class KafkaConfig(
+    @Value("\${spring.kafka.bootstrap-servers:kafka:29092}") private val bootstrapServers: String
+) {
 
 
     companion object {
