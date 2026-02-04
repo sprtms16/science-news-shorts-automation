@@ -60,7 +60,8 @@ class RenderConsumer(
                 subtitles = event.subtitles,
                 mood = event.mood,
                 silenceTime = event.silenceTime,
-                reportImagePath = event.reportImagePath // 경로 추가
+                reportImagePath = event.reportImagePath,
+                targetChannelId = event.channelId // 정확한 채널 ID 전달
             )
 
             if (finalPath.isEmpty()) {
@@ -100,7 +101,7 @@ class RenderConsumer(
             // Publish 'video.created' -> This triggers the existing VideoUploadConsumer!
             // We bridge the new SAGA pipeline to the existing Upload pipeline here.
             eventPublisher.publishVideoCreated(VideoCreatedEvent(
-                channelId = channelId, // 추가
+                channelId = event.channelId, // 로컬 "renderer"가 아닌 원본 채널 ID 전달
                 videoId = event.videoId,
                 title = event.title,
                 summary = history?.summary ?: "",

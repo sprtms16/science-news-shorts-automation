@@ -60,7 +60,8 @@ class SceneConsumer(
                 scenes = scenes, 
                 videoId = event.videoId, 
                 mood = event.mood,
-                reportImagePath = event.reportImagePath, // 추가
+                reportImagePath = event.reportImagePath,
+                targetChannelId = event.channelId, // 정확한 채널 ID 전달
                 onProgress = { progress, step ->
                     videoHistoryRepository.findById(event.videoId).ifPresent { v ->
                         videoHistoryRepository.save(v.copy(
@@ -97,7 +98,7 @@ class SceneConsumer(
 
             // Publish Next Event
             eventPublisher.publishVideoAssetsReady(VideoAssetsReadyEvent(
-                channelId = channelId, // 추가
+                channelId = event.channelId, // 로컬 "renderer"가 아닌 원본 채널 ID 전달
                 videoId = event.videoId,
                 title = event.title,
                 clipPaths = assetResult.clipPaths,
@@ -105,7 +106,7 @@ class SceneConsumer(
                 subtitles = assetResult.subtitles,
                 keywords = event.keywords,
                 mood = event.mood,
-                reportImagePath = event.reportImagePath, // 경로 전달 추가
+                reportImagePath = event.reportImagePath,
                 silenceTime = assetResult.silenceTime,
                 scriptEvent = event
             ))

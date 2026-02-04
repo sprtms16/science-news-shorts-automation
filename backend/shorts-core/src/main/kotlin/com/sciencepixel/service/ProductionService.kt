@@ -32,12 +32,15 @@ class ProductionService(
         scenes: List<Scene>, 
         videoId: String, 
         mood: String,
-        reportImagePath: String? = null, // 추가
+        reportImagePath: String? = null,
+        targetChannelId: String? = null, // 추가: 대상 채널 ID
         onProgress: ((progress: Int, step: String) -> Unit)? = null
     ): AssetsResult {
         logPublisher.info("shorts-controller", "Rendering Started: $title", "Scenes: ${scenes.size}ea", traceId = videoId)
+        
+        val effectiveChannelId = targetChannelId ?: channelId
         // Organize workspace by channel
-        val workspace = File("shared-data/workspace/$channelId/$videoId").apply { mkdirs() }
+        val workspace = File("shared-data/workspace/$effectiveChannelId/$videoId").apply { mkdirs() }
         val clipFiles = mutableListOf<File>()
         val durations = mutableListOf<Double>()
         val subtitles = mutableListOf<String>()
@@ -110,8 +113,19 @@ class ProductionService(
         )
     }
 
-    fun finalizeVideo(videoId: String, title: String, clipPaths: List<String>, durations: List<Double>, subtitles: List<String>, mood: String, silenceTime: Double? = null, reportImagePath: String? = null): String {
-        val workspace = File("shared-data/workspace/$channelId/$videoId")
+    fun finalizeVideo(
+        videoId: String, 
+        title: String, 
+        clipPaths: List<String>, 
+        durations: List<Double>, 
+        subtitles: List<String>, 
+        mood: String, 
+        silenceTime: Double? = null, 
+        reportImagePath: String? = null,
+        targetChannelId: String? = null // 추가
+    ): String {
+        val effectiveChannelId = targetChannelId ?: channelId
+        val workspace = File("shared-data/workspace/$effectiveChannelId/$videoId")
         if (!workspace.exists()) workspace.mkdirs()
         
         val clipFiles = clipPaths.map { File(it) }
@@ -125,7 +139,7 @@ class ProductionService(
         mergeClipsWithoutSubtitles(clipFiles, mergedFile, workspace)
         
         val sanitizedTitle = title.take(20).replace(Regex("[^a-zA-Z0-9가-힣]"), "_").lowercase()
-        val outcomeDir = File("shared-data/videos/$channelId").apply { mkdirs() }
+        val outcomeDir = File("shared-data/videos/$effectiveChannelId").apply { mkdirs() }
         // Use videoId for deterministic filename to avoid duplicates
         val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_$videoId.mp4")
         
