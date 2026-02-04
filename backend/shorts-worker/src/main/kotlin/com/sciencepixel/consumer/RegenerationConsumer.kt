@@ -100,8 +100,7 @@ class RegenerationConsumer(
                 channelId = channelId,
                 title = event.title,
                 summary = event.summary,
-                url = event.link,
-                publishedAt = java.time.LocalDateTime.now().toString()
+                url = event.link
             )
             
             // Wait, ScriptConsumer checks history "getOrCreateHistory". 
