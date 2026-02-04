@@ -25,10 +25,11 @@ interface VideoCardProps {
     onManualUpload: (id: string) => void;
     onUpdateStatus: (id: string, status: string, url?: string) => void;
     onDelete: (id: string) => void;
+    onRetry?: (id: string) => void; // Added
     t: any;
 }
 
-export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, t }, ref) => {
+export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, onRetry, t }, ref) => {
     const statusColors: Record<string, { bg: string, text: string, border: string, icon: any, label: string }> = {
         'CREATING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: t.statusCreating },
         'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
@@ -83,6 +84,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                                     <div className="flex items-center gap-2">
                                         <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-500 text-[8px] font-black rounded uppercase leading-none">Step: {video.failureStep}</span>
                                         <span className="text-[10px] font-bold text-rose-400/80 uppercase tracking-tighter">Diagnostic Data</span>
+                                        {video.regenCount > 0 && <span className="px-1.5 py-0.5 bg-orange-500/20 text-orange-400 text-[8px] font-black rounded uppercase leading-none">Retry: {video.regenCount}/3</span>}
                                     </div>
                                     <p className="text-[11px] text-rose-300 font-medium leading-tight">
                                         {video.errorMessage}
@@ -111,6 +113,14 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                         >
                             <RefreshCw size={14} /> {t.meta}
                         </button>
+                        {video.status === 'FAILED' && onRetry && (
+                            <button
+                                onClick={() => onRetry(video.id || '')}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500/10 hover:bg-orange-600 text-orange-400 hover:text-white rounded-xl border border-orange-500/20 transition-all text-xs font-bold"
+                            >
+                                <RefreshCw size={14} /> Retry
+                            </button>
+                        )}
                         {video.status === 'COMPLETED' && (
                             <button
                                 onClick={() => onManualUpload(video.id || '')}

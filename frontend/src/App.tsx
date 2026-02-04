@@ -141,6 +141,20 @@ function App() {
     }
   };
 
+  const onRetryVideo = async (id: string) => {
+    if (!confirm(language === 'ko' ? "이 영상을 재시도하시겠습니까? (기존 실패 기록이 초기화됩니다)" : "Retry this video? Previous failure records will be reset.")) return;
+    setLoading(true);
+    try {
+      await axios.post(`/admin/videos/${id}/retry`);
+      alert(language === 'ko' ? "재시도 요청이 성공했습니다." : "Retry requested successfully.");
+      await fetchData();
+    } catch (e) {
+      alert(language === 'ko' ? "재시도 요청 실패" : "Retry request failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onRegenerateMetadata = async (id: string) => {
     if (!confirm("메타데이터를 한글로 재생성하시겠습니까? (Gemini 쿼터 소모)")) return;
     setLoading(true);
@@ -168,7 +182,7 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed') => {
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
@@ -180,7 +194,8 @@ function App() {
               action === 'growth-analysis' ? `/admin/maintenance/growth-analysis` :
                 action === 'regenerate-thumbnails' ? `/admin/maintenance/regenerate-thumbnails` :
                   action === 'clear-failed' ? `/admin/videos/history/clear-failed?channelId=${selectedChannel}` :
-                    `/admin/videos/${action}`;
+                    action === 'cleanup-workspaces' ? `/admin/maintenance/cleanup-workspaces` :
+                      `/admin/videos/${action}`;
       const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");
@@ -343,6 +358,7 @@ function App() {
                   onManualUpload={onManualUpload}
                   onUpdateStatus={updateVideoStatus}
                   onDelete={onDeleteVideo}
+                  onRetry={onRetryVideo}
                   t={t}
                   ref={isLast ? (node: any) => {
                     if (loading || loadingMore) return;
