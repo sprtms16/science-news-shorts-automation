@@ -797,7 +797,52 @@ class GeminiService(
         }
     }
 
-    // 4. Extract Keywords for Thumbnail (Auto-Regeneration)
+    // 5. Extract Trending Tickers from Headlines (Dynamic Stock Discovery)
+    fun extractTrendingTickers(headlines: String): List<String> {
+        val prompt = """
+            [Task]
+            Analyze the following recent business news headlines and identify the top 3-5 most significant stock tickers or company names that are currently 'trending' or experiencing major moves (e.g., earnings suprise, crash, surge).
+            
+            [Headlines]
+            $headlines
+            
+            [Rules]
+            1. Return ONLY a JSON list of strings.
+            2. Each string should be a company name or ticker symbol (e.g., "Nvidia", "Tesla", "Samsung", "Bitcoin").
+            3. Select only the most critical ones impacting the market.
+            4. If nothing is significant, return an empty list [].
+            
+            [Output Example]
+            ["Nvidia", "AMD", "Google"]
+        """.trimIndent()
+
+        val responseText = callGeminiWithRetry(prompt) ?: return emptyList()
+        
+        return try {
+            val jsonResponse = JSONObject(responseText)
+            val content = jsonResponse.getJSONArray("candidates")
+                .getJSONObject(0)
+                .getJSONObject("content")
+                .getJSONArray("parts")
+                .getJSONObject(0)
+                .getString("text")
+                .trim()
+                .removePrefix("```json")
+                .removeSuffix("```")
+                .trim()
+            
+            val jsonArray = JSONArray(content)
+            val list = mutableListOf<String>()
+            for (i in 0 until jsonArray.length()) {
+                list.add(jsonArray.getString(i))
+            }
+            println("📈 Extracted Trending Tickers: $list")
+            list
+        } catch (e: Exception) {
+            println("❌ Ticker Extraction Error: ${e.message}")
+            emptyList()
+        }
+    }
     fun extractThumbnailKeyword(title: String, description: String): String {
         val prompt = """
             [Task]

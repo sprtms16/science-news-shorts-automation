@@ -15,7 +15,8 @@ import java.io.ByteArrayInputStream
 
 @Service
 class ContentProviderService(
-    private val videoHistoryRepository: com.sciencepixel.repository.VideoHistoryRepository
+    private val videoHistoryRepository: com.sciencepixel.repository.VideoHistoryRepository,
+    private val geminiService: GeminiService
 ) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -117,89 +118,104 @@ class ContentProviderService(
         }
     }
 
-    private fun fetchRss(source: RssSource): List<NewsItem> {
-        // ... existing logic ...
+    private fun fetchAndParseRss(url: String): List<com.rometools.rome.feed.synd.SyndEntry> {
         val request = Request.Builder()
-            .url(source.url)
+            .url(url)
             .header("User-Agent", "Mozilla/5.0")
             .build()
             
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return emptyList()
-            val xml = response.body?.string() ?: return emptyList()
-            
-            // Basic Rome parsing
-            val input = SyndFeedInput()
-            input.isAllowDoctypes = false
-            try {
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return emptyList()
+                val xml = response.body?.string() ?: return emptyList()
+                
+                val input = SyndFeedInput()
+                input.isAllowDoctypes = false
                 val cleanXml = xml.replace(Regex("<!DOCTYPE[^>]*>"), "")
                 val feed = input.build(XmlReader(ByteArrayInputStream(cleanXml.toByteArray())))
-
-                return feed.entries.take(10).map { entry ->
-                   NewsItem(
-                       title = entry.title ?: "No Title",
-                       summary = entry.description?.value ?: entry.title ?: "",
-                       link = entry.link ?: "",
-                       sourceName = source.title,
-                       pubDate = entry.publishedDate // Add pubDate to NewsItem if it exists, or handle here? 
-                       // NewsItem doesn't have pubDate field yet? Check definition. 
-                       // Assuming it doesn't, we can't fully filter in RssItemReader without it.
-                       // Actually, for Stock, we need to filter HERE if NewsItem doesn't hold data.
-                   )
-                }
-            } catch (e: Exception) {
-                println("❌ RSS Parse Error [${source.title}] (${source.url}): ${e.message}")
-                return emptyList()
+                feed.entries
             }
+        } catch (e: Exception) {
+            println("❌ RSS Helper Error ($url): ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun fetchRss(source: RssSource): List<NewsItem> {
+        val entries = fetchAndParseRss(source.url)
+        return entries.take(10).map { entry ->
+           NewsItem(
+               title = entry.title ?: "No Title",
+               summary = entry.description?.value ?: entry.title ?: "",
+               link = entry.link ?: "",
+               sourceName = source.title
+           )
         }
     }
     
     private fun fetchStockNews(source: RssSource): List<NewsItem> {
-         val request = Request.Builder()
-            .url(source.url)
-            .header("User-Agent", "Mozilla/5.0")
-            .build()
-            
-        client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) return emptyList()
-            val xml = response.body?.string() ?: return emptyList()
-            
-            val input = SyndFeedInput()
-            input.isAllowDoctypes = false
+        println("🔍 Fetching Dynamic Stock News...")
+        
+        // 1. Fetch General Business News (Base)
+        val baseEntries = fetchAndParseRss(source.url)
+        println("  - Base Feed: Found ${baseEntries.size} items")
+        
+        // 2. Extract Headlines for AI Analysis
+        val headlines = baseEntries.take(15).joinToString("\n") { 
+            "- ${it.title}" 
+        }
+        
+        // 3. AI Analysis: Find Trending Tickers
+        val trendingTickers = geminiService.extractTrendingTickers(headlines)
+        
+        // 4. Fetch Specific News for Tickers
+        val specificNewsItems = mutableListOf<NewsItem>()
+        
+        trendingTickers.forEach { ticker ->
             try {
-                val cleanXml = xml.replace(Regex("<!DOCTYPE[^>]*>"), "")
-                val feed = input.build(XmlReader(ByteArrayInputStream(cleanXml.toByteArray())))
-
-                // Filter by Today AND Keywords
-                val today = java.time.LocalDate.now()
-                val startOfDay = java.util.Date.from(today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant())
+                // Google News Search RSS
+                val searchUrl = "https://news.google.com/rss/search?q=${ticker.replace(" ", "+")}+stock+news&hl=en-US&gl=US&ceid=US:en"
+                val searchEntries = fetchAndParseRss(searchUrl)
                 
-                val stockKeywords = listOf(
-                    "stock", "market", "finance", "economy", "invest", "trade", "trading", 
-                    "nasdaq", "dow", "s&p", "bitcoin", "crypto", "bank", "inflation", "fed", 
-                    "rate", "bond", "yield", "commodity", "gold", "oil", "earning", "profit", 
-                    "revenue", "analyst", "forecast", "bull", "bear", "ipo", "dividend", "shares"
-                )
-
-                return feed.entries
-                    .filter { it.publishedDate != null && it.publishedDate.after(startOfDay) }
-                    .filter { entry -> 
-                        val content = (entry.title ?: "") + " " + (entry.description?.value ?: "")
-                        stockKeywords.any { content.contains(it, ignoreCase = true) }
-                    }
-                    .take(20)
-                    .map { entry ->
-                       NewsItem(
-                           title = entry.title ?: "No Title",
-                           summary = entry.description?.value ?: entry.title ?: "",
-                           link = entry.link ?: "",
-                           sourceName = source.title
-                       )
-                    }
+                // Take top 2 items
+                val topItems = searchEntries.take(2).map { entry ->
+                    NewsItem(
+                        title = "[${ticker.uppercase()}] ${entry.title}", // Tag title with ticker
+                        summary = entry.description?.value ?: "",
+                        link = entry.link ?: "",
+                        sourceName = "Google News ($ticker)"
+                    )
+                }
+                specificNewsItems.addAll(topItems)
+                println("  - Fetched ${topItems.size} items for '$ticker'")
+                
+                // Rate limit politeness
+                Thread.sleep(500)
             } catch (e: Exception) {
-                println("❌ Stock RSS Parse Error [${source.title}]: ${e.message}")
-                return emptyList()
+                println("  - Failed to fetch news for $ticker: ${e.message}")
             }
         }
+        
+        // 5. Combine & Filter Base Items
+        // Filter base items to ensure they are from today (reusing logic)
+        val today = java.time.LocalDate.now()
+        val startOfDay = java.util.Date.from(today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant())
+        
+        val filteredBaseItems = baseEntries
+            .filter { it.publishedDate != null && it.publishedDate.after(startOfDay) }
+            .take(5) // Take top 5 general stories
+            .map { entry ->
+                NewsItem(
+                    title = entry.title ?: "No Title",
+                    summary = entry.description?.value ?: "",
+                    link = entry.link ?: "",
+                    sourceName = source.title
+                )
+            }
+            
+        val finalResult = (specificNewsItems + filteredBaseItems).distinctBy { it.title }
+        println("✅ Dynamic Stock News: ${finalResult.size} items collected.")
+        
+        return finalResult
     }
 }
