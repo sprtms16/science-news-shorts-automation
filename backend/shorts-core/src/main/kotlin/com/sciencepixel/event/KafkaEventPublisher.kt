@@ -27,6 +27,12 @@ class KafkaEventPublisher(
         kafkaTemplate.send(KafkaConfig.TOPIC_VIDEO_UPLOADED, event.videoId, json)
     }
 
+    fun publishUploadRequested(event: UploadRequestedEvent) {
+        println("📤 Publishing UploadRequestedEvent: ${event.videoId}")
+        val json = objectMapper.writeValueAsString(event)
+        kafkaTemplate.send(KafkaConfig.TOPIC_UPLOAD_REQUESTED, event.videoId, json)
+    }
+
     fun publishUploadFailed(event: UploadFailedEvent) {
         println("📤 Publishing UploadFailedEvent: ${event.videoId} (Retry: ${event.retryCount})")
         val json = objectMapper.writeValueAsString(event)

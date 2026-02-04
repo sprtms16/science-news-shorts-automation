@@ -53,6 +53,14 @@ data class RegenerationRequestedEvent(
     val timestamp: Long = Instant.now().toEpochMilli()
 )
 
+data class UploadRequestedEvent(
+    val channelId: String = "science", // 추가
+    val videoId: String,
+    val title: String,
+    val filePath: String,
+    val timestamp: Long = Instant.now().toEpochMilli()
+)
+
 // === SAGA Pipeline Events ===
 
 data class RssNewItemEvent(

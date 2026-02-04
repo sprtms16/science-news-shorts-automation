@@ -27,6 +27,7 @@ class KafkaConfig(
         const val TOPIC_BGM_UPLOAD = "bgm-upload"
         
         const val TOPIC_VIDEO_CREATED = "video-created" // Legacy support or final event
+        const val TOPIC_UPLOAD_REQUESTED = "upload-requested" // New Trigger for Scheduled Upload
         const val TOPIC_VIDEO_UPLOADED = "video-uploaded"
         const val TOPIC_UPLOAD_FAILED = "upload-failed"
         const val TOPIC_REGENERATION_REQUESTED = "regeneration-requested"
@@ -73,6 +74,13 @@ class KafkaConfig(
     @Bean
     fun uploadFailedTopic(): NewTopic = TopicBuilder
         .name(TOPIC_UPLOAD_FAILED)
+        .partitions(1)
+        .replicas(1)
+        .build()
+
+    @Bean
+    fun uploadRequestedTopic(): NewTopic = TopicBuilder
+        .name(TOPIC_UPLOAD_REQUESTED)
         .partitions(1)
         .replicas(1)
         .build()

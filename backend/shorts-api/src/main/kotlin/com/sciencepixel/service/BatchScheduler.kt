@@ -108,4 +108,71 @@ class BatchScheduler(
             }
         }
     }
+    // 매시 0분에 업로드 체크 (0 0 * * * *)
+    @Scheduled(cron = "0 0 * * * *")
+    fun scheduleUploads() {
+        println("⏰ Batch Scheduler: Checking Upload Schedule for [$channelId] at ${Date()}")
+
+        // 1. Determine Upload Interval
+        // Stocks, History -> 1 per day (24 hours min interval, or just once per calendar day?)
+        // Science, Horror -> 1 per hour
+        val minIntervalHours = when(channelId) {
+            "stocks", "history" -> 24L
+            else -> 1L
+        }
+
+        // 2. Check Last Upload Time
+        val lastUploaded = videoHistoryRepository.findFirstByChannelIdAndStatusOrderByUpdatedAtDesc(channelId, VideoStatus.UPLOADED)
+        val now = java.time.LocalDateTime.now()
+        
+        if (lastUploaded != null) {
+            val hoursSinceLastUpload = java.time.temporal.ChronoUnit.HOURS.between(lastUploaded.updatedAt, now)
+            if (hoursSinceLastUpload < minIntervalHours) {
+                println("⏳ [$channelId] Upload skipped. Last upload was $hoursSinceLastUpload hours ago (Min Interval: $minIntervalHours hrs).")
+                return
+            }
+        } else {
+             println("🆕 [$channelId] No previous uploads found. Proceeding with first upload.")
+        }
+
+        // 3. Find Next Ready Video (FIFO)
+        // Find oldest COMPLETED video
+        val nextVideo = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(
+            channelId, 
+            org.springframework.data.domain.PageRequest.of(0, 100) // Sort Descending to get list, then we pick Last (Oldest)?? 
+            // Better: Find findFirstByChannelIdAndStatusOrderByCreatedAtAsc
+        )
+        // Since we don't have 'findFirstBy...Asc' readily exposed in repo snippets above, let's look at available methods.
+        // We can fetch list by findAllByChannelIdOrderByCreatedAtDesc and take the LAST one.
+        
+        // Let's add specific method to repo if needed, OR use existing.
+        // Assuming we can use streams or just add the method.
+        // Let's check 'videoHistoryRepository' methods.
+        // We have 'findAllByChannelIdOrderByCreatedAtDesc'.
+        // So the last item is the oldest.
+        
+        val completedVideos = videoHistoryRepository.findByChannelIdAndStatus(channelId, VideoStatus.COMPLETED)
+            .sortedBy { it.createdAt } // Oldest first
+        
+        if (completedVideos.isNotEmpty()) {
+            val videoToUpload = completedVideos.first()
+            println("🚀 [$channelId] Triggering Upload for: ${videoToUpload.title}")
+            
+            // Publish Upload Requested Event
+            kafkaEventPublisher.publishUploadRequested(
+                com.sciencepixel.event.UploadRequestedEvent(
+                    channelId = channelId,
+                    videoId = videoToUpload.id!!,
+                    title = videoToUpload.title,
+                    filePath = videoToUpload.filePath
+                )
+            )
+            
+            // Optimistic Update to prevent double scheduling if frequent checks?
+            // VideoUploadConsumer will handle Locking (UPLOADING status).
+            
+        } else {
+             println("📉 [$channelId] No COMPLETED videos ready for upload.")
+        }
+    }
 }

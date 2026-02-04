@@ -33,11 +33,11 @@ class VideoUploadConsumer(
     }
 
     @KafkaListener(
-        topics = [KafkaConfig.TOPIC_VIDEO_CREATED],
+        topics = [KafkaConfig.TOPIC_UPLOAD_REQUESTED], // Changed from VIDEO_CREATED
         groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-upload-group}"
     )
-    fun handleVideoCreated(message: String) {
-        val event = objectMapper.readValue(message, VideoCreatedEvent::class.java)
+    fun handleUploadRequested(message: String) {
+        val event = objectMapper.readValue(message, UploadRequestedEvent::class.java)
         if (event.channelId != channelId) return
         
         println("📥 [$channelId] Received VideoCreatedEvent: ${event.videoId}")
