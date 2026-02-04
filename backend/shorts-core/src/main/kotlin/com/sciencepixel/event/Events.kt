@@ -79,6 +79,7 @@ data class ScriptCreatedEvent(
     val script: String,
     val summary: String,
     val sourceLink: String,
+    val mood: String = "neutral",
     val keywords: List<String> = emptyList(),
     val timestamp: Long = Instant.now().toEpochMilli()
 )

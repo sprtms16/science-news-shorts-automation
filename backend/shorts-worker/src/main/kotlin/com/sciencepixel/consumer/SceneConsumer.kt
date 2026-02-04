@@ -53,7 +53,7 @@ class SceneConsumer(
 
             // Call Production Service to generate assets (Clips)
             // We need to refactor ProductionService to expose a method that returns clip paths
-            val assetResult = productionService.produceAssetsOnly(event.title, scenes, event.videoId)
+            val assetResult = productionService.produceAssetsOnly(event.title, scenes, event.videoId, event.mood)
 
             if (assetResult.clipPaths.isEmpty()) {
                 println("❌ Assets generation failed (empty clips).")

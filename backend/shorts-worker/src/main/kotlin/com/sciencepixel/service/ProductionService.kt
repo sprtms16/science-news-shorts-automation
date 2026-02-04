@@ -25,7 +25,7 @@ class ProductionService(
         val subtitles: List<String>
     )
 
-    fun produceAssetsOnly(title: String, scenes: List<Scene>, videoId: String): AssetsResult {
+    fun produceAssetsOnly(title: String, scenes: List<Scene>, videoId: String, mood: String): AssetsResult {
         logPublisher.info("shorts-controller", "Rendering Started: $title", "Scenes: ${scenes.size}ea", traceId = videoId)
         // Organize workspace by channel
         val workspace = File("shared-data/workspace/$channelId/$videoId").apply { mkdirs() }
@@ -61,7 +61,7 @@ class ProductionService(
         
         // Return absolute paths
         return AssetsResult(
-            mood = "neutral", // TODO: Pass mood from script
+            mood = mood, 
             clipPaths = clipFiles.map { it.absolutePath },
             durations = durations,
             subtitles = subtitles

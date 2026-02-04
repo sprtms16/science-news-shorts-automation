@@ -345,7 +345,7 @@ class GeminiService(
         val effectiveChannelId = targetChannelId ?: channelId
         val nicheContext = when (effectiveChannelId) {
             "science" -> "You explain recent scientific breakthroughs, space exploration, and high-tech news in an engaging but accurate way."
-            "horror" -> "You tell eerie Reddit-style ghost stories and urban legends. Use a dark, suspenseful tone and focus on atmosphere."
+            "horror" -> "You are a master of terror. You tell the most bone-chilling, disturbing, and terrifying ghost stories. Your goal is to evoke deep fear. Use a visceral, dark, and suffocatingly suspenseful tone. Focus on psychological horror and visceral details that make the viewer's skin crawl."
             "stocks" -> "You analyze current stock market trends and popular stocks. Focus on numbers, analysis, and financial insights."
             "history" -> "You tell fascinating historical facts and stories from the past. Use a narrative and educational tone."
             else -> "You are a creative content creator."
@@ -397,7 +397,7 @@ class GeminiService(
     private fun getMoodExamples(channelId: String): String {
         return when (channelId) {
             "science" -> "Tech, Futuristic, Exciting, Curious, Synth, Modern, Bright, Inspirational"
-            "horror" -> "Dark, Eerie, Suspenseful, Horror, Mystery, Tension, Dramatic, Ambient"
+            "horror" -> "Terrifying, Bone-chilling, Visceral Horror, Deep Suspense, Nightmare, Dark Ambient, Disturbing, Psychological Thriller, Gruesome, Eerie"
             "stocks" -> "Modern, Corporate, Fast-paced, Intense, Business, Funky, Hip Hop"
             "history" -> "Epic, Orchestral, Historical, Cinematic, Grand, War, Dramatic"
             else -> "Calm, Exciting, Jazz, Lo-fi"

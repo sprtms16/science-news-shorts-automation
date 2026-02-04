@@ -141,6 +141,7 @@ class ScriptConsumer(
                 script = objectMapper.writeValueAsString(scriptResponse.scenes),
                 summary = scriptResponse.description,
                 sourceLink = event.url,
+                mood = scriptResponse.mood,
                 keywords = scriptResponse.tags
             ))
 
