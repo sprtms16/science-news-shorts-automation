@@ -454,10 +454,12 @@ class GeminiService(
             5. **Sources:** List names (e.g., "Nature", "Reddit", "Reuters").
             6. **Keywords:** Scenes' keywords MUST be visual, common English terms for stock footage extraction.
             ${
-                val todayParam = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
-                if (effectiveChannelId == "history") "7. **Date Requirement:** Today is $todayParam. You MUST create a script about a historical event that happened on THIS DATE ($todayParam). Explicitly mention the Date in the intro." 
-                else if (effectiveChannelId == "stocks") "7. **Date Context:** Today is $todayParam. Focus on the LATEST market news for this date." 
-                else ""
+                run {
+                    val todayParam = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
+                    if (effectiveChannelId == "history") "7. **Date Requirement:** Today is $todayParam. You MUST create a script about a historical event that happened on THIS DATE ($todayParam). Explicitly mention the Date in the intro." 
+                    else if (effectiveChannelId == "stocks") "7. **Date Context:** Today is $todayParam. Focus on the LATEST market news for this date." 
+                    else ""
+                }
             }
 
             [Output Format - JSON Only]

@@ -37,7 +37,42 @@ class ContentProviderService(
         }
     }
     
-    // ... fetchReddit ... (unchanged)
+    private fun fetchReddit(source: RssSource): List<NewsItem> {
+        val request = Request.Builder()
+            .url(source.url)
+            .header("User-Agent", "ScienceNewsShortsBot/1.0")
+            .build()
+            
+        return try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return emptyList()
+                val jsonStr = response.body?.string() ?: return emptyList()
+                val json = JSONObject(jsonStr)
+                val children = json.getJSONObject("data").getJSONArray("children")
+                
+                val items = mutableListOf<NewsItem>()
+                for (i in 0 until children.length()) {
+                    val data = children.getJSONObject(i).getJSONObject("data")
+                    if (data.optBoolean("stickied", false)) continue // Skip sticky posts
+                    
+                    val title = data.optString("title")
+                    val selftext = data.optString("selftext")
+                    val url = data.optString("url")
+                    
+                    items.add(NewsItem(
+                        title = title,
+                        summary = if (selftext.isNotBlank()) selftext else title,
+                        link = url,
+                        sourceName = "Reddit (${source.title})"
+                    ))
+                }
+                items.take(10)
+            }
+        } catch (e: Exception) {
+            println("❌ Reddit Fetch Error: ${e.message}")
+            emptyList()
+        }
+    }
 
     private fun fetchWikipediaOnThisDay(source: RssSource): List<NewsItem> {
         val today = LocalDate.now()
