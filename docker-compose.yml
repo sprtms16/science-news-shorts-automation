@@ -97,7 +97,7 @@ services:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=science
-      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_SCIENCE}
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_SCIENCE_B64}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -129,7 +129,7 @@ services:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=horror
-      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_HORROR}
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_HORROR_B64}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -161,7 +161,7 @@ services:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=stocks
-      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_STOCKS}
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_STOCKS_B64}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
@@ -193,7 +193,7 @@ services:
       - .env
     environment:
       - SHORTS_CHANNEL_ID=history
-      - YOUTUBE_CLIENT_SECRET_JSON=${SECRET_HISTORY}
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_HISTORY_B64}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
