@@ -32,7 +32,8 @@ data class VideoHistory(
     val filePath: String = "",
     val youtubeUrl: String = "",
     val thumbnailPath: String = "", // Local path to thumbnail image
-    val rssTitle: String? = null // Original RSS title for deduplication
+    val rssTitle: String? = null, // Original RSS title for deduplication
+    val scenes: List<Scene> = emptyList() // Persisted script content
 )
 
 enum class VideoStatus {

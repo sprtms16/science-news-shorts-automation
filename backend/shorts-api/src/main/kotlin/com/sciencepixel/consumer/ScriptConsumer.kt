@@ -129,6 +129,7 @@ class ScriptConsumer(
                 description = scriptResponse.description,
                 tags = scriptResponse.tags,
                 sources = scriptResponse.sources,
+                scenes = scriptResponse.scenes, // Persist script
                 updatedAt = LocalDateTime.now()
             ))
 
