@@ -30,4 +30,4 @@ jobs:
           docker image prune -f
           
           # Start services with forced recreation to ensure new builds are used
-          docker-compose up -d --build --force-recreate ai-media-service mongo shorts-controller shorts-log-service frontend-server tailscale zookeeper kafka
+          docker-compose up -d --build --force-recreate ai-media-service mongo zookeeper kafka shorts-science shorts-horror shorts-stocks shorts-history shorts-renderer shorts-log-service frontend-server tailscale
