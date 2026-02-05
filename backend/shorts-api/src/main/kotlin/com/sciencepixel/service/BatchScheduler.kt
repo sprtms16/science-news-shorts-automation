@@ -170,9 +170,7 @@ class BatchScheduler(
                 ))
             }
         }
-            }
-        }
-    }
+
 
     // Phase 8: Generation Recovery & Upload Timeout (Every 10 mins)
     @Scheduled(cron = "0 0/10 * * * *")
