@@ -25,6 +25,11 @@ interface YoutubeVideoListProps {
     selectedChannel: string;
 }
 
+// Helper to get channel-specific API base path
+function getApiBase(channel: string): string {
+    return `/api/${channel}`;
+}
+
 const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, selectedChannel }) => {
     const [videos, setVideos] = useState<YoutubeVideoStat[]>([]);
     const [loading, setLoading] = useState(true);
@@ -58,7 +63,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, select
 
         setError(null);
         try {
-            const url = `/admin/youtube/my-videos?size=24&page=${page}&channelId=${selectedChannel}`;
+            const url = `${getApiBase(selectedChannel)}/admin/youtube/my-videos?size=24&page=${page}&channelId=${selectedChannel}`;
             const response = await axios.get(url);
 
             if (isInitial) {
@@ -81,7 +86,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, select
         if (!window.confirm(language === 'ko' ? '이 영상의 설명을 새로 생성하여 업데이트하시겠습니까?' : 'Do you want to regenerate and update the description for this video?')) return;
 
         try {
-            const response = await axios.post(`/admin/youtube/fix-video-description?videoId=${videoId}&channelId=${selectedChannel}`);
+            const response = await axios.post(`${getApiBase(selectedChannel)}/admin/youtube/fix-video-description?videoId=${videoId}&channelId=${selectedChannel}`);
             if (response.data.status === 'success') {
                 alert(language === 'ko' ? '설명이 성공적으로 수정되었습니다.' : 'Description fixed successfully.');
             }
@@ -95,7 +100,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, select
         setLoading(true);
         setError(null);
         try {
-            await axios.post(`/admin/youtube/sync?channelId=${selectedChannel}`);
+            await axios.post(`${getApiBase(selectedChannel)}/admin/youtube/sync?channelId=${selectedChannel}`);
             await fetchVideos('0'); // Refresh list after sync
         } catch (err: any) {
             console.error('Sync failed:', err);

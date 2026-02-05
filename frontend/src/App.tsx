@@ -19,6 +19,11 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+// Helper to get channel-specific API base path
+function getApiBase(channel: string): string {
+  return `/api/${channel}`;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState<'videos' | 'prompts' | 'tools' | 'settings' | 'logs' | 'youtube' | 'bgm'>('videos');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -102,7 +107,7 @@ function App() {
 
     try {
       if (activeTab === 'videos') {
-        const res = await axios.get(`/admin/videos?page=${page}&size=15&channelId=${selectedChannel}`);
+        const res = await axios.get(`${getApiBase(selectedChannel)}/admin/videos?page=${page}&size=15&channelId=${selectedChannel}`);
         if (isInitial) {
           setVideos(res.data.videos);
         } else {
@@ -111,11 +116,11 @@ function App() {
         setNextPage(res.data.nextPage);
         setTotalCount(res.data.totalCount);
       } else if (activeTab === 'prompts') {
-        const res = await axios.get(`/admin/prompts?channelId=${selectedChannel}`);
+        const res = await axios.get(`${getApiBase(selectedChannel)}/admin/prompts?channelId=${selectedChannel}`);
         setPrompts(res.data);
       } else if (activeTab === 'settings') {
         try {
-          const res = await axios.get(`/admin/settings?channelId=${selectedChannel}`);
+          const res = await axios.get(`${getApiBase(selectedChannel)}/admin/settings?channelId=${selectedChannel}`);
           setSettings(res.data);
         } catch (e) { console.error(e); }
       }
@@ -131,7 +136,7 @@ function App() {
     // Direct link download is more reliable for Mobile/PWA and preserves filename from server headers
     try {
       // Construct the absolute URL (or relative) to trigger browser download
-      const downloadUrl = `/admin/videos/${id}/download`;
+      const downloadUrl = `${getApiBase(selectedChannel)}/admin/videos/${id}/download`;
 
       // Navigate to the URL - since Content-Disposition is attachment, 
       // the browser will stay on the current page and start the download.
@@ -145,7 +150,7 @@ function App() {
     if (!confirm(language === 'ko' ? "이 영상을 재시도하시겠습니까? (기존 실패 기록이 초기화됩니다)" : "Retry this video? Previous failure records will be reset.")) return;
     setLoading(true);
     try {
-      await axios.post(`/admin/videos/${id}/retry`);
+      await axios.post(`${getApiBase(selectedChannel)}/admin/videos/${id}/retry`);
       alert(language === 'ko' ? "재시도 요청이 성공했습니다." : "Retry requested successfully.");
       await fetchData();
     } catch (e) {
@@ -159,7 +164,7 @@ function App() {
     if (!confirm("메타데이터를 한글로 재생성하시겠습니까? (Gemini 쿼터 소모)")) return;
     setLoading(true);
     try {
-      await axios.post(`/admin/videos/${id}/metadata/regenerate`);
+      await axios.post(`${getApiBase(selectedChannel)}/admin/videos/${id}/metadata/regenerate`);
       await fetchData();
     } catch (e) {
       alert("메타데이터 재생성 실패");
@@ -172,7 +177,7 @@ function App() {
     if (!confirm(language === 'ko' ? "이 영상을 유튜브에 수동으로 업로드하시겠습니까?" : "Manual upload this video to YouTube?")) return;
     setLoading(true);
     try {
-      await axios.post(`/admin/videos/${id}/upload`);
+      await axios.post(`${getApiBase(selectedChannel)}/admin/videos/${id}/upload`);
       alert(language === 'ko' ? "업로드 요청이 성공적으로 전달되었습니다." : "Upload request sent successfully.");
       await fetchData();
     } catch (e) {
@@ -187,16 +192,17 @@ function App() {
     setLoading(true);
     setToolsResult(null);
     try {
-      const endpoint = action === 'sync-uploaded' ? `/admin/maintenance/sync-uploaded` :
-        action === 'cleanup-sensitive' ? `/admin/videos/cleanup-sensitive` :
-          action === 'prune-deleted' ? `/admin/maintenance/cleanup-deleted-youtube` :
-            action === 'translate-uploaded' ? `/admin/maintenance/translate-uploaded-videos` :
-              action === 'growth-analysis' ? `/admin/maintenance/growth-analysis` :
-                action === 'regenerate-thumbnails' ? `/admin/maintenance/regenerate-thumbnails` :
-                  action === 'clear-failed' ? `/admin/videos/history/clear-failed?channelId=${selectedChannel}` :
-                    action === 'cleanup-workspaces' ? `/admin/maintenance/cleanup-workspaces` :
-                      action === 'refresh-prompts' ? `/admin/maintenance/refresh-prompts?channelId=${selectedChannel}` :
-                        `/admin/videos/${action}`;
+      const apiBase = getApiBase(selectedChannel);
+      const endpoint = action === 'sync-uploaded' ? `${apiBase}/admin/maintenance/sync-uploaded` :
+        action === 'cleanup-sensitive' ? `${apiBase}/admin/videos/cleanup-sensitive` :
+          action === 'prune-deleted' ? `${apiBase}/admin/maintenance/cleanup-deleted-youtube` :
+            action === 'translate-uploaded' ? `${apiBase}/admin/maintenance/translate-uploaded-videos` :
+              action === 'growth-analysis' ? `${apiBase}/admin/maintenance/growth-analysis` :
+                action === 'regenerate-thumbnails' ? `${apiBase}/admin/maintenance/regenerate-thumbnails` :
+                  action === 'clear-failed' ? `${apiBase}/admin/videos/history/clear-failed?channelId=${selectedChannel}` :
+                    action === 'cleanup-workspaces' ? `${apiBase}/admin/maintenance/cleanup-workspaces` :
+                      action === 'refresh-prompts' ? `${apiBase}/admin/maintenance/refresh-prompts?channelId=${selectedChannel}` :
+                        `${apiBase}/admin/videos/${action}`;
       const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");
@@ -211,7 +217,7 @@ function App() {
 
   const updateVideoStatus = async (id: string, status: string, youtubeUrl?: string) => {
     try {
-      await axios.put(`/admin/videos/${id}/status`, { status, youtubeUrl });
+      await axios.put(`${getApiBase(selectedChannel)}/admin/videos/${id}/status`, { status, youtubeUrl });
       await fetchData();
       alert("Status updated successfully!");
     } catch (e) {
@@ -224,7 +230,7 @@ function App() {
     if (!confirm("이 영상을 정말 삭제하시겠습니까? (파일과 데이터가 영구 삭제됩니다)")) return;
     setLoading(true);
     try {
-      await axios.delete(`/admin/videos/${id}`);
+      await axios.delete(`${getApiBase(selectedChannel)}/admin/videos/${id}`);
       await fetchData();
       alert("영상 삭제 성공");
     } catch (e) {
@@ -237,7 +243,7 @@ function App() {
 
   const savePrompt = async (prompt: SystemPrompt) => {
     try {
-      await axios.post('/admin/prompts', prompt);
+      await axios.post(`${getApiBase(selectedChannel)}/admin/prompts`, prompt);
       alert("Prompt saved!");
       fetchData();
     } catch (e) {
@@ -247,7 +253,7 @@ function App() {
 
   const saveSetting = async (key: string, value: string, desc: string) => {
     try {
-      await axios.post('/admin/settings', { channelId: selectedChannel, key, value, description: desc });
+      await axios.post(`${getApiBase(selectedChannel)}/admin/settings`, { channelId: selectedChannel, key, value, description: desc });
       alert("Setting saved!");
       fetchData();
     } catch (e) {

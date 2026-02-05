@@ -25,7 +25,7 @@ const BgmManager: React.FC = () => {
 
     const fetchBgmList = async () => {
         try {
-            const res = await fetch('/api/admin/bgm/list');
+            const res = await fetch('/api/science/admin/bgm/list');
             if (res.ok) {
                 const data = await res.json();
                 setBgmList(data);
@@ -70,7 +70,7 @@ const BgmManager: React.FC = () => {
         formData.append("forceCategory", forceCategory);
 
         try {
-            const response = await fetch('/api/admin/bgm/upload', {
+            const response = await fetch('/api/science/admin/bgm/upload', {
                 method: 'POST',
                 body: formData,
             });
@@ -94,7 +94,7 @@ const BgmManager: React.FC = () => {
     const handleRetry = async (id: string) => {
         if (!confirm("Retry AI verification for this item?")) return;
         try {
-            const res = await fetch(`/api/admin/bgm/retry/${id}`, { method: 'POST' });
+            const res = await fetch(`/api/science/admin/bgm/retry/${id}`, { method: 'POST' });
             if (res.ok) {
                 alert("Retry initiated!");
                 fetchBgmList();
@@ -110,7 +110,7 @@ const BgmManager: React.FC = () => {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this BGM? This cannot be undone.")) return;
         try {
-            const res = await fetch(`/api/admin/bgm/${id}`, { method: 'DELETE' });
+            const res = await fetch(`/api/science/admin/bgm/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 fetchBgmList();
             } else {
@@ -127,7 +127,7 @@ const BgmManager: React.FC = () => {
         if (newMood === null || newMood === bgm.mood) return;
 
         try {
-            const res = await fetch(`/api/admin/bgm/${bgm.id}`, {
+            const res = await fetch(`/api/science/admin/bgm/${bgm.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mood: newMood })
