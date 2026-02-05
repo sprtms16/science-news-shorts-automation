@@ -34,6 +34,12 @@ class VideoUploadService(
                     return
                 }
 
+                // Channel Ownership Check
+                if (video.channelId != channelId) {
+                    println("⏭️ Video $videoId belongs to channel '${video.channelId}', but this service is for '$channelId'. Skipping.")
+                    return
+                }
+
                 if (video.status == VideoStatus.UPLOADING) {
                     println("⏳ Video $videoId is already being uploaded. Skipping.")
                     return
