@@ -109,7 +109,6 @@ class BatchScheduler(
         } else {
             println("🛑 Active Buffer Full ($activeCount >= $limit). Skipping generation.")
         }
-        }
     }
 
     // 매시 5분에 실패한 영상 재시도 체크 - 비활성화 (Kafka 자동화로 대체)
