@@ -6,6 +6,7 @@ import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.service.JobClaimService
 import com.sciencepixel.service.LogPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -20,6 +21,7 @@ class RegenerationConsumer(
     private val eventPublisher: KafkaEventPublisher,
     private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper,
+    private val jobClaimService: JobClaimService,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -80,19 +82,25 @@ class RegenerationConsumer(
                 return
             }
 
-            // Since we removed the monolithic produceVideo, we'll re-trigger the pipeline flow
-            // instead of calling ProductionService directly.
-            // 1. Reset Status to CREATING
-            // 2. Publish RssNewItemEvent (treat as new, but update regen count)
-            
-            repository.findById(event.videoId).ifPresent { video ->
-                repository.save(video.copy(
-                    status = VideoStatus.QUEUED, // Reset to QUEUED to be picked up by ScriptConsumer again
-                    regenCount = event.regenCount + 1,
-                    retryCount = 0,
-                    updatedAt = java.time.LocalDateTime.now()
-                ))
+            // 원자적 상태 전환: FAILED → QUEUED (중복 방지)
+            val video = repository.findById(event.videoId).orElse(null)
+            if (video == null) {
+                println("❌ Video not found: ${event.videoId}")
+                return
             }
+            
+            // FAILED 상태에서만 재생성 가능
+            if (!jobClaimService.claimJob(event.videoId, VideoStatus.FAILED, VideoStatus.QUEUED)) {
+                println("⏭️ Video not in FAILED state, skipping regeneration: ${event.videoId}")
+                return
+            }
+            
+            // regenCount 업데이트
+            repository.save(video.copy(
+                regenCount = event.regenCount + 1,
+                retryCount = 0,
+                updatedAt = java.time.LocalDateTime.now()
+            ))
 
             // Re-publish as RSS Event to restart the flow
             val rssEvent = RssNewItemEvent(
@@ -101,10 +109,6 @@ class RegenerationConsumer(
                 summary = event.summary,
                 url = event.link
             )
-            
-            // Wait, ScriptConsumer checks history "getOrCreateHistory". 
-            // If history exists, it uses it.
-            // So if we reset status to QUEUED, ScriptConsumer will pick it up and confirm it as QUEUED and process it.
             
             eventPublisher.publishRssNewItem(rssEvent)
             

@@ -110,8 +110,8 @@ class BatchScheduler(
         }
     }
 
-    // 매시 5분에 실패한 영상 재시도 체크 (0 5 * * * *)
-    @Scheduled(cron = "0 5 * * * *")
+    // 매시 5분에 실패한 영상 재시도 체크 - 비활성화 (Kafka 자동화로 대체)
+    // @Scheduled(cron = "0 5 * * * *")
     fun retryFailedGenerations() {
         println("⏰ Batch Scheduler: Checking for FAILED videos to retry at ${Date()}")
         

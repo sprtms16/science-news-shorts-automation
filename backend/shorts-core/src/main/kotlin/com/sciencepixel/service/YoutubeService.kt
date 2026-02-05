@@ -295,7 +295,11 @@ class YoutubeService(
     
     fun getAuthorizationUrl(targetChannelId: String? = null): String {
         val flow = getFlow(targetChannelId)
-        return flow.newAuthorizationUrl().setRedirectUri(redirectUri).setAccessType("offline").build()
+        return flow.newAuthorizationUrl()
+            .setRedirectUri(redirectUri)
+            .setAccessType("offline")
+            .set("prompt", "consent")  // 🔑 RefreshToken 재발급 강제 (재인증 시에도 토큰 영구 유지)
+            .build()
     }
 
     // Explicitly public so Controller can call it

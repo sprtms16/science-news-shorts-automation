@@ -8,6 +8,7 @@ import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.YoutubeService
 import com.sciencepixel.service.NotificationService
+import com.sciencepixel.service.JobClaimService
 import com.sciencepixel.service.LogPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
@@ -25,6 +26,7 @@ class VideoUploadConsumer(
     private val notificationService: NotificationService,
     private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper,
+    private val jobClaimService: JobClaimService,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -65,14 +67,12 @@ class VideoUploadConsumer(
                     return
                 }
 
-
-
-                // Claim the upload (Set to UPLOADING)
-                repository.save(video.copy(
-                    status = VideoStatus.UPLOADING,
-                    updatedAt = java.time.LocalDateTime.now()
-                ))
-                println("🔒 Claimed upload (COMPLETED -> UPLOADING): ${video.title}")
+                // 원자적 Claim (MongoDB findAndModify) - 중복 업로드 방지
+                val allowedStatuses = listOf(VideoStatus.COMPLETED, VideoStatus.UPLOAD_FAILED, VideoStatus.FAILED)
+                if (!jobClaimService.claimJobFromAny(event.videoId, allowedStatuses, VideoStatus.UPLOADING)) {
+                    println("⏭️ Upload already claimed by another instance: ${video.title}")
+                    return
+                }
 
                 val file = File(video.filePath)
                 
