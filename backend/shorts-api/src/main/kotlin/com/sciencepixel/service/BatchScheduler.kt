@@ -109,68 +109,14 @@ class BatchScheduler(
         } else {
             println("🛑 Active Buffer Full ($activeCount >= $limit). Skipping generation.")
         }
+        }
     }
 
     // 매시 5분에 실패한 영상 재시도 체크 - 비활성화 (Kafka 자동화로 대체)
     // @Scheduled(cron = "0 5 * * * *")
     fun retryFailedGenerations() {
-        println("⏰ Batch Scheduler: Checking for FAILED videos to retry at ${Date()}")
-        
-        val failedVideos = videoHistoryRepository.findByChannelIdAndStatus(channelId, VideoStatus.FAILED)
-            .filter { it.regenCount < 1 } // 재생성 시도 안 한 것만
-        
-        if (failedVideos.isNotEmpty()) {
-            println("🔄 Found ${failedVideos.size} FAILED videos. Processing 1 item to avoid burst load...")
-            
-            failedVideos.take(1).forEach { video ->
-                // Skip safety issues for auto-retry? 
-                // Better: if it failed for SAFETY, don't auto-retry the SAME title/link.
-                if (video.failureStep == "SAFETY") {
-                    println("🛡️ Skipping auto-retry for safety-blocked item: ${video.title}")
-                    return@forEach
-                }
-
-                if (video.regenCount >= 3) {
-                    println("🛑 Max retries (3) reached for: ${video.title}. Requires manual intervention.")
-                    return@forEach
-                }
-
-                if (video.failureStep == "UPLOAD") {
-                    val file = java.io.File(video.filePath)
-                    if (file.exists() && file.length() > 0) {
-                        println("♻️ [Auto-Recovery] File exists for ${video.title} (UPLOAD fail). Resetting to COMPLETED for retry.")
-                        videoHistoryRepository.save(video.copy(
-                            status = VideoStatus.COMPLETED,
-                            failureStep = "",
-                            errorMessage = "",
-                            updatedAt = java.time.LocalDateTime.now()
-                        ))
-                        return@forEach
-                    }
-                }
-                
-                // Default: Full Regeneration
-                println("🔄 [$channelId] [Auto-Recovery] Triggering regeneration (${video.regenCount + 1}/3) for: ${video.title}")
-                kafkaEventPublisher.publishRegenerationRequested(
-                    com.sciencepixel.event.RegenerationRequestedEvent(
-                        channelId = channelId,
-                        videoId = video.id!!,
-                        title = video.title,
-                        summary = video.summary,
-                        link = video.link,
-                        regenCount = video.regenCount + 1 // Increment count
-                    )
-                )
-                
-                // Update DB immediately to avoid duplicate triggers
-                videoHistoryRepository.save(video.copy(
-                    regenCount = video.regenCount + 1,
-                    status = VideoStatus.QUEUED, // Set to QUEUED to show it's being retried
-                    updatedAt = java.time.LocalDateTime.now()
-                ))
-            }
-        }
-
+        // Deprecated: Replaced by recoverFailedJobs
+    }
 
     // Phase 8: Generation Recovery & Upload Timeout (Every 10 mins)
     @Scheduled(cron = "0 0/10 * * * *")
