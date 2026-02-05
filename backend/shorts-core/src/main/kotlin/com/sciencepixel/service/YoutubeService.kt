@@ -185,9 +185,34 @@ class YoutubeService(
         val effectiveChannelId = targetChannelId ?: channelId
         val tokenPath = "tokens/$effectiveChannelId"
         
-        // Try to load from resources or root
-        val inStream = YoutubeService::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH) 
-            ?: FileInputStream("client_secret.json")
+        // Priority 1: Environment variable (Base64 encoded JSON) - for GitHub Actions / CI/CD
+        val secretB64 = System.getenv("YOUTUBE_CLIENT_SECRET_JSON_B64")
+        val inStream = if (!secretB64.isNullOrBlank()) {
+            println("✅ Using client_secret from environment variable (B64)")
+            val decoded = java.util.Base64.getDecoder().decode(secretB64)
+            java.io.ByteArrayInputStream(decoded)
+        } else {
+            // Priority 2: File system (Docker volume mount) - for local development
+            val targetCredentialFolder = when(effectiveChannelId) {
+                "science" -> "SciencePixel"
+                "horror" -> "MysteryPixel"
+                "stocks" -> "ValuePixel"
+                "history" -> "HistoryPixel"
+                else -> "SciencePixel"
+            }
+            val credentialPath = "/app/client_secret/$targetCredentialFolder/client_secret.json"
+            val credentialFile = File(credentialPath)
+            
+            if (credentialFile.exists()) {
+                println("✅ Found client_secret at: $credentialPath")
+                FileInputStream(credentialFile)
+            } else {
+                // Priority 3: Classpath resource (for JAR packaging)
+                println("⚠️ File not found at $credentialPath, trying classpath...")
+                YoutubeService::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH) 
+                    ?: throw RuntimeException("❌ client_secret.json not found. Set YOUTUBE_CLIENT_SECRET_JSON_B64 env var or mount the file at $credentialPath")
+            }
+        }
 
         val clientSecrets = GoogleClientSecrets.load(JSON_FACTORY, InputStreamReader(inStream))
 
@@ -198,6 +223,8 @@ class YoutubeService(
         .setAccessType("offline")
         .build()
     }
+
+
 
     private fun getCredentials(targetChannelId: String? = null): Credential {
         val effectiveChannelId = targetChannelId ?: channelId

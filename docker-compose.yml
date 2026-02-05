@@ -92,8 +92,9 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/tokens:/app/tokens # [LEGACY] Keep bind for local dev debugging if needed, but primary is named volume
+      - ./backend/client_secret:/app/client_secret # YouTube OAuth credentials
       - shorts-tokens:/app/tokens
+
     env_file:
       - .env
     environment:
@@ -122,6 +123,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
       - shorts-tokens:/app/tokens
     env_file:
       - .env
@@ -151,6 +153,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
       - shorts-tokens:/app/tokens
     env_file:
       - .env
@@ -181,6 +184,7 @@ services:
       - kafka
     volumes:
       - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
       - shorts-tokens:/app/tokens
     env_file:
       - .env
