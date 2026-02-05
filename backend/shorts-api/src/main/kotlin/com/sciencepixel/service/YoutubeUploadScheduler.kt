@@ -55,7 +55,20 @@ class YoutubeUploadScheduler(
             }
         }
 
-        // 2. Fetch target videos
+        // 2. Retry Logic (Stocks & History Only)
+        // User Request: "역사와 주식 채널... 10분단위로 업로드 실패한 영상에만 재 시도"
+        if (channelId == "stocks" || channelId == "history") {
+            val failedUploads = repository.findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId, VideoStatus.FAILED)
+                .filter { it.failureStep == "UPLOAD_FAIL" }
+            
+            if (failedUploads.isNotEmpty()) {
+                println("🔄 [$channelId] Retrying ${failedUploads.size} failed uploads...")
+                failedUploads.forEach { triggerUpload(it) }
+                return // Prioritize recovery, skip new uploads this cycle
+            }
+        }
+
+        // 3. Fetch target videos (New Uploads)
         val pendingVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.COMPLETED)
             .sortedBy { it.createdAt }
             .filter { 
@@ -74,25 +87,30 @@ class YoutubeUploadScheduler(
         
         println("📦 [$channelId] Found ${pendingVideos.size} videos ready for upload.")
 
-        // 3. Trigger 
-        pendingVideos.take(1).forEach { video ->
-            if (video.filePath.isNotBlank() && File(video.filePath).exists()) {
-                println("🚀 [$channelId] Triggering upload via Kafka: ${video.title}")
-                kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
-                    channelId = channelId, // 추가
-                    videoId = video.id ?: "",
-                    title = video.title,
-                    summary = video.summary,
-                    description = video.description,
-                    link = video.link,
-                    filePath = video.filePath,
-                    keywords = emptyList()
-                ))
-            } else {
-                if (video.status != VideoStatus.UPLOADED) {
-                    println("⚠️ [$channelId] File missing for ${video.title}. Triggering regeneration.")
-                    triggerRegeneration(video)
-                }
+        // 4. Trigger 
+        pendingVideos.take(1).forEach { triggerUpload(it) }
+    }
+
+    private fun triggerUpload(video: VideoHistory) {
+         if (video.filePath.isNotBlank() && File(video.filePath).exists()) {
+            println("🚀 [$channelId] Triggering upload via Kafka: ${video.title}")
+            kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
+                channelId = channelId,
+                videoId = video.id ?: "",
+                title = video.title,
+                summary = video.summary,
+                description = video.description,
+                link = video.link,
+                filePath = video.filePath,
+                keywords = emptyList()
+            ))
+            
+            // Optimistic Status Update to prevent double triggering
+            repository.save(video.copy(status = VideoStatus.UPLOADING, updatedAt = java.time.LocalDateTime.now()))
+        } else {
+            if (video.status != VideoStatus.UPLOADED) {
+                println("⚠️ [$channelId] File missing for ${video.title}. Triggering regeneration.")
+                triggerRegeneration(video)
             }
         }
     }

@@ -374,7 +374,8 @@ class YoutubeService(
         val response = try {
             request.execute()
         } catch (e: GoogleJsonResponseException) {
-            if (e.details?.errors?.any { it.reason == "quotaExceeded" } == true) {
+            val errors = e.details?.errors ?: emptyList()
+            if (errors.any { it.reason == "quotaExceeded" || it.reason == "uploadLimitExceeded" }) {
                 println("🛑 [$effectiveChannelId] YouTube Quota Exceeded detected during upload.")
                 quotaTracker.setSuspended("Quota Exceeded Error from YouTube API ($effectiveChannelId)")
             }

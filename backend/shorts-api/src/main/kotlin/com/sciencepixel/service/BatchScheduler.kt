@@ -170,6 +170,67 @@ class BatchScheduler(
                 ))
             }
         }
+            }
+        }
+    }
+
+    // Phase 8: Generation Recovery & Upload Timeout (Every 10 mins)
+    @Scheduled(cron = "0 0/10 * * * *")
+    fun recoverFailedJobs() {
+        if (channelBehavior.shouldSkipGeneration()) return 
+
+        recoverFailedGenerations()
+        recoverStuckUploads()
+    }
+
+    private fun recoverFailedGenerations() {
+        // Find FAILED jobs (excluding upload errors, safety errors treated as permanent fail generally but checking policy)
+        // User request: "10분 단위로 실패 영상을 복구 시도 하되... 최대 파티션 수만큼"
+        val failedVideos = videoHistoryRepository.findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId, VideoStatus.FAILED)
+        
+        failedVideos.filter { it.failureStep != "UPLOAD_FAIL" && it.failureStep != "SAFETY" && (it.regenCount ?: 0) < 3 }
+            .forEach { video ->
+                println("🔄 [$channelId] [Auto-Recovery] Triggering generation retry (${(video.regenCount ?: 0) + 1}/3) for: ${video.title}")
+                
+                // Re-publish to RSS Topic to restart from Gemin
+                kafkaEventPublisher.publishRssNewItem(
+                     com.sciencepixel.event.RssNewItemEvent(
+                         channelId = channelId,
+                         title = video.title,
+                         url = video.link,
+                         summary = video.summary ?: ""
+                     )
+                )
+
+                videoHistoryRepository.save(video.copy(
+                    regenCount = (video.regenCount ?: 0) + 1,
+                    status = VideoStatus.QUEUED, // Reset to QUEUED to pass ScriptConsumer check
+                    failureStep = null,
+                    errorMessage = null,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            }
+    }
+
+    private fun recoverStuckUploads() {
+        val thirtyMinutesAgo = java.time.LocalDateTime.now().minusMinutes(30)
+        
+        // Find Stuck Uploads (UPLOADING for > 30 mins)
+        val stuckUploads = videoHistoryRepository.findByChannelIdAndStatusAndUpdatedAtBefore(
+            channelId, VideoStatus.UPLOADING, thirtyMinutesAgo
+        )
+
+        if (stuckUploads.isNotEmpty()) {
+            println("⚠️ [$channelId] Found ${stuckUploads.size} stuck uploads. Marking as UPLOAD_FAILED.")
+            stuckUploads.forEach { video ->
+                videoHistoryRepository.save(video.copy(
+                    status = VideoStatus.FAILED,
+                    failureStep = "UPLOAD_FAIL",
+                    errorMessage = "Upload Timeout (>30min)",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            }
+        }
     }
     // 매시 0분에 업로드 체크 (0 0 * * * *) - 설정 가능하도록 변경
     @Scheduled(cron = "\${app.scheduling.upload-cron:0 0 * * * *}")

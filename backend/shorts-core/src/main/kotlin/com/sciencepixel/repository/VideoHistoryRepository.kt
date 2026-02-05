@@ -35,4 +35,8 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
 
     // Daily Limit Check
     fun countByChannelIdAndStatusInAndCreatedAtAfter(channelId: String, statuses: Collection<VideoStatus>, date: java.time.LocalDateTime): Long
+
+    // Retry Logic Queries
+    fun findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId: String, status: VideoStatus): List<VideoHistory>
+    fun findByChannelIdAndStatusAndUpdatedAtBefore(channelId: String, status: VideoStatus, time: java.time.LocalDateTime): List<VideoHistory>
 }
