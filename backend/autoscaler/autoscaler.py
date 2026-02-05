@@ -24,7 +24,9 @@ MAX_REPLICAS = int(os.getenv("MAX_REPLICAS", "5"))
 SCALE_UP_THRESHOLD = int(os.getenv("SCALE_UP_THRESHOLD", "5"))
 SCALE_DOWN_THRESHOLD = int(os.getenv("SCALE_DOWN_THRESHOLD", "2"))
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "30"))
-COOLDOWN_PERIOD = int(os.getenv("COOLDOWN_PERIOD", "60"))
+COOLDOWN_PERIOD = int(os.getenv("COOLDOWN_PERIOD", "60"))  # Scale UP cooldown
+SCALE_DOWN_COOLDOWN = int(os.getenv("SCALE_DOWN_COOLDOWN", "120"))  # Scale DOWN cooldown (longer)
+ZERO_LAG_COUNT_TO_SCALE_DOWN = int(os.getenv("ZERO_LAG_COUNT_TO_SCALE_DOWN", "3"))  # Consecutive 0 LAG checks before aggressive scale-down
 AUTO_UPGRADE = os.getenv("AUTO_UPGRADE", "true").lower() == "true"
 
 # Topics to monitor
@@ -35,7 +37,9 @@ class DockerAutoscaler:
     def __init__(self):
         self.docker_client = docker.from_env()
         self.last_scale_time = 0
+        self.last_scale_down_time = 0  # Separate cooldown for scale-down
         self.last_pull_time = 0
+        self.zero_lag_count = 0  # Track consecutive zero LAG checks
         self.current_replicas = self._get_current_replicas()
         print(f"🚀 Autoscaler initialized")
         print(f"   Target: {TARGET_SERVICE}")
@@ -268,18 +272,47 @@ class DockerAutoscaler:
                 
                 self.current_replicas = desired_replicas
                 self.last_scale_time = time.time()
+                self.last_scale_down_time = time.time()  # Also update scale-down timer
                 print(f"✅ Scaled DOWN to {desired_replicas} replicas")
                 
         except Exception as e:
             print(f"❌ Scale error: {e}")
 
     def calculate_desired_replicas(self, lag: int) -> int:
+        # Scale UP logic
         if lag > SCALE_UP_THRESHOLD * 2:
+            self.zero_lag_count = 0  # Reset zero LAG counter
             return min(MAX_REPLICAS, self.current_replicas + 2)
         elif lag > SCALE_UP_THRESHOLD:
+            self.zero_lag_count = 0
             return min(MAX_REPLICAS, self.current_replicas + 1)
+        
+        # Scale DOWN logic
+        elif lag == 0:
+            self.zero_lag_count += 1
+            print(f"   📉 Zero LAG detected ({self.zero_lag_count}/{ZERO_LAG_COUNT_TO_SCALE_DOWN} consecutive checks)")
+            
+            # After N consecutive zero LAG checks, scale down aggressively
+            if self.zero_lag_count >= ZERO_LAG_COUNT_TO_SCALE_DOWN and self.current_replicas > MIN_REPLICAS:
+                # Check scale-down specific cooldown
+                if time.time() - self.last_scale_down_time < SCALE_DOWN_COOLDOWN:
+                    print(f"   ⏳ Scale-down cooldown active. Waiting...")
+                    return self.current_replicas
+                
+                print(f"   🔻 Zero LAG sustained. Scaling down to MIN_REPLICAS ({MIN_REPLICAS})")
+                return MIN_REPLICAS
+            
+            return self.current_replicas
+        
         elif lag < SCALE_DOWN_THRESHOLD and self.current_replicas > MIN_REPLICAS:
+            # Low but non-zero LAG: gradual scale-down
+            self.zero_lag_count = 0
+            if time.time() - self.last_scale_down_time < SCALE_DOWN_COOLDOWN:
+                return self.current_replicas
             return max(MIN_REPLICAS, self.current_replicas - 1)
+        
+        # No change
+        self.zero_lag_count = 0
         return self.current_replicas
 
     def run(self):
