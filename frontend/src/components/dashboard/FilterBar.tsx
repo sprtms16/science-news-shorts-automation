@@ -60,7 +60,9 @@ export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFi
                         <option value="ALL" className="bg-slate-900 text-white dark:bg-slate-900">{t.statusAll}</option>
                         <option value="UPLOADED" className="bg-slate-900 text-white dark:bg-slate-900">✅ {t.statusUploaded}</option>
                         <option value="COMPLETED" className="bg-slate-900 text-white dark:bg-slate-900">📦 {t.statusCompleted}</option>
-                        <option value="CREATING" className="bg-slate-900 text-white dark:bg-slate-900">⚙️ {t.statusCreating}</option>
+                        <option value="SCRIPTING" className="bg-slate-900 text-white dark:bg-slate-900">📜 Scripting</option>
+                        <option value="ASSETS_GENERATING" className="bg-slate-900 text-white dark:bg-slate-900">🎨 Assets</option>
+                        <option value="RENDERING" className="bg-slate-900 text-white dark:bg-slate-900">🎬 Rendering</option>
                         <option value="FAILED" className="bg-slate-900 text-white dark:bg-slate-900">❌ {t.statusFailed}</option>
                     </select>
                 </div>

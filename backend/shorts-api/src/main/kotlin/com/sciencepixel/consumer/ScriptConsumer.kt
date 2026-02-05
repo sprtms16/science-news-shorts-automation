@@ -67,7 +67,7 @@ class ScriptConsumer(
             // Daily Limit Check using ChannelBehavior
             if (channelBehavior.dailyLimit == 1) {
                 val startOfDay = java.time.LocalDate.now().atStartOfDay()
-                val successStatuses = listOf(VideoStatus.CREATING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
+                val successStatuses = listOf(VideoStatus.SCRIPTING, VideoStatus.ASSETS_QUEUED, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
                 val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
                 
                 if (dailyCount >= channelBehavior.dailyLimit) {
@@ -83,7 +83,8 @@ class ScriptConsumer(
             }
             
             // 원자적 Claim (MongoDB findAndModify) - 중복 실행 방지
-            if (!jobClaimService.claimJob(history.id!!, VideoStatus.QUEUED, VideoStatus.CREATING)) {
+            // QUEUED -> SCRIPTING (Start Scripting)
+            if (!jobClaimService.claimJob(history.id!!, VideoStatus.QUEUED, VideoStatus.SCRIPTING)) {
                 println("⏭️ Job already claimed by another instance: ${event.title}")
                 return
             }
@@ -104,14 +105,16 @@ class ScriptConsumer(
                 return
             }
 
-            // 3. Update History with Script Data (Stay in CREATING)
+            // 3. Update History with Script Data (Next: ASSETS_QUEUED)
+            // Script is done, now we wait for Assets
             val updatedHistory = videoHistoryRepository.save(history.copy(
-                status = VideoStatus.CREATING,
+                status = VideoStatus.ASSETS_QUEUED,
                 title = scriptResponse.title,
                 description = scriptResponse.description,
                 tags = scriptResponse.tags,
                 sources = scriptResponse.sources,
                 scenes = scriptResponse.scenes, // Persist script
+                currentStep = "대본 생성 완료, 에셋 대기 중",
                 updatedAt = LocalDateTime.now()
             ))
 

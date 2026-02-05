@@ -31,11 +31,16 @@ interface VideoCardProps {
 
 export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, onRetry, t }, ref) => {
     const statusColors: Record<string, { bg: string, text: string, border: string, icon: any, label: string }> = {
-        'CREATING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: t.statusCreating },
+        'SCRIPTING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Scripting' },
+        'ASSETS_QUEUED': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', icon: <Clock size={12} />, label: 'Assets Queued' },
+        'ASSETS_GENERATING': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Assets Gen' },
+        'RENDER_QUEUED': { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', icon: <Clock size={12} />, label: 'Render Queued' },
+        'RENDERING': { bg: 'bg-fuchsia-500/10', text: 'text-fuchsia-400', border: 'border-fuchsia-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Rendering' },
         'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
         'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} />, label: t.statusCompleted },
         'UPLOAD_FAILED': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', icon: <AlertCircle size={12} />, label: t.statusUploadFailed || 'Upload Failed' },
         'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} />, label: t.statusUploaded },
+        'RETRY_QUEUED': { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/20', icon: <Clock size={12} />, label: 'Retry Queued' },
     };
 
     const currentStatus = statusColors[video.status] || { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: <AlertCircle size={12} />, label: video.status };

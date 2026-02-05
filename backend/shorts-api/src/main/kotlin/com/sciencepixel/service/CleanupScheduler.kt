@@ -43,8 +43,8 @@ class CleanupScheduler(
     }
 
     private fun runSafetyCheck() {
-        // Check COMPLETED and CREATING videos (not UPLOADED)
-        val targetVideos = videoRepository.findByChannelIdAndStatusIn(channelId, listOf(VideoStatus.COMPLETED, VideoStatus.CREATING))
+        // Check COMPLETED and SCRIPTING videos (not UPLOADED)
+        val targetVideos = videoRepository.findByChannelIdAndStatusIn(channelId, listOf(VideoStatus.COMPLETED, VideoStatus.SCRIPTING))
 
         if (targetVideos.isEmpty()) return
 
