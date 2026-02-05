@@ -227,12 +227,29 @@ class BatchScheduler(
             .filter { it.updatedAt.isBefore(timeoutThreshold) && it.regenCount > 0 } // Only retries
         
         if (stuckJobs.isNotEmpty()) {
-            println("⚠️ [$channelId] Found ${stuckJobs.size} stuck retries > 30m. Reverting to RETRY_QUEUED.")
+            println("⚠️ [$channelId] Found ${stuckJobs.size} stuck retries > 30m. Processing stuck detection...")
+            
             stuckJobs.forEach { video ->
-                videoHistoryRepository.save(video.copy(
-                    status = VideoStatus.RETRY_QUEUED,
-                    updatedAt = java.time.LocalDateTime.now()
-                ))
+                val currentRegen = video.regenCount ?: 0
+                if (currentRegen >= 3) {
+                    println("🚫 [$channelId] Stuck Job Max Retry Reached ($currentRegen/3). Marking as FAILED: ${video.title}")
+                    videoHistoryRepository.save(video.copy(
+                        status = VideoStatus.FAILED,
+                        failureStep = "TIMEOUT",
+                        errorMessage = "Stuck in processing > 30m (Max Retries)",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                } else {
+                    println("🔄 [$channelId] Stuck Job detected (Retry $currentRegen/3). Re-queueing as RETRY_QUEUED: ${video.title}")
+                    videoHistoryRepository.save(video.copy(
+                        status = VideoStatus.RETRY_QUEUED,
+                        // Do NOT increment regenCount here. It will be incremented when 'processRetryQueue' picks it up.
+                        // However, we must ensure we don't just loop forever if it keeps getting stuck.
+                        // Let's increment it here to penalize the "Stuck" attempt.
+                        regenCount = currentRegen + 1, 
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                }
             }
         }
     }
