@@ -47,6 +47,7 @@ class AdminController(
     private val rssSourceRepository: com.sciencepixel.repository.RssSourceRepository,
     private val contentProviderService: com.sciencepixel.service.ContentProviderService,
     private val dataInitializer: com.sciencepixel.config.DataInitializer,
+    private val batchScheduler: com.sciencepixel.service.BatchScheduler,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val defaultChannelId: String
 ) {
 
@@ -63,6 +64,15 @@ class AdminController(
         
         return ResponseEntity.ok(mapOf(
             "message" to "Triggered pending video upload check in background."
+        ))
+    }
+
+    @PostMapping("/batch/trigger")
+    fun triggerBatchGeneration(@RequestParam(defaultValue = "false") force: Boolean): ResponseEntity<Map<String, Any>> {
+        batchScheduler.triggerBatchJob(force)
+        return ResponseEntity.ok(mapOf(
+            "message" to "Batch generation triggered successfully.",
+            "force" to force
         ))
     }
 
