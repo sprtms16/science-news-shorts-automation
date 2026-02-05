@@ -79,12 +79,23 @@ class DockerAutoscaler:
             return 1  # Assume at least 1 to prevent unnecessary scaling
 
     def get_consumer_lag(self) -> int:
-        """Get total consumer lag for the monitored topics."""
+        """Get total consumer lag for the monitored topics using AdminClient."""
         total_lag = 0
         try:
+            from kafka.admin import KafkaAdminClient
+            
+            admin_client = KafkaAdminClient(
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                client_id="autoscaler-admin"
+            )
+            
+            # Get committed offsets for the consumer group
+            consumer_offsets = admin_client.list_consumer_group_offsets(CONSUMER_GROUP)
+            
+            # Create a temporary consumer to get end offsets
             consumer = KafkaConsumer(
                 bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-                group_id=f"{CONSUMER_GROUP}-monitor",
+                group_id=f"{CONSUMER_GROUP}-lag-check",
                 enable_auto_commit=False,
             )
             
@@ -102,12 +113,12 @@ class DockerAutoscaler:
                         consumer.seek_to_end(tp)
                         end_offset = consumer.position(tp)
                         
-                        # Get committed offset
-                        committed = consumer.committed(tp)
-                        if committed is None:
-                            committed = 0
+                        # Get committed offset from the actual consumer group
+                        committed_offset = 0
+                        if tp in consumer_offsets:
+                            committed_offset = consumer_offsets[tp].offset
                         
-                        lag = max(0, end_offset - committed)
+                        lag = max(0, end_offset - committed_offset)
                         total_lag += lag
                         
                 except Exception as e:
@@ -115,12 +126,14 @@ class DockerAutoscaler:
                     continue
             
             consumer.close()
+            admin_client.close()
             
         except Exception as e:
             print(f"❌ Kafka connection error: {e}")
             return 0
         
         return total_lag
+
 
     def refresh_image(self):
         """Pull the latest image and upgrade outdated containers."""

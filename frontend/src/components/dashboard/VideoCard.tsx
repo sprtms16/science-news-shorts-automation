@@ -34,6 +34,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
         'CREATING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: t.statusCreating },
         'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
         'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} />, label: t.statusCompleted },
+        'UPLOAD_FAILED': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', icon: <AlertCircle size={12} />, label: t.statusUploadFailed || 'Upload Failed' },
         'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} />, label: t.statusUploaded },
     };
 
@@ -79,7 +80,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                             {!isKoreanTitle && (
                                 <span className="px-3 py-1 bg-orange-500/10 text-orange-400 text-[10px] font-bold rounded-full border border-orange-500/20 tracking-wider uppercase">{t.needsLocalization}</span>
                             )}
-                            {video.status === 'FAILED' && video.errorMessage && (
+                            {(video.status === 'FAILED' || video.status === 'UPLOAD_FAILED') && video.errorMessage && (
                                 <div className="w-full mt-2 p-3 bg-rose-500/5 rounded-xl border border-rose-500/10 flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
                                         <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-500 text-[8px] font-black rounded uppercase leading-none">Step: {video.failureStep}</span>
@@ -113,7 +114,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                         >
                             <RefreshCw size={14} /> {t.meta}
                         </button>
-                        {video.status === 'FAILED' && onRetry && (
+                        {(video.status === 'FAILED' || video.status === 'UPLOAD_FAILED') && onRetry && (
                             <button
                                 onClick={() => onRetry(video.id || '')}
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500/10 hover:bg-orange-600 text-orange-400 hover:text-white rounded-xl border border-orange-500/20 transition-all text-xs font-bold"
@@ -121,7 +122,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                                 <RefreshCw size={14} /> Retry
                             </button>
                         )}
-                        {video.status === 'COMPLETED' && (
+                        {(video.status === 'COMPLETED' || video.status === 'UPLOAD_FAILED') && (
                             <button
                                 onClick={() => onManualUpload(video.id || '')}
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all text-xs font-bold animate-pulse"
