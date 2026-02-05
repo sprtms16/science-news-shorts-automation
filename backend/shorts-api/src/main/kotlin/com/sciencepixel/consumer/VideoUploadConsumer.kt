@@ -2,17 +2,9 @@ package com.sciencepixel.consumer
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.sciencepixel.config.KafkaConfig
-import com.sciencepixel.domain.VideoHistory
-import com.sciencepixel.domain.VideoStatus
-import com.sciencepixel.event.*
-import com.sciencepixel.repository.VideoHistoryRepository
-import com.sciencepixel.service.YoutubeService
-import com.sciencepixel.service.NotificationService
-import com.sciencepixel.service.JobClaimService
-import com.sciencepixel.service.LogPublisher
+import com.sciencepixel.service.VideoUploadService
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
-import java.io.File
 
 /**
  * 비디오 업로드 Consumer
