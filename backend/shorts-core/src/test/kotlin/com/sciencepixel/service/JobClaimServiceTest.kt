@@ -8,8 +8,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.Mock
 import org.mockito.junit.jupiter.MockitoExtension
-import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.any as mockAny
+import org.mockito.kotlin.whenever as mockWhenever
 import org.springframework.data.mongodb.core.FindAndModifyOptions
 import org.springframework.data.mongodb.core.MongoTemplate
 import org.springframework.data.mongodb.core.query.Query
@@ -37,16 +37,18 @@ class JobClaimServiceTest {
             id = videoId,
             channelId = "science",
             title = "Test Video",
+            summary = "Test Summary",
+            link = "http://test.com",
             status = VideoStatus.QUEUED,
             createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now()
         )
         
-        whenever(mongoTemplate.findAndModify(
-            any<Query>(),
-            any<Update>(),
-            any<FindAndModifyOptions>(),
-            any<Class<VideoHistory>>()
+        mockWhenever(mongoTemplate.findAndModify(
+            mockAny<Query>(),
+            mockAny<Update>(),
+            mockAny<FindAndModifyOptions>(),
+            mockAny<Class<VideoHistory>>()
         )).thenReturn(existingVideo)
 
         // When
@@ -61,11 +63,11 @@ class JobClaimServiceTest {
         // Given
         val videoId = "test-video-id"
         
-        whenever(mongoTemplate.findAndModify(
-            any<Query>(),
-            any<Update>(),
-            any<FindAndModifyOptions>(),
-            any<Class<VideoHistory>>()
+        mockWhenever(mongoTemplate.findAndModify(
+            mockAny<Query>(),
+            mockAny<Update>(),
+            mockAny<FindAndModifyOptions>(),
+            mockAny<Class<VideoHistory>>()
         )).thenReturn(null)
 
         // When
@@ -83,16 +85,18 @@ class JobClaimServiceTest {
             id = videoId,
             channelId = "science",
             title = "Test Video",
+            summary = "Test Summary",
+            link = "http://test.com",
             status = VideoStatus.COMPLETED,
             createdAt = LocalDateTime.now(),
             updatedAt = LocalDateTime.now()
         )
         
-        whenever(mongoTemplate.findAndModify(
-            any<Query>(),
-            any<Update>(),
-            any<FindAndModifyOptions>(),
-            any<Class<VideoHistory>>()
+        mockWhenever(mongoTemplate.findAndModify(
+            mockAny<Query>(),
+            mockAny<Update>(),
+            mockAny<FindAndModifyOptions>(),
+            mockAny<Class<VideoHistory>>()
         )).thenReturn(existingVideo)
 
         // When
@@ -108,11 +112,11 @@ class JobClaimServiceTest {
         // Given
         val videoId = "test-video-id"
         
-        whenever(mongoTemplate.findAndModify(
-            any<Query>(),
-            any<Update>(),
-            any<FindAndModifyOptions>(),
-            any<Class<VideoHistory>>()
+        mockWhenever(mongoTemplate.findAndModify(
+            mockAny<Query>(),
+            mockAny<Update>(),
+            mockAny<FindAndModifyOptions>(),
+            mockAny<Class<VideoHistory>>()
         )).thenReturn(null)
 
         // When
