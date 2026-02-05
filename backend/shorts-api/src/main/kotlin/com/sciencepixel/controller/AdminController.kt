@@ -85,13 +85,9 @@ class AdminController(
             channelId = video.channelId,
             videoId = video.id!!,
             title = video.title,
-            summary = video.summary,
-            description = video.description,
-            link = video.link,
-            filePath = video.filePath,
-            thumbnailPath = video.thumbnailPath,
-            keywords = emptyList()
+            filePath = video.filePath
         ))
+
 
 
         return ResponseEntity.ok(mapOf("message" to "Upload triggered for ${video.title}"))
