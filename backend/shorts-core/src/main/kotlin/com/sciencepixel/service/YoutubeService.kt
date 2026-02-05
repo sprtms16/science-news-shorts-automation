@@ -185,32 +185,51 @@ class YoutubeService(
         val effectiveChannelId = targetChannelId ?: channelId
         val tokenPath = "tokens/$effectiveChannelId"
         
-        // Priority 1: Environment variable (Base64 encoded JSON) - for GitHub Actions / CI/CD
-        val secretB64 = System.getenv("YOUTUBE_CLIENT_SECRET_JSON_B64")
-        val inStream = if (!secretB64.isNullOrBlank()) {
-            println("✅ Using client_secret from environment variable (B64)")
-            val decoded = java.util.Base64.getDecoder().decode(secretB64)
-            java.io.ByteArrayInputStream(decoded)
-        } else {
-            // Priority 2: File system (Docker volume mount) - for local development
-            val targetCredentialFolder = when(effectiveChannelId) {
-                "science" -> "SciencePixel"
-                "horror" -> "MysteryPixel"
-                "stocks" -> "ValuePixel"
-                "history" -> "HistoryPixel"
-                else -> "SciencePixel"
+        // Priority 1: Channel-specific environment variable (SECRET_SCIENCE_B64, etc.) - for GitHub Actions
+        val channelEnvName = when(effectiveChannelId) {
+            "science" -> "SECRET_SCIENCE_B64"
+            "horror" -> "SECRET_HORROR_B64"
+            "stocks" -> "SECRET_STOCKS_B64"
+            "history" -> "SECRET_HISTORY_B64"
+            else -> "SECRET_SCIENCE_B64"
+        }
+        val channelSecretB64 = System.getenv(channelEnvName)
+        
+        // Priority 2: Generic environment variable (YOUTUBE_CLIENT_SECRET_JSON_B64)
+        val genericSecretB64 = System.getenv("YOUTUBE_CLIENT_SECRET_JSON_B64")
+        
+        val inStream = when {
+            !channelSecretB64.isNullOrBlank() -> {
+                println("✅ [$effectiveChannelId] Using client_secret from $channelEnvName")
+                val decoded = java.util.Base64.getDecoder().decode(channelSecretB64)
+                java.io.ByteArrayInputStream(decoded)
             }
-            val credentialPath = "/app/client_secret/$targetCredentialFolder/client_secret.json"
-            val credentialFile = File(credentialPath)
-            
-            if (credentialFile.exists()) {
-                println("✅ Found client_secret at: $credentialPath")
-                FileInputStream(credentialFile)
-            } else {
-                // Priority 3: Classpath resource (for JAR packaging)
-                println("⚠️ File not found at $credentialPath, trying classpath...")
-                YoutubeService::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH) 
-                    ?: throw RuntimeException("❌ client_secret.json not found. Set YOUTUBE_CLIENT_SECRET_JSON_B64 env var or mount the file at $credentialPath")
+            !genericSecretB64.isNullOrBlank() -> {
+                println("✅ [$effectiveChannelId] Using client_secret from YOUTUBE_CLIENT_SECRET_JSON_B64")
+                val decoded = java.util.Base64.getDecoder().decode(genericSecretB64)
+                java.io.ByteArrayInputStream(decoded)
+            }
+            else -> {
+                // Priority 3: File system (Docker volume mount) - for local development
+                val targetCredentialFolder = when(effectiveChannelId) {
+                    "science" -> "SciencePixel"
+                    "horror" -> "MysteryPixel"
+                    "stocks" -> "ValuePixel"
+                    "history" -> "HistoryPixel"
+                    else -> "SciencePixel"
+                }
+                val credentialPath = "/app/client_secret/$targetCredentialFolder/client_secret.json"
+                val credentialFile = File(credentialPath)
+                
+                if (credentialFile.exists()) {
+                    println("✅ [$effectiveChannelId] Found client_secret at: $credentialPath")
+                    FileInputStream(credentialFile)
+                } else {
+                    // Priority 4: Classpath resource (for JAR packaging)
+                    println("⚠️ [$effectiveChannelId] File not found at $credentialPath, trying classpath...")
+                    YoutubeService::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH) 
+                        ?: throw RuntimeException("❌ client_secret.json not found. Set $channelEnvName or YOUTUBE_CLIENT_SECRET_JSON_B64 env var, or mount at $credentialPath")
+                }
             }
         }
 
@@ -223,6 +242,7 @@ class YoutubeService(
         .setAccessType("offline")
         .build()
     }
+
 
 
 
