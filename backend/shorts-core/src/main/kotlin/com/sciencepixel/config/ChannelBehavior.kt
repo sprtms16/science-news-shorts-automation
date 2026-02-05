@@ -19,9 +19,19 @@ interface ChannelBehavior {
     fun getExtraPrompt(today: String): String
     
     /**
-     * 생성 스킵 조건
+     * 생성 스킵 조건 (Renderer 등)
      */
     fun shouldSkipGeneration(): Boolean = false
+
+    /**
+     * 엄격한 날짜 체크 필요 여부 (오늘 생성된 영상만 업로드)
+     */
+    val requiresStrictDateCheck: Boolean get() = false
+    
+    /**
+     * 뉴스 집계(Aggregation) 필요 여부 (Stocks 채널 등)
+     */
+    val shouldAggregateNews: Boolean get() = false
 }
 
 /**
@@ -66,6 +76,8 @@ class StocksChannelBehavior : ChannelBehavior {
     override val isLongForm = true
     override val dailyLimit = 1
     override val useAsyncFlow = true
+    override val requiresStrictDateCheck = true
+    override val shouldAggregateNews = true
     
     override fun getExtraPrompt(today: String) = 
         "7. **Date Context:** Today is $today. Focus on the LATEST market news for this date."
@@ -81,6 +93,7 @@ class HistoryChannelBehavior : ChannelBehavior {
     override val isLongForm = true
     override val dailyLimit = 1
     override val useAsyncFlow = false
+    override val requiresStrictDateCheck = true
     
     override fun getExtraPrompt(today: String) = 
         "7. **Date Requirement:** Today is $today. You MUST create a script about a historical event that happened on THIS DATE ($today). Explicitly mention the Date in the intro."

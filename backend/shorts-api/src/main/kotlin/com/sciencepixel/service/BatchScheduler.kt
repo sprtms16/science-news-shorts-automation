@@ -1,5 +1,6 @@
 package com.sciencepixel.service
 
+import com.sciencepixel.config.ChannelBehavior
 import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.repository.SystemSettingRepository
 import com.sciencepixel.repository.VideoHistoryRepository
@@ -19,6 +20,7 @@ class BatchScheduler(
     private val cleanupService: CleanupService,
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher,
     private val notificationService: com.sciencepixel.service.NotificationService, // Added
+    private val channelBehavior: ChannelBehavior,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -42,15 +44,14 @@ class BatchScheduler(
         val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
             ?.value?.toIntOrNull() ?: 10
         
-        // [New] Strict Daily Limit for History/Stocks
-        // Limit Check: Skip if FORCE is true
-        if (!force && (channelId == "history" || channelId == "stocks")) {
+        // Daily Limit Check using ChannelBehavior
+        if (!force && channelBehavior.dailyLimit == 1) {
             val startOfDay = java.time.LocalDate.now().atStartOfDay()
             val todayCount = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(channelId, org.springframework.data.domain.PageRequest.of(0, 100))
                 .count { it.createdAt.isAfter(startOfDay) }
             
-            if (todayCount >= 1) {
-                println("🛑 [$channelId] Daily Limit Reached (Generated: $todayCount). Strict 1-per-day rule applied. (Use /manual/trigger to bypass)")
+            if (todayCount >= channelBehavior.dailyLimit) {
+                println("🛑 [$channelId] Daily Limit Reached (Generated: $todayCount). Strict ${channelBehavior.dailyLimit}-per-day rule applied. (Use /manual/trigger to bypass)")
                 return
             }
         }
@@ -86,9 +87,9 @@ class BatchScheduler(
         if (activeCount < limit) {
             println("🚀 Active buffer has space. Triggering Batch Job...")
 
-            // [New] Async Flow for Stocks
-            if (channelId == "stocks") {
-                println("📡 [BatchScheduler] Triggering Async Stock Discovery via Kafka...")
+            // Async Flow using ChannelBehavior
+            if (channelBehavior.useAsyncFlow) {
+                println("📡 [BatchScheduler] Triggering Async Discovery via Kafka for $channelId...")
                 kafkaEventPublisher.publishStockDiscoveryRequested(
                     com.sciencepixel.event.StockDiscoveryRequestedEvent(channelId)
                 )

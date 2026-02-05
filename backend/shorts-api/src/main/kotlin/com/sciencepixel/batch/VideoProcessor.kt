@@ -19,13 +19,14 @@ class VideoProcessor(
     private val geminiService: GeminiService,
     private val youtubeService: com.sciencepixel.service.YoutubeService,
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher,
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) : ItemProcessor<NewsItem, VideoHistory> {
 
     override fun process(item: NewsItem): VideoHistory? {
         // 0. Final Buffer Check
         val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
-            ?.value?.toIntOrNull() ?: 10
+            ?.value?.toIntOrNull() ?: channelBehavior.dailyLimit
         
         val currentActive = videoHistoryRepository.findByChannelIdAndStatusNotIn(channelId, listOf(
             VideoStatus.UPLOADED, 

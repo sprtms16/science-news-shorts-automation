@@ -1,5 +1,6 @@
 package com.sciencepixel.service
 
+import com.sciencepixel.config.ChannelBehavior
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.domain.Scene
@@ -13,9 +14,10 @@ class ProductionService(
     private val audioService: AudioService,
     private val geminiService: GeminiService,
     private val logPublisher: LogPublisher,
+    private val channelBehavior: ChannelBehavior,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
-    private val isLongForm = channelId == "stocks" || channelId == "history"
+    private val isLongForm = channelBehavior.isLongForm
     private val videoWidth = if (isLongForm) 1920 else 1080
     private val videoHeight = if (isLongForm) 1080 else 1920
     private val vfScaleFilter = "scale=$videoWidth:$videoHeight:force_original_aspect_ratio=increase,crop=$videoWidth:$videoHeight"

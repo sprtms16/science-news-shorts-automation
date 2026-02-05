@@ -15,7 +15,7 @@ open class RssItemReader(
     private val sources: List<com.sciencepixel.domain.RssSource>,
     private val contentProviderService: com.sciencepixel.service.ContentProviderService,
     private val maxItems: Int = 10,
-    private val channelId: String = "science" // Default for backward compatibility
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior
 ) : ItemReader<NewsItem> {
     private val items = LinkedList<NewsItem>()
     private var initialized = false
@@ -41,7 +41,7 @@ open class RssItemReader(
         }
 
         // [Stocks Aggregation Logic]
-        if (channelId == "stocks" && allItems.isNotEmpty()) {
+        if (channelBehavior.shouldAggregateNews && allItems.isNotEmpty()) {
             println("📈 Aggregating ${allItems.size} stock news items into a single Monthly Report...")
             
             val todayDate = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_DATE)
