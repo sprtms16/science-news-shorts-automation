@@ -58,39 +58,26 @@ class ScriptConsumer(
 
             // 이미 파이프라인 진행 중인 경우 건너뜀
             // 1.5 Safety Check & Claim (Locking)
-            // 오직 QUEUED 상태인 경우에만 작업을 시작하고 CREATING으로 상태를 변경하여 선점함
-            if (history.status != VideoStatus.QUEUED && history.status != VideoStatus.CREATING) {
-                 println("⏭️ Skipping: Video is in terminal state (${history.status}) for: ${event.title}")
+            // Valid states: QUEUED (New), SCRIPTING (Retry started by Scheduler), RETRY_QUEUED (Just in case)
+            if (history.status != VideoStatus.QUEUED && history.status != VideoStatus.SCRIPTING) {
+                 if (history.status == VideoStatus.FAILED || history.status == VideoStatus.RETRY_QUEUED) {
+                     println("⚠️ [ScriptConsumer] Invalid state for processing: ${history.status}. Reverting to RETRY_QUEUED.")
+                     videoHistoryRepository.save(history.copy(
+                         status = VideoStatus.RETRY_QUEUED,
+                         updatedAt = LocalDateTime.now()
+                     ))
+                     return
+                 }
+                 println("⏭️ Skipping: Video is in terminal or advanced state (${history.status}) for: ${event.title}")
                  return
             }
             
-            // 이미 CREATING이면 누군가 처리 중이므로 스킵 (단, 아주 오래된 건 데드락일 수 있으나 여기서는 안전하게 스킵)
-            // 예외: 최초 생성 시 getOrCreateHistory가 CREATING으로 만들었을 수 있으므로 이 로직은 QUEUED 도입 후 더욱 명확해짐
-            if (history.status == VideoStatus.CREATING) {
-                 // But wait, if we handle manual requests, they start as CREATING.
-                 // So we only skip if it seems 'active' (e.g. updated recently). 
-                 // However, with QUEUED introduced, we can strictly say: 
-                 // Batch jobs start as QUEUED. Manual jobs start as CREATING.
-                 // If it's QUEUED, we execute. If it's CREATING, we assume it's running OR it's a manual sync job that doesn't use this consumer.
-                 // But wait, Manual Async also goes here? No, Manual Async calls asyncVideoService directly.
-                 // So this Consumer is mostly for RSS Batch.
-                 
-                 // Let's implement Strict Claim for QUEUED items.
-                 // If it is CREATING, we double check if it's stale? 
-                 // For safety, let's process ONLY QUEUED items or items that just got created (if manual).
-                 // But effectively, if we use QUEUED, we should look for QUEUED.
-                 if (history.updatedAt.isAfter(LocalDateTime.now().minusMinutes(10))) {
-                     println("⏭️ Video already in pipeline (Status: CREATING) for: ${event.title}. Skipping.")
-                     return
-                 }
-            }
-
-            // Claim the job (Set to CREATING)
+            // Claim the job (Set to SCRIPTING)
             val processingHistory = videoHistoryRepository.save(history.copy(
-                status = VideoStatus.CREATING,
+                status = VideoStatus.SCRIPTING,
                 updatedAt = LocalDateTime.now()
             ))
-            println("🔒 Claimed job (QUEUED -> CREATING): ${event.title}")
+            println("🔒 Claimed job (QUEUED/RETRY -> SCRIPTING): ${event.title}")
 
             // 2. Call Gemini
             println("🤖 generating script for: ${event.title}...")
@@ -108,9 +95,9 @@ class ScriptConsumer(
                 return
             }
 
-            // 3. Update History with Script Data (Stay in CREATING)
+            // 3. Update History with Script Data (Stay in SCRIPTING)
             val updatedHistory = videoHistoryRepository.save(history.copy(
-                status = VideoStatus.CREATING,
+                status = VideoStatus.SCRIPTING,
                 title = scriptResponse.title,
                 description = scriptResponse.description,
                 tags = scriptResponse.tags,

@@ -39,13 +39,18 @@ data class VideoHistory(
 )
 
 enum class VideoStatus {
-    QUEUED,         // 대기 중 (배치 등록 직후)
-    CREATING,       // 생성 중 (작업 시작됨)
-    FAILED,         // 생성 실패
-    COMPLETED,      // 생성 완료
-    UPLOADING,      // 업로드 진행 중 (선점)
-    UPLOAD_FAILED,  // 업로드 실패 (영상은 완성됨)
-    UPLOADED        // 업로드 완료
+    QUEUED,             // 대기 중 (배치 등록 직후)
+    SCRIPTING,          // 대본 제작 중 (ScriptConsumer)
+    ASSETS_QUEUED,      // 에셋 생성 대기 (Script 완료 -> Kafka)
+    ASSETS_GENERATING,  // 에셋 생성 중 (SceneConsumer)
+    RENDER_QUEUED,      // 렌더링 대기 (Assets 완료 -> Kafka)
+    RENDERING,          // 렌더링 중 (RenderConsumer)
+    FAILED,             // 실패
+    RETRY_QUEUED,       // 재생성 대기 중 (실패 후 복구 대기)
+    COMPLETED,          // 제작 완료 (렌더링 완료 -> Upload 대기)
+    UPLOADING,          // 업로드 진행 중
+    UPLOAD_FAILED,      // 업로드 실패
+    UPLOADED            // 업로드 완료
 }
 
 @Document(collection = "quota_usage")

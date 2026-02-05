@@ -298,7 +298,7 @@ class AdminController(
 
         val videosToMatchStatuses = listOf(
             VideoStatus.COMPLETED,
-            VideoStatus.CREATING,
+            VideoStatus.RENDERING,
             VideoStatus.FAILED
         )
         val videosToMatch = videoRepository.findByStatusIn(videosToMatchStatuses).filter { 
@@ -364,7 +364,7 @@ class AdminController(
         var triggeredCount = 0
         targetVideos.forEach { video: com.sciencepixel.domain.VideoHistory ->
             // Update status (Preserve UPLOADED status to avoid re-uploading)
-            val nextStatus = if (video.status == VideoStatus.UPLOADED) VideoStatus.UPLOADED else VideoStatus.CREATING
+            val nextStatus = if (video.status == VideoStatus.UPLOADED) VideoStatus.UPLOADED else VideoStatus.SCRIPTING
             videoRepository.save(video.copy(status = nextStatus, updatedAt = LocalDateTime.now()))
             
             kafkaEventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
@@ -797,7 +797,8 @@ class AdminController(
         val effectiveChannelId = channelId ?: defaultChannelId
         val videos = videoRepository.findByChannelIdAndStatusIn(effectiveChannelId, listOf(
             VideoStatus.COMPLETED,
-            VideoStatus.CREATING,
+            VideoStatus.SCRIPTING,
+            VideoStatus.RENDERING,
             VideoStatus.FAILED
         )).filter { 
             it.youtubeUrl.isNotBlank() 
@@ -888,9 +889,9 @@ class AdminController(
                     targetStatus = VideoStatus.COMPLETED
                 } else {
                     // No link, No file
-                    // If it was recently updated (within 30 mins), maybe it's still CREATING
+                    // If it was recently updated (within 30 mins), maybe it's still Processing
                     val isRecent = video.updatedAt.isAfter(now.minusMinutes(30))
-                    targetStatus = if (isRecent) VideoStatus.CREATING else VideoStatus.FAILED
+                    targetStatus = if (isRecent) VideoStatus.SCRIPTING else VideoStatus.FAILED
                 }
 
                 if (video.status != targetStatus) {
@@ -932,7 +933,10 @@ class AdminController(
     @PostMapping("/maintenance/reset-creating-to-queued")
     fun resetCreatingToQueued(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
         val effectiveChannelId = channelId ?: defaultChannelId
-        val stuckVideos = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.CREATING)
+        // Find stuck SCRIPTING or RENDERING
+        val stuckScripting = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.SCRIPTING)
+        val stuckRendering = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.RENDERING)
+        val stuckVideos = stuckScripting + stuckRendering
         var resetCount = 0
         
         stuckVideos.forEach { video ->

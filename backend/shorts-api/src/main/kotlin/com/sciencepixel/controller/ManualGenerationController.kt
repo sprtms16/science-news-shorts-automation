@@ -230,7 +230,7 @@ class ManualGenerationController(
         return JobStatus(
             id = savedHistory.id!!,
             title = news.title,
-            status = VideoStatus.CREATING.name,
+            status = VideoStatus.SCRIPTING.name,
             filePath = null,
             youtubeUrl = null,
             message = "✅ 작업이 시작되었습니다. 완료 시 Discord/Telegram으로 알림됩니다. GET /manual/status/${savedHistory.id}로 상태 확인 가능"
@@ -255,7 +255,9 @@ class ManualGenerationController(
 
         val statusMessage = when (history.status) {
             VideoStatus.QUEUED -> "⏸️ 비디오 생성 대기 중..."
-            VideoStatus.CREATING -> "⏳ 비디오 생성 중..."
+            VideoStatus.SCRIPTING -> "📝 대본 작성 중..."
+            VideoStatus.RENDERING -> "🎬 영상 렌더링 중..."
+            VideoStatus.RETRY_QUEUED -> "⏳ 재시도 대기 중..."
             VideoStatus.COMPLETED -> "✅ 비디오 생성 완료! YouTube 업로드 대기 중..."
             VideoStatus.UPLOADED -> "🎉 YouTube 업로드 완료!"
             VideoStatus.FAILED -> "❌ 비디오 생성 실패: ${history.errorMessage}"

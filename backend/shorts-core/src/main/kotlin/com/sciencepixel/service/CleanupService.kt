@@ -188,9 +188,16 @@ class CleanupService(
         println("🧹 [$channelId] Starting cleanup of STALE jobs (Processing or Uploading for too long)...")
         val now = LocalDateTime.now()
         
-        // 1. Stuck in CREATING (Renderer/Worker issue)
+        // 1. Stuck in Processing (Gemini, Assets, Render)
         val creatingThreshold = now.minusMinutes(30)
-        val staleCreating = repository.findByChannelIdAndStatus(channelId, VideoStatus.CREATING).filter { 
+        val processingStatuses = listOf(
+            VideoStatus.SCRIPTING, 
+            VideoStatus.ASSETS_QUEUED, 
+            VideoStatus.ASSETS_GENERATING, 
+            VideoStatus.RENDER_QUEUED, 
+            VideoStatus.RENDERING
+        )
+        val staleProcessing = repository.findByChannelIdAndStatusIn(channelId, processingStatuses).filter { 
             it.updatedAt.isBefore(creatingThreshold) 
         }
 
@@ -200,7 +207,7 @@ class CleanupService(
             it.updatedAt.isBefore(uploadingThreshold)
         }
 
-        val totalStale = staleCreating + staleUploading
+        val totalStale = staleProcessing + staleUploading
 
         if (totalStale.isEmpty()) {
             println("✅ No stale jobs found.")
@@ -213,13 +220,21 @@ class CleanupService(
                 // Determine if we should delete file (only if it exists and is potentially corrupted/stuck)
                 if (video.filePath.isNotBlank()) {
                     val file = File(video.filePath)
-                    if (file.exists() && video.status == VideoStatus.CREATING) {
+                    val isProcessing = processingStatuses.contains(video.status)
+                    if (file.exists() && isProcessing) {
                         file.delete()
                     }
                 }
                 
                 // Mark as FAILED so it can be retried or inspected manually
-                val reason = if (video.status == VideoStatus.CREATING) "CREATING_TIMEOUT" else "UPLOADING_TIMEOUT"
+                val reason = when(video.status) {
+                    VideoStatus.SCRIPTING -> "SCRIPTING_TIMEOUT"
+                    VideoStatus.ASSETS_QUEUED -> "ASSETS_QUEUE_TIMEOUT"
+                    VideoStatus.ASSETS_GENERATING -> "ASSETS_GEN_TIMEOUT"
+                    VideoStatus.RENDER_QUEUED -> "RENDER_QUEUE_TIMEOUT"
+                    VideoStatus.RENDERING -> "RENDERING_TIMEOUT" 
+                    else -> "UPLOADING_TIMEOUT"
+                }
                 repository.save(video.copy(
                     status = VideoStatus.FAILED,
                     failureStep = "STALE_JOB",

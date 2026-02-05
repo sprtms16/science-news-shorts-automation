@@ -46,12 +46,12 @@ class SceneConsumer(
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.CREATING,
+                    status = VideoStatus.ASSETS_GENERATING,
                     progress = 10,
                     currentStep = "에셋 생성 시작",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
-                println("📊 [${event.title}] 진행률: 10% - 에셋 생성 시작")
+                println("📊 [${event.title}] 진행률: 10% - 에셋 생성 시작 (Status: ASSETS_GENERATING)")
             }
 
             // Call Production Service to generate assets (Clips) with progress callback
@@ -86,14 +86,15 @@ class SceneConsumer(
                 return
             }
 
-            // Progress update (60%: 에셋 생성 완료)
+            // Progress update (60%: 에셋 생성 완료 -> RENDER_QUEUED)
             videoHistoryRepository.findById(event.videoId).ifPresent { v ->
                 videoHistoryRepository.save(v.copy(
+                    status = VideoStatus.RENDER_QUEUED,
                     progress = 60,
                     currentStep = "에셋 생성 완료, 렌더링 대기",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
-                println("📊 [${event.title}] 진행률: 60% - 에셋 생성 완료")
+                println("⏳ [${event.title}] 에셋 완료. Status -> RENDER_QUEUED. Publishing event...")
             }
 
             // Publish Next Event

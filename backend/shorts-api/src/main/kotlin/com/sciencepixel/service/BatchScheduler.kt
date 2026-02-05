@@ -56,10 +56,14 @@ class BatchScheduler(
             }
         }
 
-        // 3. Count Active and Failed separately
         val activeStatuses = listOf(
             VideoStatus.QUEUED,
-            VideoStatus.CREATING,
+            VideoStatus.SCRIPTING,
+            VideoStatus.ASSETS_QUEUED,
+            VideoStatus.ASSETS_GENERATING,
+            VideoStatus.RENDER_QUEUED,
+            VideoStatus.RENDERING,
+            VideoStatus.RETRY_QUEUED, 
             VideoStatus.COMPLETED,
             VideoStatus.UPLOADING
         )
@@ -121,14 +125,16 @@ class BatchScheduler(
     @Scheduled(cron = "0 0/10 * * * *")
     fun recoverFailedJobs() {
         if (channelBehavior.shouldSkipGeneration()) return 
-
+        
         recoverFailedGenerations()
+        processRetryQueue()
+        monitorStuckRetries()
         recoverStuckUploads()
     }
 
+    // 4. Retry Logic: FAILED -> RETRY_QUEUED
     private fun recoverFailedGenerations() {
-        // Find FAILED jobs (excluding upload errors, safety errors treated as permanent fail generally but checking policy)
-        // User request: "10분 단위로 실패 영상을 복구 시도 하되... 최대 파티션 수만큼"
+        // Find FAILED jobs
         val failedVideos = videoHistoryRepository.findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId, VideoStatus.FAILED)
         
         failedVideos.filter { it.failureStep != "UPLOAD_FAIL" && it.failureStep != "SAFETY" && it.failureStep != "DUPLICATE" && (it.regenCount ?: 0) < 3 }
@@ -151,26 +157,84 @@ class BatchScheduler(
                     return@forEach
                 }
 
-                println("🔄 [$channelId] [Auto-Recovery] Triggering generation retry (${(video.regenCount ?: 0) + 1}/3) for: ${video.title}")
-                
-                // Re-publish to RSS Topic to restart from Gemin
-                kafkaEventPublisher.publishRssNewItem(
-                     com.sciencepixel.event.RssNewItemEvent(
-                         channelId = channelId,
-                         title = video.title ?: "Untitled",
-                         url = video.link ?: "",
-                         summary = video.summary ?: ""
-                     )
-                )
-
+                println("⏳ [$channelId] [Recovery] Moving to RETRY_QUEUED: ${video.title}")
                 videoHistoryRepository.save(video.copy(
-                    regenCount = (video.regenCount ?: 0) + 1,
-                    status = VideoStatus.QUEUED, // Reset to QUEUED to pass ScriptConsumer check
-                    failureStep = "",
-                    errorMessage = "",
+                    status = VideoStatus.RETRY_QUEUED,
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
+    }
+
+    // 5. Retry Dispatcher: RETRY_QUEUED -> SCRIPTING (Throttle)
+    private fun processRetryQueue() {
+        val retries = videoHistoryRepository.findByChannelIdAndStatus(channelId, VideoStatus.RETRY_QUEUED)
+        if (retries.isEmpty()) return
+
+        // Count currently active regenerations (Active items with regenCount > 0)
+        // using SCRIPTING/ASSETS/RENDERING status implies active processing.
+        val processingStatuses = listOf(
+            VideoStatus.SCRIPTING, 
+            VideoStatus.ASSETS_QUEUED, 
+            VideoStatus.ASSETS_GENERATING, 
+            VideoStatus.RENDER_QUEUED, 
+            VideoStatus.RENDERING
+        )
+        val activeRegens = videoHistoryRepository.findByChannelIdAndStatusIn(channelId, processingStatuses)
+            .count { it.regenCount > 0 }
+        
+        // Define Partition Limit (e.g., 5 concurrent retries)
+        val maxConcurrentRetries = 5 
+
+        if (activeRegens >= maxConcurrentRetries) {
+            println("🛑 [$channelId] Retry Concurrency Limit Reached ($activeRegens/$maxConcurrentRetries). Waiting...")
+            return
+        }
+
+        val slotsAvailable = maxConcurrentRetries - activeRegens
+        retries.take(slotsAvailable).forEach { video ->
+             println("🔄 [$channelId] [Retry-Dispatch] Starting generation retry (${(video.regenCount ?: 0) + 1}/3) for: ${video.title}")
+                
+             // Re-publish to RSS Topic to restart from Gemini
+             kafkaEventPublisher.publishRssNewItem(
+                  com.sciencepixel.event.RssNewItemEvent(
+                      channelId = channelId,
+                      title = video.title ?: "Untitled",
+                      url = video.link ?: "",
+                      summary = video.summary ?: ""
+                  )
+             )
+
+             videoHistoryRepository.save(video.copy(
+                 regenCount = (video.regenCount ?: 0) + 1,
+                 status = VideoStatus.SCRIPTING, // Start SCRIPTING
+                 failureStep = "",
+                 errorMessage = "",
+                 updatedAt = java.time.LocalDateTime.now()
+             ))
+        }
+    }
+
+    private fun monitorStuckRetries() {
+        val timeoutThreshold = java.time.LocalDateTime.now().minusMinutes(30)
+        val processingStatuses = listOf(
+            VideoStatus.SCRIPTING, 
+            VideoStatus.ASSETS_QUEUED, 
+            VideoStatus.ASSETS_GENERATING, 
+            VideoStatus.RENDER_QUEUED, 
+            VideoStatus.RENDERING
+        )
+        val stuckJobs = videoHistoryRepository.findByChannelIdAndStatusIn(channelId, processingStatuses)
+            .filter { it.updatedAt.isBefore(timeoutThreshold) && it.regenCount > 0 } // Only retries
+        
+        if (stuckJobs.isNotEmpty()) {
+            println("⚠️ [$channelId] Found ${stuckJobs.size} stuck retries > 30m. Reverting to RETRY_QUEUED.")
+            stuckJobs.forEach { video ->
+                videoHistoryRepository.save(video.copy(
+                    status = VideoStatus.RETRY_QUEUED,
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            }
+        }
     }
 
     private fun recoverStuckUploads() {

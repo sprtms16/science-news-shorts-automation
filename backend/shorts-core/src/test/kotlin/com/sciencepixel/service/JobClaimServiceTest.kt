@@ -52,7 +52,7 @@ class JobClaimServiceTest {
         )).thenReturn(existingVideo)
 
         // When
-        val result = jobClaimService.claimJob(videoId, VideoStatus.QUEUED, VideoStatus.CREATING)
+        val result = jobClaimService.claimJob(videoId, VideoStatus.QUEUED, VideoStatus.SCRIPTING)
 
         // Then
         assertTrue(result)
@@ -71,7 +71,7 @@ class JobClaimServiceTest {
         )).thenReturn(null)
 
         // When
-        val result = jobClaimService.claimJob(videoId, VideoStatus.QUEUED, VideoStatus.CREATING)
+        val result = jobClaimService.claimJob(videoId, VideoStatus.QUEUED, VideoStatus.SCRIPTING)
 
         // Then
         assertFalse(result)

@@ -48,9 +48,9 @@ class RenderConsumer(
                 }
 
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.CREATING,
+                    status = VideoStatus.RENDERING,
                     progress = 70,
-                    currentStep = "영상 렌더링 중",
+                    currentStep = "영상 렌더링 중 (Status: RENDERING)",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 println("📊 [${event.title}] 진행률: 70% - 영상 렌더링 시작")
