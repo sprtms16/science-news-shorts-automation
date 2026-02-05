@@ -69,15 +69,11 @@ class YoutubeUploadScheduler(
                     updatedAt = java.time.LocalDateTime.now()
                 ))
 
-                kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
-                    channelId = channelId, // 추가
+                kafkaEventPublisher.publishUploadRequested(com.sciencepixel.event.UploadRequestedEvent(
+                    channelId = channelId,
                     videoId = video.id ?: "",
                     title = video.title,
-                    summary = video.summary,
-                    description = video.description,
-                    link = video.link,
-                    filePath = video.filePath,
-                    keywords = emptyList()
+                    filePath = video.filePath
                 ))
             } else {
                 if (video.status != VideoStatus.UPLOADED) {

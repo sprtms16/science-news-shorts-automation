@@ -152,6 +152,15 @@ class VideoUploadConsumer(
                     println("✅ [$channelId] Upload Success via Kafka: $youtubeUrl")
                 } else {
                     println("⚠️ [$channelId] File not found: ${video.filePath}")
+                    
+                    // Mark as UPLOAD_FAILED (video was rendered, but file missing)
+                    repository.save(video.copy(
+                        status = VideoStatus.UPLOAD_FAILED,
+                        failureStep = "UPLOAD",
+                        errorMessage = "File not found: ${video.filePath}",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                    
                     eventPublisher.publishUploadFailed(UploadFailedEvent(
                         channelId = channelId,
                         videoId = video.id!!,
@@ -169,11 +178,20 @@ class VideoUploadConsumer(
         } catch (e: Exception) {
             logPublisher.error("shorts-controller", "YouTube Upload Failed: ${event.videoId}", "Error: ${e.message}", traceId = event.videoId)
             
+            // Mark as UPLOAD_FAILED in DB
+            repository.findById(event.videoId).ifPresent { video ->
+                repository.save(video.copy(
+                    status = VideoStatus.UPLOAD_FAILED,
+                    failureStep = "UPLOAD",
+                    errorMessage = e.message ?: "Unknown error",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            }
+            
             eventPublisher.publishUploadFailed(UploadFailedEvent(
                 channelId = channelId,
                 videoId = event.videoId,
-                title = "Unknown Title", // We might not have video object here if findById failed? Accessing event is safer for basic info if available, but event only has limited fields.
-                // UploadRequestedEvent has title.
+                title = event.title,
                 filePath = event.filePath,
                 reason = e.message ?: "Unknown error",
                 retryCount = 0,
