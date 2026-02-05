@@ -36,6 +36,7 @@ dependencies {
     api("com.rometools:rome:2.1.0")
     
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
 }
 
 // This is a library module, not a bootable app
