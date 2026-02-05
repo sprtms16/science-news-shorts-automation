@@ -81,8 +81,8 @@ class AdminController(
 
         println("🚀 Manual Upload Triggered for: ${video.title}")
         
-        kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
-            channelId = video.channelId, // video 객체에서 가져옴
+        kafkaEventPublisher.publishUploadRequested(com.sciencepixel.event.UploadRequestedEvent(
+            channelId = video.channelId,
             videoId = video.id!!,
             title = video.title,
             summary = video.summary,
@@ -92,6 +92,7 @@ class AdminController(
             thumbnailPath = video.thumbnailPath,
             keywords = emptyList()
         ))
+
 
         return ResponseEntity.ok(mapOf("message" to "Upload triggered for ${video.title}"))
     }
