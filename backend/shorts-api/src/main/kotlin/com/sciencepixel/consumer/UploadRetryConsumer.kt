@@ -5,6 +5,7 @@ import com.sciencepixel.config.KafkaConfig
 import com.sciencepixel.event.*
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.domain.VideoStatus
+import com.sciencepixel.service.JobClaimService
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 
@@ -18,6 +19,7 @@ class UploadRetryConsumer(
     private val eventPublisher: KafkaEventPublisher,
     private val objectMapper: ObjectMapper,
     private val cleanupService: com.sciencepixel.service.CleanupService,
+    private val jobClaimService: JobClaimService,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 

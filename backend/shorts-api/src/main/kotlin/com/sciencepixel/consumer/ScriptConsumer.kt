@@ -8,6 +8,7 @@ import com.sciencepixel.event.RssNewItemEvent
 import com.sciencepixel.event.ScriptCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.GeminiService
+import com.sciencepixel.service.JobClaimService
 import com.sciencepixel.service.LogPublisher
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.kafka.annotation.KafkaListener
@@ -27,6 +28,7 @@ class ScriptConsumer(
     private val eventPublisher: KafkaEventPublisher,
     private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper,
+    private val jobClaimService: JobClaimService,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -72,39 +74,17 @@ class ScriptConsumer(
                 }
             }
 
-            // 오직 QUEUED 상태인 경우에만 작업을 시작하고 CREATING으로 상태를 변경하여 선점함
-            if (history.status != VideoStatus.QUEUED && history.status != VideoStatus.CREATING) {
-                 println("⏭️ Skipping: Video is in terminal state (${history.status}) for: ${event.title}")
+            // 오직 QUEUED 상태인 경우에만 작업을 시작 - 원자적 상태 전환으로 중복 방지
+            if (history.status != VideoStatus.QUEUED) {
+                 println("⏭️ Skipping: Video is not in QUEUED state (${history.status}) for: ${event.title}")
                  return
             }
             
-            // 이미 CREATING이면 누군가 처리 중이므로 스킵 (단, 아주 오래된 건 데드락일 수 있으나 여기서는 안전하게 스킵)
-            // 예외: 최초 생성 시 getOrCreateHistory가 CREATING으로 만들었을 수 있으므로 이 로직은 QUEUED 도입 후 더욱 명확해짐
-            if (history.status == VideoStatus.CREATING) {
-                 // But wait, if we handle manual requests, they start as CREATING.
-                 // So we only skip if it seems 'active' (e.g. updated recently). 
-                 // However, with QUEUED introduced, we can strictly say: 
-                 // Batch jobs start as QUEUED. Manual jobs start as CREATING.
-                 // If it's QUEUED, we execute. If it's CREATING, we assume it's running OR it's a manual sync job that doesn't use this consumer.
-                 // But wait, Manual Async also goes here? No, Manual Async calls asyncVideoService directly.
-                 // So this Consumer is mostly for RSS Batch.
-                 
-                 // Let's implement Strict Claim for QUEUED items.
-                 // If it is CREATING, we double check if it's stale? 
-                 // For safety, let's process ONLY QUEUED items or items that just got created (if manual).
-                 // But effectively, if we use QUEUED, we should look for QUEUED.
-                 if (history.updatedAt.isAfter(LocalDateTime.now().minusMinutes(10))) {
-                     println("⏭️ Video already in pipeline (Status: CREATING) for: ${event.title}. Skipping.")
-                     return
-                 }
+            // 원자적 Claim (MongoDB findAndModify) - 중복 실행 방지
+            if (!jobClaimService.claimJob(history.id!!, VideoStatus.QUEUED, VideoStatus.CREATING)) {
+                println("⏭️ Job already claimed by another instance: ${event.title}")
+                return
             }
-
-            // Claim the job (Set to CREATING)
-            val processingHistory = videoHistoryRepository.save(history.copy(
-                status = VideoStatus.CREATING,
-                updatedAt = LocalDateTime.now()
-            ))
-            println("🔒 Claimed job (QUEUED -> CREATING): ${event.title}")
 
             // 2. Call Gemini
             println("🤖 generating script for: ${event.title}...")

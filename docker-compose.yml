@@ -292,10 +292,12 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_EXTRA_ARGS=--hostname=shorts-admin
+      - TS_SERVE_CONFIG=/config/serve.json
     ports:
       - "3000:80"
     volumes:
       - ./vpn-state:/var/lib/tailscale
+      - ./tailscale-config:/config
       - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
