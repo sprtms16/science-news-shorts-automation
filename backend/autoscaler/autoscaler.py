@@ -214,44 +214,68 @@ class DockerAutoscaler:
             if desired_replicas > self.current_replicas:
                 containers_to_add = desired_replicas - self.current_replicas
                 
-                # Get env from any existing container if possible
-                existing = self.docker_client.containers.list()
-                env_dict = {}
-                for c in existing:
-                    if TARGET_SERVICE in c.name:
-                        env_list = c.attrs['Config']['Env'] or []
-                        for env_str in env_list:
-                            if '=' in env_str:
-                                k, v = env_str.split('=', 1)
-                                env_dict[k] = v
+                # First, try to restart stopped containers
+                stopped_containers = self.docker_client.containers.list(
+                    all=True,
+                    filters={"status": "exited"}
+                )
+                stopped_renderers = [c for c in stopped_containers 
+                                    if TARGET_SERVICE in c.name and 'autoscaler' not in c.name]
+                stopped_renderers.sort(key=lambda c: c.name)  # Start lower-numbered ones first
+                
+                restarted = 0
+                for container in stopped_renderers:
+                    if restarted >= containers_to_add:
                         break
+                    try:
+                        print(f"   ♻️ Restarting stopped container: {container.name}")
+                        container.start()
+                        restarted += 1
+                    except Exception as e:
+                        print(f"   ⚠️ Failed to restart {container.name}: {e}")
+                
+                # If we still need more, create new containers
+                remaining_to_add = containers_to_add - restarted
+                
+                if remaining_to_add > 0:
+                    # Get env from any existing container if possible
+                    existing = self.docker_client.containers.list()
+                    env_dict = {}
+                    for c in existing:
+                        if TARGET_SERVICE in c.name:
+                            env_list = c.attrs['Config']['Env'] or []
+                            for env_str in env_list:
+                                if '=' in env_str:
+                                    k, v = env_str.split('=', 1)
+                                    env_dict[k] = v
+                            break
 
-                for i in range(containers_to_add):
-                    # Find the next available index for naming
-                    existing_names = [c.name for c in self.docker_client.containers.list(all=True)]
-                    idx = 2
-                    while f"{TARGET_SERVICE}_{idx}" in existing_names:
-                        idx += 1
-                    
-                    new_name = f"{TARGET_SERVICE}_{idx}"
-                    print(f"   Starting replica: {new_name}")
-                    
-                    self.docker_client.containers.run(
-                        image=IMAGE_NAME,
-                        detach=True,
-                        name=new_name,
-                        network="science-news-shorts-automation_default",
-                        environment=env_dict,
-                        volumes={
-                            'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'},
-                            'science-news-shorts-automation_shorts-tokens': {'bind': '/app/tokens', 'mode': 'rw'}
-                        },
-                        restart_policy={"Name": "unless-stopped"}
-                    )
+                    for i in range(remaining_to_add):
+                        # Find the next available index for naming
+                        existing_names = [c.name for c in self.docker_client.containers.list(all=True)]
+                        idx = 2
+                        while f"{TARGET_SERVICE}_{idx}" in existing_names:
+                            idx += 1
+                        
+                        new_name = f"{TARGET_SERVICE}_{idx}"
+                        print(f"   🆕 Creating new replica: {new_name}")
+                        
+                        self.docker_client.containers.run(
+                            image=IMAGE_NAME,
+                            detach=True,
+                            name=new_name,
+                            network="science-news-shorts-automation_default",
+                            environment=env_dict,
+                            volumes={
+                                'science-news-shorts-automation_shorts-shared-data': {'bind': '/app/shared-data', 'mode': 'rw'},
+                                'science-news-shorts-automation_shorts-tokens': {'bind': '/app/tokens', 'mode': 'rw'}
+                            },
+                            restart_policy={"Name": "unless-stopped"}
+                        )
                 
                 self.current_replicas = desired_replicas
                 self.last_scale_time = time.time()
-                print(f"✅ Scaled UP to {desired_replicas} replicas")
+                print(f"✅ Scaled UP to {desired_replicas} replicas (restarted: {restarted}, new: {remaining_to_add})")
             else:
                 containers = [c for c in self.docker_client.containers.list() if TARGET_SERVICE in c.name]
                 containers.sort(key=lambda c: c.name, reverse=True) # Remove replicas first
@@ -266,9 +290,9 @@ class DockerAutoscaler:
                     if len(containers) > 1 and is_main:
                         continue
 
-                    print(f"   Stopping container: {container.name}")
+                    print(f"   ⏹️ Stopping container: {container.name}")
                     container.stop(timeout=10)
-                    container.remove()
+                    # Don't remove - keep for reuse!
                 
                 self.current_replicas = desired_replicas
                 self.last_scale_time = time.time()
