@@ -58,10 +58,11 @@ class VideoUploadConsumer(
                 }
                 
                 // Status check: Is it ready? (Avoid race with rendering/etc)
-                if (video.status != VideoStatus.COMPLETED) {
+                if (video.status != VideoStatus.COMPLETED && video.status != VideoStatus.UPLOAD_FAILED) {
                     println("⏳ Video ${event.videoId} is in status ${video.status}. Waiting for it to reach COMPLETED state.")
                     return
                 }
+
 
                 // Claim the upload (Set to UPLOADING)
                 repository.save(video.copy(
