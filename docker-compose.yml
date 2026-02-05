@@ -109,6 +109,7 @@ services:
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
       - APP_SCHEDULING_BATCH_CRON=0 0 * * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
 
@@ -139,6 +140,7 @@ services:
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
       - APP_SCHEDULING_BATCH_CRON=0 15 * * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback
 

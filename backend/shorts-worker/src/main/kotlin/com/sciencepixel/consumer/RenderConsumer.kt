@@ -97,26 +97,7 @@ class RenderConsumer(
 
             println("📊 [${event.title}] 진행률: 100% - 렌더링 완료")
 
-            // 🔔 Discord 알림: 영상 생성 완료
-            notificationService.notifyVideoCreated(
-                title = event.title,
-                filePath = finalPath
-            )
-
-            // Publish 'video.created' -> This triggers the existing VideoUploadConsumer!
-            // We bridge the new SAGA pipeline to the existing Upload pipeline here.
-            eventPublisher.publishVideoCreated(VideoCreatedEvent(
-                channelId = event.channelId, // 로컬 "renderer"가 아닌 원본 채널 ID 전달
-                videoId = event.videoId,
-                title = event.title,
-                summary = history?.summary ?: "",
-                description = event.scriptEvent?.summary ?: "", // ScriptCreatedEvent.summary is description
-                link = event.scriptEvent?.sourceLink ?: "",
-                filePath = finalPath,
-                keywords = event.keywords
-            ))
-
-            println("✅ [$channelId] Video Finalized & Upload Event Published: $finalPath")
+            println("✅ [$channelId] Video Finalized & Ready for Scheduler: $finalPath")
 
         } catch (e: Exception) {
             println("❌ [RenderConsumer] Error: ${e.message}")

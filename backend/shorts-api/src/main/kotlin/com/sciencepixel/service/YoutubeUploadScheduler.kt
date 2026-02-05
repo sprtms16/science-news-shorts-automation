@@ -30,47 +30,22 @@ class YoutubeUploadScheduler(
         private const val MAX_REGEN_COUNT = 1
     }
 
-    @Scheduled(cron = "0 0/5 * * * *") // 매 5분마다 체크
-    @Async
+    @Scheduled(cron = "\${app.scheduling.upload-cron:0 0/5 * * * *}") 
     fun uploadPendingVideos() {
+        // 1. Channel Behavior & Quota Check
         if (channelBehavior.shouldSkipGeneration()) return 
 
-        println("⏰ [$channelId] Scheduler Triggered: Checking for pending videos at ${java.time.LocalDateTime.now()}")
+        println("⏰ [$channelId] Schedular Triggered: Checking for pending videos (Time: ${java.time.LocalDateTime.now()})")
 
         if (!quotaTracker.canUpload()) {
             println("🛑 [$channelId] Quota exceeded. Skipping upload trigger.")
             return
         }
 
-        // 1. Check Interval Setting
-        val intervalHours = systemSettingRepository.findByChannelIdAndKey(channelId, "UPLOAD_INTERVAL_HOURS")
-            ?.value?.toDoubleOrNull() ?: 1.0 
-        
-        val lastUploaded = repository.findFirstByChannelIdAndStatusOrderByUpdatedAtDesc(channelId, VideoStatus.UPLOADED)
-        
-        if (lastUploaded != null) {
-            val nextUploadTime = lastUploaded.updatedAt.plusMinutes((intervalHours * 60).toLong())
-            if (java.time.LocalDateTime.now().isBefore(nextUploadTime)) {
-                println("⏳ [$channelId] Cadence check: Next upload scheduled after $nextUploadTime. Skipping.")
-                return
-            }
-        }
-
-        // 2. Retry Logic (Stocks & History Only)
-        if (channelId == "stocks" || channelId == "history") {
-            val failedUploads = repository.findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId, VideoStatus.FAILED)
-                .filter { it.failureStep == "UPLOAD_FAIL" }
-            
-            if (failedUploads.isNotEmpty()) {
-                println("🔄 [$channelId] Retrying ${failedUploads.size} failed uploads...")
-                failedUploads.forEach { triggerUpload(it) }
-                return 
-            }
-        }
-
-        // 3. Fetch target videos (New Uploads)
+        // 2. Fetch target videos (COMPLETED only)
+        // We only pick ONE video to upload per cycle.
         val pendingVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.COMPLETED)
-            .sortedBy { it.createdAt }
+            .sortedBy { it.createdAt } // Oldest first
             .filter { 
                 if (channelBehavior.requiresStrictDateCheck) {
                     val startOfDay = java.time.LocalDate.now().atStartOfDay()
@@ -84,38 +59,36 @@ class YoutubeUploadScheduler(
                 }
             }
         
-        println("📦 [$channelId] Found ${pendingVideos.size} videos ready for upload.")
+        if (pendingVideos.isEmpty()) {
+            println("📦 [$channelId] No pending COMPLETED videos found.")
+            return
+        }
 
-        // 4. Trigger 
-        pendingVideos.take(1).forEach { triggerUpload(it) }
+        // 3. Trigger One Upload
+        val targetVideo = pendingVideos.first()
+        println("🚀 [$channelId] Triggering upload for: ${targetVideo.title}")
+        
+        try {
+            triggerUpload(targetVideo)
+        } catch (e: Exception) {
+            println("❌ [$channelId] Error during scheduled upload for ${targetVideo.title}: ${e.message}")
+            // Stop on Error: Do NOT retry, just leave it as UPLOAD_FAILED (or whatever the service sets)
+            // The service handles setting the status to UPLOAD_FAILED.
+            // We do not proceed to next video. We stop here.
+        }
     }
 
     private fun triggerUpload(video: VideoHistory) {
          if (video.filePath.isNotBlank() && File(video.filePath).exists()) {
-            println("🚀 [$channelId] Triggering upload directly via Service: ${video.title}")
             videoUploadService.uploadVideo(video.id!!)
         } else {
-            if (video.status != VideoStatus.UPLOADED) {
-                println("⚠️ [$channelId] File missing for ${video.title}. Triggering regeneration.")
-                triggerRegeneration(video)
-            }
-        }
-    }
-
-    private fun triggerRegeneration(video: VideoHistory) {
-        val currentRegen = video.regenCount ?: 0
-        if (currentRegen < MAX_REGEN_COUNT) {
-            kafkaEventPublisher.publishRegenerationRequested(com.sciencepixel.event.RegenerationRequestedEvent(
-                channelId = channelId,
-                videoId = video.id ?: "",
-                title = video.title,
-                summary = video.summary,
-                link = video.link,
-                regenCount = currentRegen
+            println("⚠️ [$channelId] File missing for ${video.title}. Marking as FAILED.")
+            repository.save(video.copy(
+                status = VideoStatus.FAILED,
+                failureStep = "UPLOAD",
+                errorMessage = "File missing during scheduled upload",
+                updatedAt = java.time.LocalDateTime.now()
             ))
-        } else {
-            println("🚫 [$channelId] Max regeneration reached for: ${video.title}")
-            repository.save(video.copy(status = VideoStatus.FAILED, updatedAt = java.time.LocalDateTime.now()))
         }
     }
 }
