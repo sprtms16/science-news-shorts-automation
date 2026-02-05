@@ -70,9 +70,10 @@ class AdminController(
     fun uploadVideoManually(@PathVariable id: String): ResponseEntity<Map<String, Any>> {
         val video = videoRepository.findById(id).orElseThrow { RuntimeException("Video not found") }
         
-        if (video.status != com.sciencepixel.domain.VideoStatus.COMPLETED) {
-            return ResponseEntity.badRequest().body(mapOf("error" to "Video must be in COMPLETED status to upload"))
+        if (video.status != com.sciencepixel.domain.VideoStatus.COMPLETED && video.status != com.sciencepixel.domain.VideoStatus.UPLOAD_FAILED) {
+            return ResponseEntity.badRequest().body(mapOf("error" to "Video must be in COMPLETED or UPLOAD_FAILED status to upload"))
         }
+
 
         if (video.filePath.isBlank() || !File(video.filePath).exists()) {
             return ResponseEntity.badRequest().body(mapOf("error" to "Video file not found on disk"))
