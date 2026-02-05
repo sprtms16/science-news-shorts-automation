@@ -24,6 +24,7 @@ class ShortsBatchConfig(
     private val mongoWriter: MongoWriter,
     private val rssSourceRepository: com.sciencepixel.repository.RssSourceRepository,
     private val contentProviderService: com.sciencepixel.service.ContentProviderService,
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior,
     @Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -60,10 +61,10 @@ class ShortsBatchConfig(
         if (activeSources.isEmpty()) {
             println("⚠️ No active sources found for channel '$channelId' in DB! (Batch will be empty)")
              // Return empty reader safely
-             return RssItemReader(emptyList(), contentProviderService, 0)
+             return RssItemReader(emptyList(), contentProviderService, 0, channelBehavior)
         }
         
         println("📡 Loaded ${activeSources.size} active sources from DB for Batch.")
-        return RssItemReader(activeSources, contentProviderService, remainingSlots?.toInt() ?: 10, channelId)
+        return RssItemReader(activeSources, contentProviderService, remainingSlots?.toInt() ?: 10, channelBehavior)
     }
 }

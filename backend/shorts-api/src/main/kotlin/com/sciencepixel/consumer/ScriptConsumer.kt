@@ -29,6 +29,7 @@ class ScriptConsumer(
     private val logPublisher: LogPublisher,
     private val objectMapper: ObjectMapper,
     private val jobClaimService: JobClaimService,
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -63,12 +64,13 @@ class ScriptConsumer(
             
             // Daily Limit Check for 'stocks' and 'history'
             // One successful video per day guarantee (Rate Limit)
-            if (channelId == "stocks" || channelId == "history") {
+            // Daily Limit Check using ChannelBehavior
+            if (channelBehavior.dailyLimit == 1) {
                 val startOfDay = java.time.LocalDate.now().atStartOfDay()
                 val successStatuses = listOf(VideoStatus.CREATING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
                 val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
                 
-                if (dailyCount >= 1) {
+                if (dailyCount >= channelBehavior.dailyLimit) {
                     println("🛑 [$channelId] Daily limit reached (Count: $dailyCount). Skipping execution for today.")
                     return
                 }

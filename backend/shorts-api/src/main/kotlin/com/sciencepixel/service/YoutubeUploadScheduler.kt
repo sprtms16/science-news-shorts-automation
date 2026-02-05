@@ -21,6 +21,7 @@ class YoutubeUploadScheduler(
     private val systemSettingRepository: SystemSettingRepository,
     private val notificationService: NotificationService,
     private val quotaTracker: QuotaTracker,
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
     
@@ -31,7 +32,7 @@ class YoutubeUploadScheduler(
     @Scheduled(cron = "0 0/5 * * * *") // 매 5분마다 체크
     @Async
     fun uploadPendingVideos() {
-        if (channelId == "renderer") return // Renderer should not upload or check schedule
+        if (channelBehavior.shouldSkipGeneration()) return // Renderer(Worker) should not upload or check schedule
 
         println("⏰ [$channelId] Scheduler Triggered: Checking for pending videos at ${java.time.LocalDateTime.now()}")
 
@@ -58,8 +59,8 @@ class YoutubeUploadScheduler(
         val pendingVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.COMPLETED)
             .sortedBy { it.createdAt }
             .filter { 
-                // [New] Strict Date Rule for History/Stocks: Only upload videos created TODAY
-                if (channelId == "history" || channelId == "stocks") {
+                // Strict Date Rule using ChannelBehavior
+                if (channelBehavior.requiresStrictDateCheck) {
                     val startOfDay = java.time.LocalDate.now().atStartOfDay()
                     val isToday = it.createdAt.isAfter(startOfDay)
                     if (!isToday) {
