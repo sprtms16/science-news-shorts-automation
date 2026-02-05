@@ -139,8 +139,8 @@ class BatchScheduler(
                 kafkaEventPublisher.publishRssNewItem(
                      com.sciencepixel.event.RssNewItemEvent(
                          channelId = channelId,
-                         title = video.title,
-                         url = video.link,
+                         title = video.title ?: "Untitled",
+                         url = video.link ?: "",
                          summary = video.summary ?: ""
                      )
                 )
