@@ -148,8 +148,8 @@ class BatchScheduler(
                 videoHistoryRepository.save(video.copy(
                     regenCount = (video.regenCount ?: 0) + 1,
                     status = VideoStatus.QUEUED, // Reset to QUEUED to pass ScriptConsumer check
-                    failureStep = null,
-                    errorMessage = null,
+                    failureStep = "",
+                    errorMessage = "",
                     updatedAt = java.time.LocalDateTime.now()
                 ))
             }
