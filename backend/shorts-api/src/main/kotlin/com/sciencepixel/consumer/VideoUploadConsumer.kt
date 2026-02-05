@@ -35,17 +35,40 @@ class VideoUploadConsumer(
     }
 
     @KafkaListener(
-        topics = [KafkaConfig.TOPIC_UPLOAD_REQUESTED],
+        topics = [KafkaConfig.TOPIC_UPLOAD_REQUESTED, KafkaConfig.TOPIC_VIDEO_CREATED],
         groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-upload-group}"
     )
-    fun handleUploadRequested(message: String) {
-        val event = objectMapper.readValue(message, UploadRequestedEvent::class.java)
-        if (event.channelId != channelId) return
-        
-        println("📥 [$channelId] Received UploadRequestedEvent: ${event.videoId}")
+    fun handleEvent(message: String) {
+        try {
+            // Determine event type
+            if (message.contains("videoId") && message.contains("youtubeUrl")) {
+                // VideoUploadedEvent (Ignore)
+                return 
+            }
+            
+            val videoId = if (message.contains("\"videoId\":\"")) {
+                message.substringAfter("\"videoId\":\"").substringBefore("\"")
+            } else {
+                // VideoCreatedEvent format fallback check
+                null
+            }
+            
+            if (videoId == null) return
+
+            // Route to common handler logic
+            // We use a simplified common payload for processing
+            handleUploadForVideoId(videoId)
+
+        } catch (e: Exception) {
+            println("❌ Error parsing upload triggering event: ${e.message}")
+        }
+    }
+
+    private fun handleUploadForVideoId(videoId: String) {
+        println("📥 [$channelId] Processing Upload Trigger for: $videoId")
 
         try {
-            val videoOpt = repository.findById(event.videoId)
+            val videoOpt = repository.findById(videoId)
             if (videoOpt.isPresent) {
                 val video = videoOpt.get()
                 // Idempotency check: Already uploaded or currently uploading?
@@ -180,10 +203,10 @@ class VideoUploadConsumer(
                 return
             }
         } catch (e: Exception) {
-            logPublisher.error("shorts-controller", "YouTube Upload Failed: ${event.videoId}", "Error: ${e.message}", traceId = event.videoId)
+            logPublisher.error("shorts-controller", "YouTube Upload Failed: $videoId", "Error: ${e.message}", traceId = videoId)
             
             // Mark as UPLOAD_FAILED in DB
-            repository.findById(event.videoId).ifPresent { video ->
+            repository.findById(videoId).ifPresent { video ->
                 repository.save(video.copy(
                     status = VideoStatus.UPLOAD_FAILED,
                     failureStep = "UPLOAD",
@@ -194,13 +217,15 @@ class VideoUploadConsumer(
             
             eventPublisher.publishUploadFailed(UploadFailedEvent(
                 channelId = channelId,
-                videoId = event.videoId,
-                title = event.title,
-                filePath = event.filePath,
+                videoId = videoId,
+                title = "Unknown",
+                filePath = "",
                 reason = e.message ?: "Unknown error",
                 retryCount = 0,
                 thumbnailPath = "" 
             ))
         }
     }
+
+    // Legacy handler kept for reference or removed? (Replaced by handleEvent)
 }

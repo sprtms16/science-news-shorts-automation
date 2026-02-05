@@ -105,8 +105,8 @@ class YoutubeUploadScheduler(
                 keywords = emptyList()
             ))
             
-            // Optimistic Status Update to prevent double triggering
-            repository.save(video.copy(status = VideoStatus.UPLOADING, updatedAt = java.time.LocalDateTime.now()))
+            // Do NOT update status here. Let the Consumer claim it via Atomic check.
+            // This prevents the "Already UPLOADING" lock-out race condition.
         } else {
             if (video.status != VideoStatus.UPLOADED) {
                 println("⚠️ [$channelId] File missing for ${video.title}. Triggering regeneration.")
