@@ -131,8 +131,26 @@ class BatchScheduler(
         // User request: "10분 단위로 실패 영상을 복구 시도 하되... 최대 파티션 수만큼"
         val failedVideos = videoHistoryRepository.findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId, VideoStatus.FAILED)
         
-        failedVideos.filter { it.failureStep != "UPLOAD_FAIL" && it.failureStep != "SAFETY" && (it.regenCount ?: 0) < 3 }
+        failedVideos.filter { it.failureStep != "UPLOAD_FAIL" && it.failureStep != "SAFETY" && it.failureStep != "DUPLICATE" && (it.regenCount ?: 0) < 3 }
             .forEach { video ->
+                // Fundamental Check: Is there already a successful version?
+                val alreadyExists = videoHistoryRepository.existsByChannelIdAndLinkAndStatusIn(
+                    channelId,
+                    video.link ?: "",
+                    listOf(VideoStatus.COMPLETED, VideoStatus.UPLOADED, VideoStatus.UPLOADING)
+                )
+
+                if (alreadyExists) {
+                    println("⏭️ [$channelId] [Auto-Recovery] Skipping retry for '${video.title}' - A completed version already exists.")
+                    videoHistoryRepository.save(video.copy(
+                        status = VideoStatus.FAILED,
+                        failureStep = "DUPLICATE",
+                        errorMessage = "Duplicate of existing completed video",
+                        updatedAt = java.time.LocalDateTime.now()
+                    ))
+                    return@forEach
+                }
+
                 println("🔄 [$channelId] [Auto-Recovery] Triggering generation retry (${(video.regenCount ?: 0) + 1}/3) for: ${video.title}")
                 
                 // Re-publish to RSS Topic to restart from Gemin

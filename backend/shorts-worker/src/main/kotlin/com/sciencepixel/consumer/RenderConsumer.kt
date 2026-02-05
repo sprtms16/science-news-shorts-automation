@@ -42,6 +42,11 @@ class RenderConsumer(
 
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
+                if (history.status == VideoStatus.COMPLETED || history.status == VideoStatus.UPLOADED) {
+                    println("⏭️ Video already rendered: ${event.title}. Skipping.")
+                    return
+                }
+
                 videoHistoryRepository.save(history.copy(
                     status = VideoStatus.CREATING,
                     progress = 70,

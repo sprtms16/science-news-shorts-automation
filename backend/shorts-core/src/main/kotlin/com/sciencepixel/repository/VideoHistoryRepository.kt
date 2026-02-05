@@ -19,6 +19,7 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
     fun findByChannelIdAndTitle(channelId: String, title: String): List<VideoHistory>
     fun findByChannelIdAndRssTitle(channelId: String, rssTitle: String): List<VideoHistory>
     fun existsByChannelIdAndLink(channelId: String, link: String): Boolean
+    fun existsByChannelIdAndLinkAndStatusIn(channelId: String, link: String, statuses: Collection<VideoStatus>): Boolean
     
     // Admin 전용: 모든 채널 데이터 조회용
     fun findByChannelId(channelId: String): List<VideoHistory>
