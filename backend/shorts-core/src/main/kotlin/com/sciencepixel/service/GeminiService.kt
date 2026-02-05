@@ -449,8 +449,8 @@ class GeminiService(
             [Rules]
             1. **Language:** MUST BE KOREAN (한국어). Do not output English sentences in the script/title/description (except keywords).
             2. **Format:** Optimized for YouTube Shorts (~60 seconds, 13-14 sentences).
-            3. **Tone:** Appropriate for $CHANNEL_NAME audience. 
-            4. **Intro/Outro:** Greeting as $CHANNEL_NAME, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
+            3. **Tone:** Appropriate for $effectiveChannelName audience. 
+            4. **Intro/Outro:** Greeting as $effectiveChannelName, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
             5. **Sources:** List names (e.g., "Nature", "Reddit", "Reuters").
             6. **Keywords:** Scenes' keywords MUST be visual, common English terms for stock footage extraction.
             ${
