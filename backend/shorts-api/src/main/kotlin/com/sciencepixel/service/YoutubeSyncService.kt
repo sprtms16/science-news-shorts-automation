@@ -18,9 +18,11 @@ class YoutubeSyncService(
     /**
      * Sync YouTube videos to local DB every 1 hour.
      * Initially performs a deep sync, then incremental.
+     * initialDelay prevents immediate auth request on server startup.
      */
-    @Scheduled(fixedRate = 3600000) // 1 hour
+    @Scheduled(fixedRate = 3600000, initialDelay = 300000) // 1 hour, start after 5 minutes
     fun syncVideos() {
+
         println("📡 [$channelId] Starting YouTube video sync...")
         try {
             var pageToken: String? = null

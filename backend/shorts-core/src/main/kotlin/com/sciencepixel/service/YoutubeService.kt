@@ -200,24 +200,39 @@ class YoutubeService(
     }
 
     private fun getCredentials(targetChannelId: String? = null): Credential {
+        val effectiveChannelId = targetChannelId ?: channelId
         val flow = getFlow(targetChannelId)
+        
+        println("🔑 [$effectiveChannelId] Loading credentials from tokens/$effectiveChannelId...")
+        
         // Try to load existing credential
         var credential = flow.loadCredential("user")
         
+        if (credential == null) {
+            println("⚠️ [$effectiveChannelId] No stored credential found!")
+        } else {
+            println("✅ [$effectiveChannelId] Credential loaded. RefreshToken: ${credential.refreshToken?.take(20)}..., ExpiresIn: ${credential.expiresInSeconds}s")
+        }
+        
         // Check if credential exists and is valid (or refreshable)
         if (credential != null && (credential.refreshToken != null || credential.expiresInSeconds == null || credential.expiresInSeconds > 60)) {
+            println("✅ [$effectiveChannelId] Credential is valid, using existing token.")
             return credential
         }
         
         // Try to refresh if possible
         try {
             if (credential != null && credential.refreshToken != null) {
+                println("🔄 [$effectiveChannelId] Attempting to refresh token...")
                 if (credential.refreshToken()) {
+                    println("✅ [$effectiveChannelId] Token refreshed successfully!")
                     return credential
+                } else {
+                    println("⚠️ [$effectiveChannelId] Token refresh returned false.")
                 }
             }
         } catch (e: Exception) {
-            println("⚠️ Refresh failed for $targetChannelId, re-authenticating...")
+            println("⚠️ [$effectiveChannelId] Refresh failed: ${e.message}")
         }
 
         // Needs new Auth
@@ -225,10 +240,11 @@ class YoutubeService(
         
         credential = flow.loadCredential("user")
         if (credential == null) {
-             throw RuntimeException("Authorization failed or timed out for $targetChannelId. Please authenticate via the URL in logs.")
+             throw RuntimeException("Authorization failed or timed out for $effectiveChannelId. Please authenticate via the URL in logs.")
         }
         return credential
     }
+
     
     fun getAuthorizationUrl(targetChannelId: String? = null): String {
         val flow = getFlow(targetChannelId)
