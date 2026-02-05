@@ -933,10 +933,15 @@ class AdminController(
     @PostMapping("/maintenance/reset-creating-to-queued")
     fun resetCreatingToQueued(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
         val effectiveChannelId = channelId ?: defaultChannelId
-        // Find stuck SCRIPTING or RENDERING
-        val stuckScripting = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.SCRIPTING)
-        val stuckRendering = videoRepository.findByChannelIdAndStatus(effectiveChannelId, VideoStatus.RENDERING)
-        val stuckVideos = stuckScripting + stuckRendering
+        // Find stuck SCRIPTING, RENDERING or intermediate QUEUED states
+        val stuckStatuses = listOf(
+            VideoStatus.SCRIPTING,
+            VideoStatus.ASSETS_QUEUED,
+            VideoStatus.ASSETS_GENERATING,
+            VideoStatus.RENDER_QUEUED,
+            VideoStatus.RENDERING
+        )
+        val stuckVideos = videoRepository.findByChannelIdAndStatusIn(effectiveChannelId, stuckStatuses)
         var resetCount = 0
         
         stuckVideos.forEach { video ->
