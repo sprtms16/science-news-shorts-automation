@@ -18,7 +18,7 @@ data class VideoHistory(
     val title: String,
     val summary: String,
     val link: String,
-    val status: VideoStatus = VideoStatus.CREATING,
+    val status: VideoStatus = VideoStatus.QUEUED,
     val failureStep: String = "", // e.g. "SCRIPT", "ASSETS", "RENDER", "UPLOAD"
     val errorMessage: String = "",
     val description: String = "", // YouTube description (Korean)
