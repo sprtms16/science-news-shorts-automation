@@ -122,7 +122,7 @@ class CleanupService(
     }
 
     fun cleanupOldWorkspaces() {
-        println("🧹 Starting cleanup of old workspace directories...")
+        println("🧹 [$channelId] Starting cleanup of old workspace directories...")
         val workspaceRoot = File(sharedDataPath, "workspace")
         
         if (!workspaceRoot.exists() || !workspaceRoot.isDirectory) {
@@ -134,7 +134,8 @@ class CleanupService(
         var deletedCount = 0
 
         // Traverse: workspace -> channelId -> videoId
-        workspaceRoot.listFiles()?.filter { it.isDirectory }?.forEach { channelDir ->
+        // FIX: Scope to CURRENT CHANNEL ONLY to prevent cross-service deletions
+        workspaceRoot.listFiles()?.filter { it.isDirectory && it.name == channelId }?.forEach { channelDir ->
             channelDir.listFiles()?.filter { it.isDirectory }?.forEach { videoDir ->
                 if (videoDir.lastModified() < cleanupThreshold) {
                     try {
@@ -148,20 +149,16 @@ class CleanupService(
                 }
             }
             
-            // Clean up empty channel directories
+            // Clean up empty channel directories (Only for own channel)
             if (channelDir.listFiles()?.isEmpty() == true) {
                 channelDir.delete()
             }
         }
         
-        // Also clean up legacy workspace_ folders in root just in case
-        File(sharedDataPath).listFiles()?.forEach { file ->
-            if (file.isDirectory && file.name.startsWith("workspace_") && file.lastModified() < cleanupThreshold) {
-                file.deleteRecursively()
-            }
-        }
+        // Also clean up legacy workspace_ folders in root just in case (Only if explicitly matching, otherwise skip to be safe)
+        // Ignoring root-level legacy 'workspace_' folders to avoid accidents.
         
-        println("✅ Workspace cleanup complete. Removed $deletedCount old directories.")
+        println("✅ Workspace cleanup complete for channel '$channelId'. Removed $deletedCount old directories.")
     }
 
     /**
@@ -169,12 +166,13 @@ class CleanupService(
      * Use with caution.
      */
     fun cleanupAllTemporaryFiles(): Int {
-        println("🧹 AGGRESSIVE: Cleaning up ALL temporary workspaces...")
+        println("🧹 [$channelId] AGGRESSIVE: Cleaning up ALL temporary workspaces for this channel...")
         val workspaceRoot = File(sharedDataPath, "workspace")
         var count = 0
         if (workspaceRoot.exists()) {
             workspaceRoot.listFiles()?.forEach { channelDir ->
-                if (channelDir.isDirectory) {
+                // FIX: Only delete if channel matches
+                if (channelDir.isDirectory && channelDir.name == channelId) {
                     channelDir.listFiles()?.forEach { videoDir ->
                         if (videoDir.deleteRecursively()) count++
                     }

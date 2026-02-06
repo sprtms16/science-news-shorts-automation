@@ -540,8 +540,9 @@ class AdminController(
     fun savePrompt(@RequestBody prompt: SystemPrompt): SystemPrompt = promptRepository.save(prompt.copy(updatedAt = LocalDateTime.now()))
 
     @PostMapping("/videos/cleanup-sensitive")
-    fun cleanupSensitiveVideos(): ResponseEntity<Map<String, Any>> {
-        val videos = videoRepository.findByStatusNot(VideoStatus.UPLOADED)
+    fun cleanupSensitiveVideos(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val videos = videoRepository.findByChannelIdAndStatusNot(effectiveChannelId, VideoStatus.UPLOADED)
             .sortedByDescending { it.createdAt }
             .take(20) // 최신 20개만 집중 검사 (API 429 방지)
             
@@ -595,8 +596,9 @@ class AdminController(
     }
 
     @PostMapping("/maintenance/deep-cleanup")
-    fun deepCleanup(): ResponseEntity<Map<String, Any>> {
-        val allVideos = videoRepository.findAll()
+    fun deepCleanup(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        val allVideos = videoRepository.findByChannelId(effectiveChannelId)
         var deletedCount = 0
         
         allVideos.forEach { video ->
