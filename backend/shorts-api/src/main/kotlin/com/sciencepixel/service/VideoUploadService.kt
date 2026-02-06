@@ -99,13 +99,17 @@ class VideoUploadService(
                 .filter { it.isNotBlank() && it.length > 1 }
                 .take(20)
 
-            val baseDescription = if (video.description.isNotBlank()) video.description else video.summary
+            val masterScript = if (video.description.isNotBlank()) video.description else video.summary
             
-            // Format dynamic tags as hashtags (lowercase, prefixed with #)
-            val dynamicHashtags = keywords.joinToString(" ") { "#${it.lowercase()}" }
+            // 1. Sources (Append if available)
+            val sourcesLine = if (video.sources.isNotEmpty()) "\n\n출처: ${video.sources.joinToString(", ")}" else ""
+
+            // 2. AI Context Tags (Dynamic, Lowercase)
+            val aiContextTags = keywords.joinToString(" ") { "#${it.trim().lowercase().replace(" ", "_")}" }
             
-            val finalDescription = if (baseDescription.contains("#")) baseDescription 
-                                   else "$baseDescription\n\n$dynamicHashtags ${channelBehavior.defaultHashtags}"
+            // 3. Assemble Final Description
+            // Format: Master Script + Sources + AI Context Tags + Channel Default Tags
+            val finalDescription = "$masterScript$sourcesLine\n\n$aiContextTags ${channelBehavior.defaultHashtags}"
 
             val thumbnailFile = if (video.thumbnailPath.isNotBlank()) File(video.thumbnailPath) else null
 
