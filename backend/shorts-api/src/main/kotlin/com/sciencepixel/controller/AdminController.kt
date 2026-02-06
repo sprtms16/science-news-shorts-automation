@@ -635,14 +635,14 @@ class AdminController(
         ))
         
         // Publish event to ensure immediate processing if buffer allows
-        kafkaEventPublisher.publishRegenerationRequested(
-            com.sciencepixel.event.RegenerationRequestedEvent(
+        // Publish event to ensure immediate processing
+        // Use RssNewItemEvent to trigger ScriptConsumer directly since we already set status to QUEUED
+        kafkaEventPublisher.publishRssNewItem(
+            com.sciencepixel.event.RssNewItemEvent(
                 channelId = video.channelId,
-                videoId = video.id!!,
                 title = video.title,
                 summary = video.summary,
-                link = video.link,
-                regenCount = 0
+                url = video.link
             )
         )
         
