@@ -64,8 +64,12 @@ class ScriptConsumer(
             
             // Daily Limit Check for 'stocks' and 'history'
             // One successful video per day guarantee (Rate Limit)
+            
+            // Bypass limit if this is a Manual Retry or Auto-Recovery (regenCount > 0 or errorMessage contains "Manual")
+            val isManualRetry = (history.errorMessage?.contains("Manual", ignoreCase = true) == true) || ((history.regenCount ?: 0) > 0)
+
             // Daily Limit Check using ChannelBehavior
-            if (channelBehavior.dailyLimit == 1) {
+            if (!isManualRetry && channelBehavior.dailyLimit == 1) {
                 val startOfDay = java.time.LocalDate.now().atStartOfDay()
                 val successStatuses = listOf(VideoStatus.SCRIPTING, VideoStatus.ASSETS_QUEUED, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
                 val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
