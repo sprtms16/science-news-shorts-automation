@@ -492,7 +492,7 @@ class GeminiService(
 
     fun refreshSystemPrompts(targetChannelId: String? = null) {
         val effectiveChannelId = targetChannelId ?: channelId
-        val promptId = "script_prompt_v5"
+        val promptId = "script_prompt_v6"
         
         val content = getDefaultScriptPrompt(effectiveChannelId)
         
@@ -515,7 +515,7 @@ class GeminiService(
     // 1. 한국어 대본 작성
     fun writeScript(title: String, summary: String, targetChannelId: String? = null): ScriptResponse {
         val effectiveChannelId = targetChannelId ?: channelId
-        val promptId = "script_prompt_v5" 
+        val promptId = "script_prompt_v6" 
         var promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
         
         if (promptTemplate == null) {
