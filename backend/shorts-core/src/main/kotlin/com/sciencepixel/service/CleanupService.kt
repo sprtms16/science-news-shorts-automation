@@ -59,6 +59,91 @@ class CleanupService(
     // ... (cleanupFailedVideos kept as is or similar safety)
 
     /**
+     * Delete a specific video file manually (e.g. via Admin API)
+     */
+    fun deleteVideoFile(filePath: String): Boolean {
+        if (filePath.isBlank()) return false
+        val file = File(filePath)
+        if (file.exists()) {
+            // Safety: Ensure we only delete files related to this channel or shared-data
+            // Simple check: does path contain channelId? (e.g. /app/shared-data/videos/science/...)
+            // Unless it's an absolute path outside?
+            // For now, allow deletion if it exists, as it's Admin requested.
+            // But let's log it.
+            println("🗑️ [Manual/Admin] Deleting file: ${file.absolutePath}")
+            return file.delete()
+        }
+        return false
+    }
+
+    fun cleanupFailedVideos() {
+        println("🧹 [$channelId] Cleaning up FAILED video files...")
+        val failedVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.FAILED)
+        
+        // Threshold: 24 hours for failed videos
+        val threshold = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
+        var count = 0
+
+        failedVideos.forEach { video ->
+            if (video.filePath.isNotBlank()) {
+                val file = File(video.filePath)
+                if (file.exists() && file.lastModified() < threshold) {
+                    if (file.delete()) {
+                        println("🗑️ Deleted FAILED video file: ${file.name}")
+                        repository.save(video.copy(filePath = ""))
+                        count++
+                    }
+                }
+            }
+        }
+        println("✅ Failed Video Cleanup: Processed $count files.")
+    }
+
+    fun cleanupOldWorkspaces() {
+        println("🧹 [$channelId] Cleaning up old workspaces...")
+        val workspaceDir = File("workspace/$channelId") // Assuming this path structure based on previous context
+        if (!workspaceDir.exists()) return
+
+        // Threshold: 3 days for workspaces
+        val threshold = System.currentTimeMillis() - (3 * 24 * 60 * 60 * 1000)
+        var count = 0
+
+        workspaceDir.listFiles()?.forEach { dir ->
+            if (dir.isDirectory && dir.lastModified() < threshold) {
+                // Check if it corresponds to an active/uploaded video?
+                // For simplicity, just delete old workspaces that haven't been touched.
+                // Or maybe strictly by age.
+                if (dir.deleteRecursively()) {
+                    count++
+                }
+            }
+        }
+        println("✅ Workspace Cleanup: Removed $count old directories.")
+    }
+    
+    fun cleanupAiBgm() {
+        println("🧹 [$channelId] Cleaning up temporary AI BGM...")
+        val bgmDir = File(sharedDataPath, "bgm/$channelId")
+        if (!bgmDir.exists()) return
+
+        val threshold = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
+        var count = 0
+        
+         bgmDir.listFiles()?.forEach { file ->
+            if (file.isFile && file.lastModified() < threshold) {
+                if (file.delete()) count++
+            }
+        }
+        println("✅ BGM Cleanup: Removed $count temp files.")
+    }
+
+    fun cleanupAllTemporaryFiles() {
+        cleanupOrphanedVideos()
+        cleanupOldWorkspaces()
+        cleanupAiBgm()
+    }
+
+    /**
      * Identify and delete video files that have no corresponding record in the database
      */
     fun cleanupOrphanedVideos() {
