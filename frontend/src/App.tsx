@@ -34,7 +34,7 @@ function App() {
   const [toolsResult, setToolsResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('NOT_UPLOADED');
   const [nextPage, setNextPage] = useState<number | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [totalCount, setTotalCount] = useState<number>(0);
@@ -338,6 +338,32 @@ function App() {
 
         {activeTab === 'videos' && (
           <div className="grid gap-6">
+            {/* View Mode Toggle (Active vs History) */}
+            <div className="flex gap-4 border-b border-gray-200 dark:border-gray-800 pb-2">
+              <button
+                onClick={() => { setStatusFilter('NOT_UPLOADED'); setSearchTerm(''); }}
+                className={cn(
+                  "px-4 py-2 text-sm font-bold rounded-t-lg transition-all",
+                  statusFilter !== 'UPLOADED'
+                    ? "border-b-2 border-purple-500 text-purple-600 dark:text-purple-400 bg-purple-500/5"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                )}
+              >
+                🚀 {language === 'ko' ? '진행 중' : 'Active'}
+              </button>
+              <button
+                onClick={() => { setStatusFilter('UPLOADED'); setSearchTerm(''); }}
+                className={cn(
+                  "px-4 py-2 text-sm font-bold rounded-t-lg transition-all",
+                  statusFilter === 'UPLOADED'
+                    ? "border-b-2 border-green-500 text-green-600 dark:text-green-400 bg-green-500/5"
+                    : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                )}
+              >
+                ✅ {language === 'ko' ? '업로드 완료' : 'Uploaded'}
+              </button>
+            </div>
+
             <FilterBar
               searchTerm={searchTerm}
               setSearchTerm={setSearchTerm}
@@ -345,15 +371,20 @@ function App() {
               setStatusFilter={setStatusFilter}
               videos={videos}
               t={t}
+              hideStatusFilter={true} // Hide the dropdown status filter since we use tabs now
             />
 
             {videos.filter(v => {
               const matchesSearch = v.title.toLowerCase().includes(searchTerm.toLowerCase());
-              const matchesStatus = statusFilter === 'ALL' ? true :
-                statusFilter === 'UPLOADED' ? v.status === 'UPLOADED' :
-                  statusFilter === 'NOT_UPLOADED' ? v.status !== 'UPLOADED' :
-                    v.status === statusFilter;
-              return matchesSearch && matchesStatus;
+              // Strict separation logic
+              const matchesMode = statusFilter === 'UPLOADED'
+                ? v.status === 'UPLOADED'
+                : v.status !== 'UPLOADED'; // Active view shows EVERYTHING except Uploaded
+
+              // Secondary status filter from FilterBar (if we kept it enabled, but we hide it for simplicity initially)
+              // For now, let's trust the matchesMode as the primary driver.
+
+              return matchesSearch && matchesMode;
             }).map((video, index, filteredArray) => {
               const isLast = index === filteredArray.length - 1;
               return (
@@ -393,7 +424,11 @@ function App() {
               </div>
             )}
             {videos.length === 0 && !loading && (
-              <div className="text-center py-20 text-gray-500">No videos found.</div>
+              <div className="text-center py-20 text-gray-500">
+                {statusFilter === 'UPLOADED'
+                  ? (language === 'ko' ? '아직 업로드된 영상이 없습니다.' : 'No uploaded videos yet.')
+                  : (language === 'ko' ? '진행 중인 영상이 없습니다.' : 'No active videos.')}
+              </div>
             )}
           </div>
         )}

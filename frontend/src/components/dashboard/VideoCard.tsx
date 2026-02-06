@@ -116,23 +116,38 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                         <button
                             onClick={() => onRegenerateMetadata(video.id || '')}
                             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white rounded-xl border border-blue-500/20 transition-all text-xs font-bold"
+                            title={t.meta}
                         >
                             <RefreshCw size={14} /> {t.meta}
                         </button>
-                        {(video.status === 'FAILED' || video.status === 'UPLOAD_FAILED') && onRetry && (
+
+                        {/* Start From Scratch (Restart) - Always visible except UPLOADED */}
+                        {video.status !== 'UPLOADED' && onRetry && (
                             <button
                                 onClick={() => onRetry(video.id || '')}
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500/10 hover:bg-orange-600 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl border border-orange-500/20 transition-all text-xs font-bold"
                             >
-                                <RefreshCw size={14} /> Retry
+                                <RefreshCw size={14} /> Restart
                             </button>
                         )}
-                        {(video.status === 'COMPLETED' || video.status === 'UPLOAD_FAILED') && (
+
+                        {/* Next Step (Upload) - Visible for COMPLETED or UPLOAD_FAILED */}
+                        {/* Next Step (Context Aware) - Visible for ALL non-uploaded statuses */}
+                        {video.status !== 'UPLOADED' && (
                             <button
-                                onClick={() => onManualUpload(video.id || '')}
+                                onClick={() => {
+                                    if (video.status === 'COMPLETED' || video.status === 'UPLOAD_FAILED') {
+                                        onManualUpload(video.id || '');
+                                    } else if (onRetry) {
+                                        // For stuck intermediate states, Retry acts as "Try Next/Nudge"
+                                        if (confirm(t.language === 'ko' ? "현재 단계에서 재시도 하시겠습니까?" : "Retry current step?")) {
+                                            onRetry(video.id || '');
+                                        }
+                                    }
+                                }}
                                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all text-xs font-bold animate-pulse"
                             >
-                                <Youtube size={14} /> {t.manualUpload}
+                                <Youtube size={14} /> Next Step
                             </button>
                         )}
                         <button
