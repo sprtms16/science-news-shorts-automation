@@ -47,6 +47,7 @@ enum class VideoStatus {
     RENDERING,          // 렌더링 중 (RenderConsumer)
     FAILED,             // 실패
     RETRY_QUEUED,       // 재생성 대기 중 (실패 후 복구 대기)
+    BLOCKED,            // 유해성/정책 위반으로 생성 차단 (재시도 불가)
     COMPLETED,          // 제작 완료 (렌더링 완료 -> Upload 대기)
     UPLOADING,          // 업로드 진행 중
     UPLOAD_FAILED,      // 업로드 실패

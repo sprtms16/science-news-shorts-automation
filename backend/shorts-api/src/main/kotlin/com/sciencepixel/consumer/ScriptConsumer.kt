@@ -143,11 +143,11 @@ class ScriptConsumer(
             logPublisher.error("shorts-controller", if (isSafety) "Safety Blocked" else "Script Generation Failed", "Error: ${e.message}")
             println("❌ [$channelId] Error: ${e.message}")
             
-            // Mark as FAILED in DB
+            // Mark as FAILED or BLOCKED in DB
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
             videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)?.let { 
                 videoHistoryRepository.save(it.copy(
-                    status = VideoStatus.FAILED, 
+                    status = if (isSafety) VideoStatus.BLOCKED else VideoStatus.FAILED, 
                     failureStep = if (isSafety) "SAFETY" else "SCRIPT",
                     errorMessage = e.message ?: "Unknown Script Generation Error",
                     updatedAt = LocalDateTime.now()
