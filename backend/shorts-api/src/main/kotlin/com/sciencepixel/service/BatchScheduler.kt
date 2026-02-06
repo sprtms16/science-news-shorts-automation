@@ -127,9 +127,51 @@ class BatchScheduler(
         if (channelBehavior.shouldSkipGeneration()) return 
         
         recoverFailedGenerations()
+        recoverOrphanedQueuedJobs() // Added: Rescue stuck QUEUED items
         processRetryQueue()
         monitorStuckRetries()
         recoverStuckUploads()
+    }
+
+    // New: Rescue Orphaned QUEUED items (Stuck > 1 hour)
+    private fun recoverOrphanedQueuedJobs() {
+        // Find items stuck in QUEUED for more than 1 hour
+        // This handles cases where Batch created the record but Kafka event was lost or Consumer failed
+        val oneHourAgo = java.time.LocalDateTime.now().minusHours(1)
+        
+        val stuckQueued = videoHistoryRepository.findByChannelIdAndStatusAndUpdatedAtBefore(
+            channelId, 
+            VideoStatus.QUEUED, 
+            oneHourAgo
+        )
+        
+        if (stuckQueued.isNotEmpty()) {
+            println("⚠️ [$channelId] Found ${stuckQueued.size} stuck QUEUED items (>1hr). Re-publishing events...")
+            stuckQueued.forEach { video ->
+                // Check daily limit before re-publishing (to avoid useless loop if limit is full)
+                if (channelBehavior.dailyLimit <= 10) { // arbitrary small number check
+                   val startOfDay = java.time.LocalDate.now().atStartOfDay()
+                   val successStatuses = listOf(VideoStatus.SCRIPTING, VideoStatus.ASSETS_QUEUED, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
+                   val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
+                   
+                   if (dailyCount >= channelBehavior.dailyLimit) {
+                       println("⏳ [$channelId] [Rescue] Skipping ${video.title} - Daily Limit Reached. Will retry tomorrow.")
+                       return@forEach
+                   }
+                }
+
+                println("🔄 [$channelId] [Rescue] Re-publishing NEW_ITEM event for: ${video.title}")
+                kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
+                    channelId = channelId,
+                    title = video.title,
+                    url = video.link,
+                    summary = video.summary ?: ""
+                ))
+                
+                // Touch updatedAt to prevent immediate re-trigger
+                videoHistoryRepository.save(video.copy(updatedAt = java.time.LocalDateTime.now()))
+            }
+        }
     }
 
     // 4. Retry Logic: FAILED -> RETRY_QUEUED
