@@ -26,6 +26,7 @@ class RenderConsumer(
     private val eventPublisher: KafkaEventPublisher,
     private val objectMapper: ObjectMapper,
     private val notificationService: NotificationService,
+    private val jobClaimService: com.sciencepixel.service.JobClaimService, // Inject Service
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -40,6 +41,11 @@ class RenderConsumer(
             
             println("▶️ [$channelId] Received Assets Ready event: ${event.videoId}")
 
+            // Atomic Claim: RENDER_QUEUED -> RENDERING
+            // Note: Since we don't have event.status, we rely on DB Current Status (RENDER_QUEUED)
+            // But sometimes the status might be ASSETS_QUEUED if skipped scene generation? No.
+            // Let's use RENDER_QUEUED. If it fails, maybe it's already completed.
+            
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
                 if (history.status == VideoStatus.COMPLETED || history.status == VideoStatus.UPLOADED) {
@@ -47,8 +53,13 @@ class RenderConsumer(
                     return
                 }
 
+                if (!jobClaimService.claimJob(event.videoId, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING)) {
+                     println("⏭️ Job already claimed or not in RENDER_QUEUED state: ${event.title}")
+                     return
+                }
+
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.RENDERING,
+                    // Status already updated by claimJob
                     progress = 70,
                     currentStep = "영상 렌더링 중 (Status: RENDERING)",
                     updatedAt = java.time.LocalDateTime.now()

@@ -206,7 +206,7 @@ class BatchScheduler(
 
              videoHistoryRepository.save(video.copy(
                  regenCount = (video.regenCount ?: 0) + 1,
-                 status = VideoStatus.SCRIPTING, // Start SCRIPTING
+                 status = VideoStatus.QUEUED, // FIX: Set to QUEUED so ScriptConsumer can claim it (was SCRIPTING)
                  failureStep = "",
                  errorMessage = "",
                  updatedAt = java.time.LocalDateTime.now()
@@ -243,10 +243,8 @@ class BatchScheduler(
                     println("🔄 [$channelId] Stuck Job detected (Retry $currentRegen/3). Re-queueing as RETRY_QUEUED: ${video.title}")
                     videoHistoryRepository.save(video.copy(
                         status = VideoStatus.RETRY_QUEUED,
-                        // Do NOT increment regenCount here. It will be incremented when 'processRetryQueue' picks it up.
-                        // However, we must ensure we don't just loop forever if it keeps getting stuck.
-                        // Let's increment it here to penalize the "Stuck" attempt.
-                        regenCount = currentRegen + 1, 
+                        // Fix: Do not increment regenCount here. processRetryQueue will increment it.
+                        regenCount = currentRegen, 
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                 }

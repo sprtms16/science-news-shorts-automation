@@ -25,6 +25,7 @@ class SceneConsumer(
     private val videoHistoryRepository: VideoHistoryRepository,
     private val eventPublisher: KafkaEventPublisher,
     private val objectMapper: ObjectMapper,
+    private val jobClaimService: com.sciencepixel.service.JobClaimService, // Inject Service
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -43,10 +44,15 @@ class SceneConsumer(
             val scenes: List<Scene> = objectMapper.readValue(event.script)
 
             // Update Status + Progress (10%: 시작)
+            // Atomic Claim: ASSETS_QUEUED -> ASSETS_GENERATING
+            if (!jobClaimService.claimJob(event.videoId, VideoStatus.ASSETS_QUEUED, VideoStatus.ASSETS_GENERATING)) {
+                 println("⏭️ Job already claimed or not in ASSETS_QUEUED state: ${event.title}")
+                 return
+            }
+
             val history = videoHistoryRepository.findById(event.videoId).orElse(null)
             if (history != null) {
                 videoHistoryRepository.save(history.copy(
-                    status = VideoStatus.ASSETS_GENERATING,
                     progress = 10,
                     currentStep = "에셋 생성 시작",
                     updatedAt = java.time.LocalDateTime.now()
