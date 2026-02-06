@@ -177,4 +177,32 @@ class CleanupService(
         }
         println("✅ Orphaned Video Cleanup: Deleted $count files from $channelId folder.")
     }
+
+    fun cleanupStaleJobs() {
+        println("🧹 [$channelId] Scanning for stale jobs > 2 hours...")
+        val threshold = LocalDateTime.now().minusHours(2)
+        val activeStatuses = listOf(
+            VideoStatus.SCRIPTING,
+            VideoStatus.ASSETS_QUEUED,
+            VideoStatus.ASSETS_GENERATING,
+            VideoStatus.RENDER_QUEUED,
+            VideoStatus.RENDERING
+        )
+
+        val activeVideos = repository.findByChannelIdAndStatusIn(channelId, activeStatuses)
+        var staleCount = 0
+
+        activeVideos.filter { it.updatedAt.isBefore(threshold) }.forEach { video ->
+            println("🚫 [$channelId] Stale Job detected (Updated: ${video.updatedAt}). Marking as FAILED: ${video.title}")
+            repository.save(video.copy(
+                status = VideoStatus.FAILED,
+                failureStep = "STALE_CLEANUP",
+                errorMessage = "Job stuck for > 2 hours (Stale Cleanup)",
+                updatedAt = LocalDateTime.now()
+            ))
+            staleCount++
+        }
+        
+        if (staleCount > 0) println("✅ Stale Job Cleanup: Marked $staleCount jobs as FAILED.")
+    }
 }
