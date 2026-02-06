@@ -64,7 +64,7 @@ export function Sidebar({
                 </div>
                 <button
                     onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                    className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+                    className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors"
                 >
                     {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
                 </button>
@@ -153,7 +153,7 @@ export function Sidebar({
                                 onClick={() => setLanguage('ko')}
                                 className={cn(
                                     "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
-                                    language === 'ko' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                                    language === 'ko' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-black/5 dark:bg-white/5 text-gray-500 border-transparent hover:bg-black/10 dark:hover:bg-white/10"
                                 )}
                             >
                                 KO
@@ -162,7 +162,7 @@ export function Sidebar({
                                 onClick={() => setLanguage('en')}
                                 className={cn(
                                     "px-3 py-1.5 rounded-lg text-xs font-bold transition-all border",
-                                    language === 'en' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                                    language === 'en' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-black/5 dark:bg-white/5 text-gray-500 border-transparent hover:bg-black/10 dark:hover:bg-white/10"
                                 )}
                             >
                                 EN
@@ -179,7 +179,7 @@ export function Sidebar({
                                 onClick={() => setTheme('light')}
                                 className={cn(
                                     "p-2 rounded-lg transition-all border flex justify-center",
-                                    theme === 'light' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                                    theme === 'light' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-black/5 dark:bg-white/5 text-gray-500 border-transparent hover:bg-black/10 dark:hover:bg-white/10"
                                 )}
                                 title={t.light}
                             >
@@ -189,7 +189,7 @@ export function Sidebar({
                                 onClick={() => setTheme('dark')}
                                 className={cn(
                                     "p-2 rounded-lg transition-all border flex justify-center",
-                                    theme === 'dark' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                                    theme === 'dark' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-black/5 dark:bg-white/5 text-gray-500 border-transparent hover:bg-black/10 dark:hover:bg-white/10"
                                 )}
                                 title={t.dark}
                             >
@@ -199,7 +199,7 @@ export function Sidebar({
                                 onClick={() => setTheme('system')}
                                 className={cn(
                                     "p-2 rounded-lg transition-all border flex justify-center",
-                                    theme === 'system' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-white/5 text-gray-500 border-transparent hover:bg-white/10"
+                                    theme === 'system' ? "bg-purple-500/10 text-purple-400 border-purple-500/20" : "bg-black/5 dark:bg-white/5 text-gray-500 border-transparent hover:bg-black/10 dark:hover:bg-white/10"
                                 )}
                                 title={t.system}
                             >
@@ -227,7 +227,7 @@ export function Sidebar({
                             {language === 'ko' ? '앱 설치' : 'Install App'}
                         </button>
                     )}
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-black/5 dark:bg-white/5 border border-black/5 dark:border-white/5">
                         <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center">
                             <ShieldCheck size={16} className="text-purple-400" />
                         </div>

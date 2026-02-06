@@ -31,19 +31,19 @@ interface VideoCardProps {
 
 export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, onRetry, t }, ref) => {
     const statusColors: Record<string, { bg: string, text: string, border: string, icon: any, label: string }> = {
-        'SCRIPTING': { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Scripting' },
-        'ASSETS_QUEUED': { bg: 'bg-indigo-500/10', text: 'text-indigo-400', border: 'border-indigo-500/20', icon: <Clock size={12} />, label: 'Assets Queued' },
-        'ASSETS_GENERATING': { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Assets Gen' },
-        'RENDER_QUEUED': { bg: 'bg-pink-500/10', text: 'text-pink-400', border: 'border-pink-500/20', icon: <Clock size={12} />, label: 'Render Queued' },
-        'RENDERING': { bg: 'bg-fuchsia-500/10', text: 'text-fuchsia-400', border: 'border-fuchsia-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Rendering' },
-        'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
-        'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} />, label: t.statusCompleted },
-        'UPLOAD_FAILED': { bg: 'bg-orange-500/10', text: 'text-orange-400', border: 'border-orange-500/20', icon: <AlertCircle size={12} />, label: t.statusUploadFailed || 'Upload Failed' },
-        'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} />, label: t.statusUploaded },
-        'RETRY_QUEUED': { bg: 'bg-yellow-500/10', text: 'text-yellow-400', border: 'border-yellow-500/20', icon: <Clock size={12} />, label: 'Retry Queued' },
+        'SCRIPTING': { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Scripting' },
+        'ASSETS_QUEUED': { bg: 'bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/20', icon: <Clock size={12} />, label: 'Assets Queued' },
+        'ASSETS_GENERATING': { bg: 'bg-purple-500/10', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Assets Gen' },
+        'RENDER_QUEUED': { bg: 'bg-pink-500/10', text: 'text-pink-600 dark:text-pink-400', border: 'border-pink-500/20', icon: <Clock size={12} />, label: 'Render Queued' },
+        'RENDERING': { bg: 'bg-fuchsia-500/10', text: 'text-fuchsia-600 dark:text-fuchsia-400', border: 'border-fuchsia-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Rendering' },
+        'FAILED': { bg: 'bg-rose-500/10', text: 'text-rose-600 dark:text-rose-400', border: 'border-rose-500/20', icon: <AlertCircle size={12} />, label: t.statusFailed },
+        'COMPLETED': { bg: 'bg-emerald-500/10', text: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-500/20', icon: <CheckCircle2 size={12} />, label: t.statusCompleted },
+        'UPLOAD_FAILED': { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', border: 'border-orange-500/20', icon: <AlertCircle size={12} />, label: t.statusUploadFailed || 'Upload Failed' },
+        'UPLOADED': { bg: 'bg-sky-500/10', text: 'text-sky-600 dark:text-sky-400', border: 'border-sky-500/20', icon: <Youtube size={12} />, label: t.statusUploaded },
+        'RETRY_QUEUED': { bg: 'bg-yellow-500/10', text: 'text-yellow-600 dark:text-yellow-400', border: 'border-yellow-500/20', icon: <Clock size={12} />, label: 'Retry Queued' },
     };
 
-    const currentStatus = statusColors[video.status] || { bg: 'bg-slate-500/10', text: 'text-slate-400', border: 'border-slate-500/20', icon: <AlertCircle size={12} />, label: video.status };
+    const currentStatus = statusColors[video.status] || { bg: 'bg-slate-500/10', text: 'text-slate-600 dark:text-slate-400', border: 'border-slate-500/20', icon: <AlertCircle size={12} />, label: video.status };
     const isKoreanTitle = /[가-힣]/.test(video.title);
 
     const copyTitle = () => {
@@ -108,21 +108,21 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                                 </button>
                             </div>
-                            <p className="text-sm text-gray-400 leading-relaxed line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: video.summary }} />
+                            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: video.summary }} />
                         </div>
                     </div>
 
                     <div className="flex flex-row lg:flex-col gap-2 w-full lg:w-32 shrink-0">
                         <button
                             onClick={() => onRegenerateMetadata(video.id || '')}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-400 hover:text-white rounded-xl border border-blue-500/20 transition-all text-xs font-bold"
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500/10 hover:bg-blue-500 text-blue-600 dark:text-blue-400 hover:text-white rounded-xl border border-blue-500/20 transition-all text-xs font-bold"
                         >
                             <RefreshCw size={14} /> {t.meta}
                         </button>
                         {(video.status === 'FAILED' || video.status === 'UPLOAD_FAILED') && onRetry && (
                             <button
                                 onClick={() => onRetry(video.id || '')}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500/10 hover:bg-orange-600 text-orange-400 hover:text-white rounded-xl border border-orange-500/20 transition-all text-xs font-bold"
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-500/10 hover:bg-orange-600 text-orange-600 dark:text-orange-400 hover:text-white rounded-xl border border-orange-500/20 transition-all text-xs font-bold"
                             >
                                 <RefreshCw size={14} /> Retry
                             </button>
@@ -130,7 +130,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                         {(video.status === 'COMPLETED' || video.status === 'UPLOAD_FAILED') && (
                             <button
                                 onClick={() => onManualUpload(video.id || '')}
-                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all text-xs font-bold animate-pulse"
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 dark:text-emerald-400 hover:text-white rounded-xl border border-emerald-500/20 transition-all text-xs font-bold animate-pulse"
                             >
                                 <Youtube size={14} /> {t.manualUpload}
                             </button>
@@ -141,15 +141,15 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                             className={cn(
                                 "flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-xs font-bold",
                                 video.filePath
-                                    ? "bg-purple-500/10 hover:bg-purple-500 text-purple-400 hover:text-white border-purple-500/20"
-                                    : "bg-gray-800/50 text-gray-600 border-white/5 cursor-not-allowed"
+                                    ? "bg-purple-500/10 hover:bg-purple-500 text-purple-600 dark:text-purple-400 hover:text-white border-purple-500/20"
+                                    : "bg-slate-200 dark:bg-gray-800/50 text-gray-400 dark:text-gray-600 border-black/5 dark:border-white/5 cursor-not-allowed"
                             )}
                         >
                             <Download size={14} /> {t.getMp4}
                         </button>
                         <button
                             onClick={() => onDelete(video.id || '')}
-                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl border border-rose-500/20 transition-all text-xs font-bold"
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500 text-rose-600 dark:text-rose-500 hover:text-white rounded-xl border border-rose-500/20 transition-all text-xs font-bold"
                         >
                             <Trash2 size={14} /> {t.kill}
                         </button>

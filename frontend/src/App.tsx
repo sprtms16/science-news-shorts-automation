@@ -284,8 +284,8 @@ function App() {
       />
 
       {/* Main Content */}
-      <main className="md:ml-72 min-h-screen p-4 md:p-10 transition-all duration-300">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10">
+      <main className="md:ml-72 min-h-screen p-2 md:p-10 transition-all duration-300">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-10 pl-2 md:pl-0">
           <div>
             <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-[var(--text-primary)] mb-1">
               {activeTab === 'videos' ? t.videos :
@@ -315,11 +315,11 @@ function App() {
                   className={cn(
                     "px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300",
                     selectedChannel === ch.id
-                      ? "bg-white/10 text-white shadow-lg ring-1 ring-white/20"
-                      : "text-[var(--text-secondary)] hover:text-white"
+                      ? "bg-black/5 dark:bg-white/10 text-black dark:text-white shadow-lg ring-1 ring-black/10 dark:ring-white/20"
+                      : "text-[var(--text-secondary)] hover:text-black dark:hover:text-white"
                   )}
                 >
-                  <span className={cn("mr-1.5", selectedChannel === ch.id ? ch.color : "text-gray-500")}>●</span>
+                  <span className={cn("mr-1.5", selectedChannel === ch.id ? ch.color : "text-gray-400 dark:text-gray-500")}>●</span>
                   {ch.name}
                 </button>
               ))}
