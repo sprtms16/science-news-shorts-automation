@@ -18,6 +18,7 @@ class VideoUploadService(
     private val notificationService: NotificationService,
     private val logPublisher: LogPublisher,
     private val jobClaimService: JobClaimService,
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior, // Dependency Injection
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
@@ -90,7 +91,7 @@ class VideoUploadService(
             }
 
             // 2. Metadata Prep
-            val defaultTags = listOf("Science", "News", "Shorts", "SciencePixel")
+            val defaultTags = channelBehavior.defaultTags // Use Channel Specific Tags
             val keywords = video.tags
             val combinedTags = (defaultTags + keywords)
                 .map { it.trim().take(30) }
@@ -99,7 +100,12 @@ class VideoUploadService(
                 .take(20)
 
             val baseDescription = if (video.description.isNotBlank()) video.description else video.summary
-            val finalDescription = if (baseDescription.contains("#")) baseDescription else "$baseDescription\n\n#Science #News #Shorts"
+            
+            // Format dynamic tags as hashtags (lowercase, prefixed with #)
+            val dynamicHashtags = keywords.joinToString(" ") { "#${it.lowercase()}" }
+            
+            val finalDescription = if (baseDescription.contains("#")) baseDescription 
+                                   else "$baseDescription\n\n$dynamicHashtags ${channelBehavior.defaultHashtags}"
 
             val thumbnailFile = if (video.thumbnailPath.isNotBlank()) File(video.thumbnailPath) else null
 

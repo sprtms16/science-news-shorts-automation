@@ -453,11 +453,13 @@ class GeminiService(
             4. **Intro/Outro:** Greeting as $effectiveChannelName, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
             5. **Sources:** List names (e.g., "Nature", "Reddit", "Reuters").
             6. **Keywords:** Scenes' keywords MUST be visual, common English terms for stock footage extraction.
+            7. **Hashtags:** In the 'tags' array, generating 3-5 relevant, lowercase English hashtags (e.g., "robot", "space", "ai").
+
             ${
                 run {
                     val todayParam = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
-                    if (effectiveChannelId == "history") "7. **Date Requirement:** Today is $todayParam. You MUST create a script about a historical event that happened on THIS DATE ($todayParam). Explicitly mention the Date in the intro." 
-                    else if (effectiveChannelId == "stocks") "7. **Date Context:** Today is $todayParam. Focus on the LATEST market news for this date." 
+                    if (effectiveChannelId == "history") "8. **Date Requirement:** Today is $todayParam. You MUST create a script about a historical event that happened on THIS DATE ($todayParam). Explicitly mention the Date in the intro." 
+                    else if (effectiveChannelId == "stocks") "8. **Date Context:** Today is $todayParam. Focus on the LATEST market news for this date." 
                     else ""
                 }
             }
@@ -467,7 +469,7 @@ class GeminiService(
             {
                 "title": "Korean Title (Catchy, <40 chars)",
                 "description": "Korean Description for YouTube",
-                "tags": ["tag1", "tag2", "tag3"],
+                "tags": ["lowercase_tag1", "lowercase_tag2", "lowercase_tag3"],
                 "sources": ["source1", "source2"],
                 "scenes": [
                     {"sentence": "Korean Sentence 1", "keyword": "visual english keyword"},

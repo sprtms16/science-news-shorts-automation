@@ -31,7 +31,20 @@ interface ChannelBehavior {
     /**
      * 뉴스 집계(Aggregation) 필요 여부 (Stocks 채널 등)
      */
+    /**
+     * 뉴스 집계(Aggregation) 필요 여부 (Stocks 채널 등)
+     */
     val shouldAggregateNews: Boolean get() = false
+
+    /**
+     * 업로드 시 사용할 기본 태그 리스트 (YouTube Tags)
+     */
+    val defaultTags: List<String> get() = listOf("Shorts")
+
+    /**
+     * 설명란에 추가할 기본 해시태그 (Description Hashtags)
+     */
+    val defaultHashtags: String get() = "#shorts"
 }
 
 /**
@@ -50,6 +63,9 @@ class DefaultChannelBehavior : ChannelBehavior {
     override val useAsyncFlow = false
     
     override fun getExtraPrompt(today: String) = ""
+    
+    override val defaultTags = listOf("science", "news", "shorts", "sciencepixel")
+    override val defaultHashtags = "#science #news #shorts"
 }
 
 /**
@@ -64,6 +80,9 @@ class HorrorChannelBehavior : ChannelBehavior {
     override val useAsyncFlow = false
     
     override fun getExtraPrompt(today: String) = ""
+    
+    override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
+    override val defaultHashtags = "#공포 #괴담 #미스테리 #호러 #shorts"
 }
 
 /**
@@ -81,6 +100,9 @@ class StocksChannelBehavior : ChannelBehavior {
     
     override fun getExtraPrompt(today: String) = 
         "7. **Date Context:** Today is $today. Focus on the LATEST market news for this date."
+        
+    override val defaultTags = listOf("stocks", "economy", "investment", "shorts")
+    override val defaultHashtags = "#주식 #경제 #재테크 #뉴스 #shorts"
 }
 
 /**
@@ -97,6 +119,9 @@ class HistoryChannelBehavior : ChannelBehavior {
     
     override fun getExtraPrompt(today: String) = 
         "7. **Date Requirement:** Today is $today. You MUST create a script about a historical event that happened on THIS DATE ($today). Explicitly mention the Date in the intro."
+        
+    override val defaultTags = listOf("history", "mystery", "facts", "shorts")
+    override val defaultHashtags = "#역사 #미스터리 #지식 #history #shorts"
 }
 
 /**
