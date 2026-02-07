@@ -365,10 +365,11 @@ class BatchScheduler(
             println("🚀 [$channelId] Triggering Upload for: ${videoToUpload.title}")
             
             // Publish Upload Requested Event
+            val videoId = requireNotNull(videoToUpload.id) { "Video ID must not be null for batch upload" }
             kafkaEventPublisher.publishUploadRequested(
                 com.sciencepixel.event.UploadRequestedEvent(
                     channelId = channelId,
-                    videoId = videoToUpload.id!!,
+                    videoId = videoId,
                     title = videoToUpload.title,
                     filePath = videoToUpload.filePath
                 )

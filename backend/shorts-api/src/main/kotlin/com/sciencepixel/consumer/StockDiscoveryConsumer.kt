@@ -98,9 +98,11 @@ class StockDiscoveryConsumer(
             val saved = videoHistoryRepository.save(history)
 
             // 5. Trigger Pipeline (Directly to ScriptCreated stage)
+            // 5. Trigger Pipeline (Directly to ScriptCreated stage)
+            val videoId = requireNotNull(saved.id) { "Video ID must not be null after morning briefing save" }
             eventPublisher.publishScriptCreated(com.sciencepixel.event.ScriptCreatedEvent(
                 channelId = channelId,
-                videoId = saved.id!!,
+                videoId = videoId,
                 title = saved.title,
                 script = objectMapper.writeValueAsString(scriptResponse.scenes),
                 summary = saved.summary,
@@ -133,7 +135,8 @@ class StockDiscoveryConsumer(
                 updatedAt = java.time.LocalDateTime.now()
             )
             val saved = videoHistoryRepository.save(history)
-            asyncVideoService.createVideoAsync(newsItem, saved.id!!)
+            val videoId = requireNotNull(saved.id) { "Video ID must not be null after deep-dive save" }
+            asyncVideoService.createVideoAsync(newsItem, videoId, event.channelId)
         }
     }
 }

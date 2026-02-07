@@ -43,7 +43,7 @@ class AdminBgmController(
         // Publish Event Again
         eventPublisher.publishBgmUpload(
             com.sciencepixel.event.BgmUploadEvent(
-                bgmId = entity.id!!,
+                bgmId = id,
                 filePath = entity.filePath,
                 filename = entity.filename,
                 channelId = entity.channelId
@@ -68,7 +68,8 @@ class AdminBgmController(
             if (file.isEmpty || file.originalFilename == null) continue
             try {
                 // 0. Duplicate Check
-                val safeFilename = file.originalFilename!!.replace(" ", "_")
+                val originalFilename = file.originalFilename ?: continue
+                val safeFilename = originalFilename.replace(" ", "_")
                 val existing = bgmRepository.findByFilename(safeFilename)
                 
                 if (existing != null) {

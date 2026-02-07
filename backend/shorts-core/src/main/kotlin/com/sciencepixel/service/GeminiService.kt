@@ -25,12 +25,14 @@ class GeminiService(
 ) {
     private val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).build()
     
-    private val CHANNEL_NAME = when (channelId) {
-        "science" -> "사이언스 픽셀"
-        "horror" -> "미스터리 픽셀"
-        "stocks" -> "밸류 픽셀"
-        "history" -> "히스토리 픽셀"
-        else -> "AI 쇼츠 마스터"
+    private fun getChannelName(targetChannelId: String? = null): String {
+        return when (targetChannelId ?: channelId) {
+            "science" -> "사이언스 픽셀"
+            "horror" -> "미스터리 픽셀"
+            "stocks" -> "밸류 픽셀"
+            "history" -> "히스토리 픽셀"
+            else -> "AI 쇼츠 마스터"
+        }
     }
 
     // Parse keys from comma-separated string
@@ -174,7 +176,7 @@ class GeminiService(
             }
             triedCombinations.add(combinedKey)
             
-            val tracker = combinedQuotas[combinedKey]!!
+            val tracker = requireNotNull(combinedQuotas[combinedKey]) { "Tracker not found for $combinedKey" }
             tracker.recordAttempt()
             
             val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
@@ -225,7 +227,7 @@ class GeminiService(
     // Default Prompts (Fallbacks)
     private val DEFAULT_SCRIPT_PROMPT = """
             [Role]
-            You are '$CHANNEL_NAME', a famous Korean science Shorts YouTuber.
+            You are '${getChannelName()}', a famous Korean science Shorts YouTuber.
             Your task is to explain the following English news in **KOREAN** (`한국어`).
 
             [Input News]
@@ -237,7 +239,7 @@ class GeminiService(
             2. **Target Audience:** High school and university students interested in science. Use appropriate vocabulary - not too childish, not too academic.
             3. **Content Level:** Explain complex topics in an engaging, accessible way. Include interesting facts and "wow" moments.
             4. **Duration:** ~60 seconds (13-14 sentences).
-            5. **Intro/Outro:** Start with "$CHANNEL_NAME" greeting, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
+            5. **Intro/Outro:** Start with "${getChannelName()}" greeting, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
             6. **Evidence & Sources:** You MUST provide a brief "Verification Note" checking accuracy and list sources (e.g., "Nature", "NASA") in the JSON output.
             7. **Description:** Write a compelling YouTube description including the summary and sources.
             8. **Keywords:** Scenes' keywords MUST be visual, common English terms (e.g., 'nebula', 'laboratory', 'robot', 'brain') rather than abstract or overly specific scientific names that might not have stock footage.
@@ -281,7 +283,7 @@ class GeminiService(
 
         val prompt = """
             [Task]
-            You are a YouTube Growth Strategist for '$CHANNEL_NAME'.
+            You are a YouTube Growth Strategist for '${getChannelName(channelId)}'.
             Analyze these High-Performing Videos from our channel to find Success Patterns.
 
             [Top Performing Videos]
@@ -290,7 +292,7 @@ class GeminiService(
             [Goal]
             Extract 3-5 concise, actionable rules for creating future scripts and titles that will replicate this success.
             Focus on: Title keywords, Topic selection patterns, Tone, or Hook styles.
-            **IMPORTANT**: The advice must be specific to our niche: $CHANNEL_NAME.
+            **IMPORTANT**: The advice must be specific to our niche: ${getChannelName(channelId)}.
 
             [Output]
             Return ONLY a JSON list of strings (The insights).
@@ -726,7 +728,8 @@ class GeminiService(
         val apiKey = selection.apiKey
         val modelName = selection.modelName
         val combinedKey = "$apiKey:$modelName"
-        val tracker = combinedQuotas[combinedKey]!!
+        
+        val tracker = requireNotNull(combinedQuotas[combinedKey]) { "Tracker not found for $combinedKey" }
         tracker.recordAttempt()
         
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
@@ -991,7 +994,7 @@ class GeminiService(
         // Use Flash model for speed/cost effectiveness on audio
         val modelName = "gemini-2.0-flash-exp" 
         
-        val tracker = combinedQuotas["$apiKey:${selection.modelName}"]!!
+        val tracker = requireNotNull(combinedQuotas["$apiKey:${selection.modelName}"]) { "Tracker not found for $apiKey" }
         tracker.recordAttempt()
 
         val url = "https://generativelanguage.googleapis.com/v1beta/models/${selection.modelName}:generateContent?key=$apiKey"
@@ -1065,7 +1068,7 @@ class GeminiService(
 
         val prompt = """
             [Role]
-            당신은 '$CHANNEL_NAME' 채널의 과학 뉴스 작가입니다.
+            당신은 '${getChannelName()}' 채널의 과학 뉴스 작가입니다.
 
             [Task]
             다음 주제에 대해 흥미로운 과학 뉴스를 생성하세요:
@@ -1137,7 +1140,7 @@ class GeminiService(
 
         val prompt = """
             [Task]
-            Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos" for the channel '$CHANNEL_NAME'.
+            Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos" for the channel '${getChannelName()}'.
             Ignore minor differences in wording, source, or catchy AI titles. 
             If they cover the same core event, story, or research, it IS a duplicate.
             
@@ -1145,7 +1148,7 @@ class GeminiService(
             Title: $newTitle
             Summary: $newSummary
             
-            [Recent Videos from $CHANNEL_NAME]
+            [Recent Videos from ${getChannelName()}]
             $historyText
             
             [Output]
@@ -1196,9 +1199,9 @@ class GeminiService(
 
         val prompt = """
             [Task]
-            Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for the channel '$CHANNEL_NAME'.
+            Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for the channel '${getChannelName()}'.
             
-            [Topics to Avoid for $CHANNEL_NAME]
+            [Topics to Avoid for ${getChannelName()}]
             $nicheAvoidance
             
             [General Rule]

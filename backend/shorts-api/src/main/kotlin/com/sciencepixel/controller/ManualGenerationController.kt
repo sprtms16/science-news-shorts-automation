@@ -133,8 +133,8 @@ class ManualGenerationController(
                     link = history.link
                 )
                 
-                // 비동기 처리 시작 (인자 순서: news, videoId)
-                asyncVideoService.createVideoAsync(news, videoId)
+                // 비동기 처리 시작 (인자 순서: news, videoId, channelId)
+                asyncVideoService.createVideoAsync(news, videoId, channelId)
             } catch (e: Exception) {
                 println("⚠️ Failed to start job for topic '$topic': ${e.message}")
             }
@@ -225,15 +225,16 @@ class ManualGenerationController(
         val savedHistory = videoHistoryRepository.save(history)
         
         // 비동기로 비디오 생성 시작
-        asyncVideoService.createVideoAsync(news, savedHistory.id!!)
+        val vId = requireNotNull(savedHistory.id) { "Video ID must not be null for async topic creation" }
+        asyncVideoService.createVideoAsync(news, vId, channelId)
         
         return JobStatus(
-            id = savedHistory.id!!,
+            id = vId,
             title = news.title,
             status = VideoStatus.SCRIPTING.name,
             filePath = null,
             youtubeUrl = null,
-            message = "✅ 작업이 시작되었습니다. 완료 시 Discord/Telegram으로 알림됩니다. GET /manual/status/${savedHistory.id}로 상태 확인 가능"
+            message = "✅ 작업이 시작되었습니다. 완료 시 Discord/Telegram으로 알림됩니다. GET /manual/status/${vId}로 상태 확인 가능"
         )
     }
 
@@ -287,9 +288,10 @@ class ManualGenerationController(
             updatedAt = java.time.LocalDateTime.now()
         )
         val savedHistory = videoHistoryRepository.save(history)
+        val historyId = requireNotNull(savedHistory.id) { "Video ID must not be null for sync production" }
         
         try {
-            val result = productionService.produceVideo(news, savedHistory.id!!)
+            val result = productionService.produceVideo(news, historyId)
             val filePath = result.filePath
             
             return if (filePath.isNotEmpty()) {
@@ -304,19 +306,18 @@ class ManualGenerationController(
                     updatedAt = java.time.LocalDateTime.now()
                 ))
                 
-                if (completedVideo.id != null) {
-                    kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
-                        channelId = channelId,
-                        videoId = completedVideo.id!!,
-                        title = completedVideo.title,
-                        summary = completedVideo.summary,
-                        description = completedVideo.description,
-                        link = completedVideo.link,
-                        filePath = filePath,
-                        keywords = result.keywords,
-                        thumbnailPath = result.thumbnailPath
-                    ))
-                }
+                val completedVideoId = requireNotNull(completedVideo.id) { "Completed video ID must not be null" }
+                kafkaEventPublisher.publishVideoCreated(com.sciencepixel.event.VideoCreatedEvent(
+                    channelId = channelId,
+                    videoId = completedVideoId,
+                    title = completedVideo.title,
+                    summary = completedVideo.summary,
+                    description = completedVideo.description,
+                    link = completedVideo.link,
+                    filePath = filePath,
+                    keywords = result.keywords,
+                    thumbnailPath = result.thumbnailPath
+                ))
                 
                 "✅ Video created successfully: $filePath (Queued for Upload via Kafka)"
             } else {

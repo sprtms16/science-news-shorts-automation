@@ -123,7 +123,8 @@ class VideoUploadService(
             )
 
             // 4. Success Handling
-            repository.findById(video.id!!).ifPresent { v ->
+            val videoId = requireNotNull(video.id) { "Video ID must not be null for upload success" }
+            repository.findById(videoId).ifPresent { v ->
                 repository.save(v.copy(
                     status = VideoStatus.UPLOADED,
                     youtubeUrl = youtubeUrl,
@@ -133,16 +134,17 @@ class VideoUploadService(
 
             eventPublisher.publishVideoUploaded(VideoUploadedEvent(
                 channelId = channelId,
-                videoId = video.id!!,
+                videoId = videoId,
                 youtubeUrl = youtubeUrl
             ))
 
             notificationService.notifyUploadComplete(video.title, youtubeUrl)
-            logPublisher.info("shorts-controller", "YouTube Upload Success: ${video.title}", "URL: $youtubeUrl", traceId = video.id!!)
+            logPublisher.info("shorts-controller", "YouTube Upload Success: ${video.title}", "URL: $youtubeUrl", traceId = videoId)
             println("✅ [$channelId] Upload Success: $youtubeUrl")
 
         } catch (e: Exception) {
-            handleUploadError(video.id!!, e)
+            val vId = video.id ?: "unknown"
+            handleUploadError(vId, e)
         }
     }
 
@@ -154,9 +156,10 @@ class VideoUploadService(
              errorMessage = "File not found: ${video.filePath}",
              updatedAt = LocalDateTime.now()
          ))
+         val videoId = video.id ?: "unknown"
          eventPublisher.publishUploadFailed(UploadFailedEvent(
              channelId = channelId,
-             videoId = video.id!!,
+             videoId = videoId,
              title = video.title,
              filePath = video.filePath,
              reason = "File not found",

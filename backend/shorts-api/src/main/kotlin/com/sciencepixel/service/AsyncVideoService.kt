@@ -30,13 +30,14 @@ class AsyncVideoService(
      * 즉시 작업 ID를 반환하고 백그라운드에서 처리
      */
     @Async
-    fun createVideoAsync(news: NewsItem, historyId: String): CompletableFuture<String> {
-        println("🚀 [ASYNC] Starting video creation: ${news.title} (Remote: $isRemoteRendering)")
+    fun createVideoAsync(news: NewsItem, historyId: String, targetChannelId: String? = null): CompletableFuture<String> {
+        val effectiveChannelId = targetChannelId ?: channelId
+        println("🚀 [ASYNC] Starting video creation: ${news.title} (Channel: $effectiveChannelId, Remote: $isRemoteRendering)")
         
         if (isRemoteRendering) {
             // V2: Publish Event to Trigger SAGA
              kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
-                channelId = channelId,
+                channelId = effectiveChannelId,
                 url = news.link,
                 title = news.title,
                 summary = news.summary,
