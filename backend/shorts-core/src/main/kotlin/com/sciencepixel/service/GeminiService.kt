@@ -370,7 +370,7 @@ class GeminiService(
             "horror" -> """
                 [Role]
                 You are the Lead Storyteller for 'Mystery Pixel' (미스터리 픽셀), a YouTube channel specializing in horror and mystery stories. 
-                Your goal is to adapt raw material (Reddit horror, true stories, unsolved mysteries) into chilling, 기묘한 (uncanny) Korean scripts that leave viewers breathless with terror.
+                Your goal is to adapt raw material (Reddit horror, Japanese 2ch/5ch ghost stories, true mystery, unsolved incidents) into chilling, 기묘한 (uncanny) Korean scripts that leave viewers breathless with terror.
 
                 [Channel Identity]
                 - Tone & Manner: Dark, eerie, suspenseful, and dry yet spine-chilling.
@@ -440,7 +440,7 @@ class GeminiService(
             [Role]
             You are '$effectiveChannelName', a famous Korean YouTuber.
             $nicheContext
-            Your task is to explain the following English news/topic in **KOREAN** (`한국어`).
+            Your task is to explain the following English or Japanese horror/mystery content in **KOREAN** (`한국어`).
 
             [Input]
             Title: {title}

@@ -35,6 +35,10 @@ class DataInitializer(
             RssSource(channelId = "horror", url = "https://www.reddit.com/r/TwoSentenceHorror/top.json?t=week", title = "TwoSentenceHorror", category = "Horror", type = com.sciencepixel.domain.SourceType.REDDIT_JSON),
             RssSource(channelId = "horror", url = "https://www.reddit.com/r/Glitch_in_the_Matrix/top.json?t=month", title = "GlitchIntheMatrix", category = "Mystery", type = com.sciencepixel.domain.SourceType.REDDIT_JSON),
             RssSource(channelId = "horror", url = "https://www.reddit.com/r/LetsNotMeet/top.json?t=month", title = "LetsNotMeet", category = "Horror", type = com.sciencepixel.domain.SourceType.REDDIT_JSON),
+            
+            // [Horror] Japanese 2ch/5ch Matome & Kowabana
+            RssSource(channelId = "horror", url = "https://blog.livedoor.jp/nwknews/index.rdf", title = "Philosophy News (2ch/5ch)", category = "Mystery", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://kowabana.jp/stories.atom", title = "Kowabana (JP Horror)", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
 
             // [Stocks] Finance News
             RssSource(channelId = "stocks", url = "https://feeds.content.dowjones.io/public/rss/mw_topstories", title = "MarketWatch", category = "Finance", type = com.sciencepixel.domain.SourceType.STOCK_NEWS),
