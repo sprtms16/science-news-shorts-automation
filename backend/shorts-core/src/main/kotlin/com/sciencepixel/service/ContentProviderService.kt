@@ -18,10 +18,29 @@ class ContentProviderService(
     private val videoHistoryRepository: com.sciencepixel.repository.VideoHistoryRepository,
     private val geminiService: GeminiService
 ) {
+    private val trustAllClient = createTrustAllClient()
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    private fun createTrustAllClient(): OkHttpClient {
+        val trustAllCerts = arrayOf<javax.net.ssl.X509TrustManager>(object : javax.net.ssl.X509TrustManager {
+            override fun checkClientTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+            override fun checkServerTrusted(chain: Array<out java.security.cert.X509Certificate>?, authType: String?) {}
+            override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = arrayOf()
+        })
+
+        val sslContext = javax.net.ssl.SSLContext.getInstance("SSL")
+        sslContext.init(null, trustAllCerts, java.security.SecureRandom())
+
+        return OkHttpClient.Builder()
+            .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0])
+            .hostnameVerifier { _, _ -> true }
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
 
     fun fetchContent(source: RssSource): List<NewsItem> {
         return try {
@@ -176,14 +195,14 @@ class ContentProviderService(
             .build()
             
         return try {
-            client.newCall(request).execute().use { response ->
+            // SSL 인증서 오류(PKIX)가 발생하는 소스를 위해 trustAllClient 사용
+            trustAllClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return emptyList()
                 
-                // byteStream을 직접 사용하여 XmlReader가 인코딩을 유추하도록 함 (UTF-8, EUC-KR 등 대응)
                 val bodyStream = response.body?.byteStream() ?: return emptyList()
                 
                 val input = SyndFeedInput()
-                input.isAllowDoctypes = false // Security: Prevent XXE
+                input.isAllowDoctypes = false
                 
                 val feed = input.build(XmlReader(bodyStream))
                 feed.entries
