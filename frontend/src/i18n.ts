@@ -91,7 +91,10 @@ export const translations = {
         manualUpload: "유튜브 업로드",
         clearFailedTitle: "실패 기록 일괄 삭제",
         clearFailedDesc: "현재 채널의 '생성 실패' 상태인 모든 기록을 삭제하고 관련 파일을 서버에서 제거합니다.",
-        runClearFailed: "실패 기록 삭제 실행"
+        runClearFailed: "실패 기록 삭제 실행",
+        resetSourcesTitle: "기본 리소스 초기화 (Seed)",
+        resetSourcesDesc: "모든 뉴스/괴담 수집 리소스를 공장 출고 상태로 초기화하고 최신 기사 수집을 준비합니다. 현재 채널에 관계없이 시스템 전역에 적용됩니다.",
+        runResetSources: "리소스 초기화 실행"
     },
     en: {
         dashboard: 'Dashboard',
@@ -183,6 +186,9 @@ export const translations = {
         manualUpload: "Upload to YouTube",
         clearFailedTitle: "Clear Failed History",
         clearFailedDesc: "Permanently delete all 'Failed' records and their associated files for the current channel.",
-        runClearFailed: "Clear Failed Records"
+        runClearFailed: "Clear Failed Records",
+        resetSourcesTitle: "Reset Default Sources (Seed)",
+        resetSourcesDesc: "Reset all news/horror collection sources to factory defaults and prepare for fresh fetching. Applies system-wide regardless of current channel.",
+        runResetSources: "Run Reset Sources"
     }
 };

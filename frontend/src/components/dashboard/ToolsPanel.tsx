@@ -12,7 +12,7 @@ import {
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts' | 'reset-sources') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -268,6 +268,28 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                                     className="px-8 py-3 bg-fuchsia-600/10 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-fuchsia-500/20"
                                 >
                                     {t.runRefreshPrompts || "Sync Prompts"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Reset Sources Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-red-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <RefreshCw size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-red-400 mb-1">{t.resetSourcesTitle || "Reset Default Sources"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.resetSourcesDesc || "Reset all news collection sources to factory defaults."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('reset-sources')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-red-500/20"
+                                >
+                                    {t.runResetSources || "Run Reset"}
                                 </button>
                             </div>
                         </div>

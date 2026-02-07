@@ -187,7 +187,7 @@ function App() {
     }
   };
 
-  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts') => {
+  const runBatchAction = async (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts' | 'reset-sources') => {
     if (!confirm(`Run ${action}? This may take a while.`)) return;
     setLoading(true);
     setToolsResult(null);
@@ -202,7 +202,8 @@ function App() {
                   action === 'clear-failed' ? `${apiBase}/admin/videos/history/clear-failed?channelId=${selectedChannel}` :
                     action === 'cleanup-workspaces' ? `${apiBase}/admin/maintenance/cleanup-workspaces` :
                       action === 'refresh-prompts' ? `${apiBase}/admin/maintenance/refresh-prompts?channelId=${selectedChannel}` :
-                        `${apiBase}/admin/videos/${action}`;
+                        action === 'reset-sources' ? `${apiBase}/admin/maintenance/reset-sources` :
+                          `${apiBase}/admin/videos/${action}`;
       const res = await axios.post(endpoint);
       setToolsResult(res.data);
       alert("Batch action completed!");
