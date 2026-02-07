@@ -16,11 +16,11 @@ open class RssItemReader(
     private val contentProviderService: com.sciencepixel.service.ContentProviderService,
     private val maxItems: Int = 10,
     private val channelBehavior: com.sciencepixel.config.ChannelBehavior
-) : ItemReader<NewsItem> {
-    private val items = LinkedList<NewsItem>()
+) : ItemReader<List<NewsItem>> {
+    private val items = LinkedList<List<NewsItem>>()
     private var initialized = false
 
-    override fun read(): NewsItem? {
+    override fun read(): List<NewsItem>? {
         if (!initialized) {
             fetchFeeds()
             initialized = true
@@ -60,14 +60,29 @@ open class RssItemReader(
             )
             
             items.clear()
-            items.add(aggregateItem)
+            items.add(listOf(aggregateItem))
             println("✅ Created 1 Aggregate Stock Video Item.")
             return
         }
 
         allItems.shuffle()
-        items.addAll(allItems.take(maxItems))
-        println("✅ Batch Feed Fetched: ${items.size} unique items (Limit: $maxItems) from ${sources.size} sources.")
+        
+        // Group items into bundles of 10 for retries
+        // We fetch enough to provide up to maxItems bundles
+        val bundleSize = 10
+        val targetBundles = maxItems
+        
+        for (i in 0 until targetBundles) {
+            val start = i * bundleSize
+            if (start >= allItems.size) break
+            
+            val bundle = allItems.subList(start, (start + bundleSize).coerceAtMost(allItems.size))
+            if (bundle.isNotEmpty()) {
+                items.add(bundle.toList())
+            }
+        }
+        
+        println("✅ Batch Feed Fetched: ${items.size} bundles (Size: $bundleSize) from ${sources.size} sources.")
     }
 
     private fun processSource(source: com.sciencepixel.domain.RssSource, allItems: MutableList<NewsItem>, seenLinks: MutableSet<String>) {

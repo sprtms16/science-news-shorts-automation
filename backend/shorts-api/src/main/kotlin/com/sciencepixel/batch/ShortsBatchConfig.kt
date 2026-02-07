@@ -43,7 +43,7 @@ class ShortsBatchConfig(
     @Bean
     fun shortsStep(): Step {
         return StepBuilder("step1", jobRepository)
-            .chunk<NewsItem, VideoHistory>(1, transactionManager)
+            .chunk<List<NewsItem>, VideoHistory>(1, transactionManager)
             .reader(realRssReader(null)) // null here, injected via StepScope
             .processor(videoProcessor)
             .writer(mongoWriter)

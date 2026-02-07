@@ -21,9 +21,9 @@ class VideoProcessor(
     private val kafkaEventPublisher: com.sciencepixel.event.KafkaEventPublisher,
     private val channelBehavior: com.sciencepixel.config.ChannelBehavior,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
-) : ItemProcessor<NewsItem, VideoHistory> {
+) : ItemProcessor<List<NewsItem>, VideoHistory> {
 
-    override fun process(item: NewsItem): VideoHistory? {
+    override fun process(bundle: List<NewsItem>): VideoHistory? {
         // 0. Final Buffer Check
         val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
             ?.value?.toIntOrNull() ?: channelBehavior.dailyLimit
@@ -34,82 +34,92 @@ class VideoProcessor(
         )).size
         
         if (currentActive >= limit) {
-            println("🛑 [$channelId] Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping: ${item.title}")
+            println("🛑 [$channelId] Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping batch bundle.")
             return null
         }
 
-        // 1. Duplicate Check (Link & Title)
-        val normalizedLink = try {
-            val url = java.net.URL(item.link)
-            "${url.protocol}://${url.host}${url.path}" 
-        } catch (e: Exception) {
-            item.link
-        }
+        // 1. Iterate through candidates (Maximum 10-retry safety logic)
+        bundle.forEachIndexed { index, item ->
+            val attempt = index + 1
+            println("🔍 [$channelId] Safety Check candidate $attempt/${bundle.size}: ${item.title}")
 
-        if (videoHistoryRepository.findByChannelIdAndLink(channelId, item.link) != null || 
-            videoHistoryRepository.findByChannelIdAndLink(channelId, normalizedLink) != null) {
-            println("⏭️ [$channelId] Skipped (Link Duplicate): $normalizedLink")
-            return null
-        }
+            // 1.1 Duplication Checks
+            val normalizedLink = try {
+                val url = java.net.URL(item.link)
+                "${url.protocol}://${url.host}${url.path}" 
+            } catch (e: Exception) {
+                item.link
+            }
 
-        // Local DB Title Duplicate Check
-        if (videoHistoryRepository.findByChannelIdAndTitle(channelId, item.title).isNotEmpty() || 
-            videoHistoryRepository.findByChannelIdAndRssTitle(channelId, item.title).isNotEmpty()) {
-            println("⏭️ [$channelId] Skipped (Local DB Title/RssTitle Duplicate): ${item.title}")
-            return null
-        }
+            if (videoHistoryRepository.findByChannelIdAndLink(channelId, item.link) != null || 
+                videoHistoryRepository.findByChannelIdAndLink(channelId, normalizedLink) != null) {
+                println("  ⏭️ candidate $attempt skipped (Link Duplicate)")
+                return@forEachIndexed
+            }
 
-        // Exact Title Match on YouTube Channel
-        if (youtubeService.isTitleDuplicateOnChannel(item.title)) {
-            println("⏭️ [$channelId] Skipped (YouTube Channel Title Duplicate): ${item.title}")
-            return null
-        }
+            if (videoHistoryRepository.findByChannelIdAndTitle(channelId, item.title).isNotEmpty() || 
+                videoHistoryRepository.findByChannelIdAndRssTitle(channelId, item.title).isNotEmpty()) {
+                println("  ⏭️ candidate $attempt skipped (Local DB Title Duplicate)")
+                return@forEachIndexed
+            }
 
-        // 2. Semantic Deduplication (AI)
-        val recentVideos = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(
-            channelId, 
-            org.springframework.data.domain.PageRequest.of(0, 30)
-        ).content
-        
-        if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
-             println("⏭️ [$channelId] Skipped (High Semantic Similarity): ${item.title}")
-             return null
-        }
+            if (youtubeService.isTitleDuplicateOnChannel(item.title)) {
+                println("  ⏭️ candidate $attempt skipped (YouTube Channel Title Duplicate)")
+                return@forEachIndexed
+            }
 
-        // 3. Safety Filter
-        if (!geminiService.checkSensitivity(item.title, item.summary, channelId)) {
-             println("⛔ [$channelId] Skipped (Sensitive Content): ${item.title}")
-             return null
-        }
-
-        try {
-            // 4. Create Record (QUEUED) 
-            val initialVideo = VideoHistory(
-                channelId = channelId,
-                title = item.title,
-                summary = item.summary,
-                link = item.link,
-                status = VideoStatus.QUEUED,
-                rssTitle = item.title,
-                createdAt = java.time.LocalDateTime.now(),
-                updatedAt = java.time.LocalDateTime.now()
-            )
-            videoHistoryRepository.save(initialVideo)
+            // 1.2 Semantic Deduplication
+            val recentVideos = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(
+                channelId, 
+                org.springframework.data.domain.PageRequest.of(0, 30)
+            ).content
             
-            // 5. Fire & Forget (SAGA Start)
-            kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
-                channelId = channelId,
-                url = item.link,
-                title = item.title,
-                category = "general"
-            ))
-            
-            println("🚀 [$channelId] Event Published: ${item.title} (Status: QUEUED)")
-            
-            return null
-        } catch (e: Exception) {
-            println("⚠️ [$channelId] Failed to trigger process: ${item.title} - ${e.message}")
-            return null
+            if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
+                 println("  ⏭️ candidate $attempt skipped (High Semantic Similarity)")
+                 return@forEachIndexed
+            }
+
+            // 1.3 Safety Filter
+            if (!geminiService.checkSensitivity(item.title, item.summary, channelId)) {
+                 println("  ⛔ candidate $attempt skipped (Sensitive Content)")
+                 return@forEachIndexed
+            }
+
+            // If we reach here, the item is safe and not a duplicate!
+            println("✅ [$channelId] Candidate $attempt selected: ${item.title}")
+
+            try {
+                // 2. Create Record (QUEUED) 
+                val initialVideo = VideoHistory(
+                    channelId = channelId,
+                    title = item.title,
+                    summary = item.summary,
+                    link = item.link,
+                    status = VideoStatus.QUEUED,
+                    rssTitle = item.title,
+                    createdAt = java.time.LocalDateTime.now(),
+                    updatedAt = java.time.LocalDateTime.now()
+                )
+                val savedVideo = videoHistoryRepository.save(initialVideo)
+                
+                // 3. Fire & Forget (SAGA Start)
+                kafkaEventPublisher.publishRssNewItem(com.sciencepixel.event.RssNewItemEvent(
+                    channelId = channelId,
+                    url = item.link,
+                    title = item.title,
+                    category = "general"
+                ))
+                
+                println("🚀 [$channelId] Event Published at attempt $attempt: ${item.title}")
+                
+                // Return the first successful one
+                return savedVideo
+            } catch (e: Exception) {
+                println("⚠️ [$channelId] Failed to trigger process at attempt $attempt: ${item.title} - ${e.message}")
+            }
         }
+
+        println("❌ [$channelId] All ${bundle.size} candidates in bundle failed safety/duplicate checks.")
+        return null
     }
 }
