@@ -198,44 +198,16 @@ class ManualGenerationController(
      * {"topic": "블랙홀의 비밀", "style": "news"}
      */
     @PostMapping("/async/topic")
-    fun createVideoFromTopicAsync(@RequestBody request: TopicRequest): JobStatus {
-        println("🚀 [ASYNC] AI-Powered Video Generation Requested")
-        println("📌 Topic: ${request.topic}")
+    fun createVideoFromTopicAsync(): ResponseEntity<Map<String, String>> {
+        println("🚀 Manual Batch Trigger Requested (via Async Topic endpoint)")
         
-        val generatedContent = geminiService.generateScienceNews(request.topic, request.style)
+        // 기존 배치를 호출하여 RSS 수집부터 시작
+        batchScheduler.triggerBatchJob(force = true)
         
-        println("✨ Generated Title: ${generatedContent.title}")
-        println("📝 Generated Summary: ${generatedContent.summary}")
-        
-        val news = NewsItem(
-            title = generatedContent.title,
-            summary = generatedContent.summary,
-            link = "ai-async-${System.currentTimeMillis()}"
-        )
-        
-        // 초기 상태 저장
-        val history = VideoHistory(
-            channelId = channelId,
-            title = news.title,
-            link = news.link,
-            summary = news.summary,
-            status = VideoStatus.QUEUED,
-            updatedAt = java.time.LocalDateTime.now()
-        )
-        val savedHistory = videoHistoryRepository.save(history)
-        
-        // 비동기로 비디오 생성 시작
-        val vId = requireNotNull(savedHistory.id) { "Video ID must not be null for async topic creation" }
-        asyncVideoService.createVideoAsync(news, vId, channelId)
-        
-        return JobStatus(
-            id = vId,
-            title = news.title,
-            status = VideoStatus.SCRIPTING.name,
-            filePath = null,
-            youtubeUrl = null,
-            message = "✅ 작업이 시작되었습니다. 완료 시 Discord/Telegram으로 알림됩니다. GET /manual/status/${vId}로 상태 확인 가능"
-        )
+        return ResponseEntity.ok(mapOf(
+            "status" to "BATCH_STARTED",
+            "message" to "✅ 기존 배치 프로세스(RSS 수집 및 비디오 생성)가 시작되었습니다. 로그 및 알림(Discord/Telegram)을 확인해주세요."
+        ))
     }
 
     /**

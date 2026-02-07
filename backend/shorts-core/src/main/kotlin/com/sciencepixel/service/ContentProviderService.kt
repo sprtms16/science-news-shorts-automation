@@ -138,10 +138,26 @@ class ContentProviderService(
                     return emptyList()
                 }
                 
-                // [Random Selection] Pick ONE random event from fresh items
-                val selected = potentialItems.random()
-                println("✨ Selected History Event: ${selected.title}")
-                return listOf(selected)
+                // [Safety Filter Retry - Max 5 attempts]
+                var attempts = 0
+                val candidates = potentialItems.toMutableList()
+                
+                while (attempts < 5 && candidates.isNotEmpty()) {
+                    val selected = candidates.random()
+                    println("🔍 Checking Safety for candidate (Attempt ${attempts + 1}): ${selected.title}")
+                    
+                    if (geminiService.checkSensitivity(selected.title, selected.summary, "history")) {
+                        println("✨ Selected History Event (Safety OK): ${selected.title}")
+                        return listOf(selected)
+                    } else {
+                        println("⛔ Wikipedia Item Rejected by Safety Filter: ${selected.title}")
+                        candidates.remove(selected)
+                        attempts++
+                    }
+                }
+                
+                println("⚠️ No safe Wikipedia items found after $attempts attempts.")
+                return emptyList()
             }
         } catch (e: Exception) {
             // ... error handling ...
@@ -156,18 +172,20 @@ class ContentProviderService(
     private fun fetchAndParseRss(url: String): List<com.rometools.rome.feed.synd.SyndEntry> {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", "Mozilla/5.0")
+            .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
             .build()
             
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return emptyList()
-                val xml = response.body?.string() ?: return emptyList()
+                
+                // byteStream을 직접 사용하여 XmlReader가 인코딩을 유추하도록 함 (UTF-8, EUC-KR 등 대응)
+                val bodyStream = response.body?.byteStream() ?: return emptyList()
                 
                 val input = SyndFeedInput()
-                input.isAllowDoctypes = false
-                val cleanXml = xml.replace(Regex("<!DOCTYPE[^>]*>"), "")
-                val feed = input.build(XmlReader(ByteArrayInputStream(cleanXml.toByteArray())))
+                input.isAllowDoctypes = false // Security: Prevent XXE
+                
+                val feed = input.build(XmlReader(bodyStream))
                 feed.entries
             }
         } catch (e: Exception) {
@@ -212,17 +230,23 @@ class ContentProviderService(
                 val searchUrl = "https://news.google.com/rss/search?q=${ticker.replace(" ", "+")}+stock+news&hl=en-US&gl=US&ceid=US:en"
                 val searchEntries = fetchAndParseRss(searchUrl)
                 
-                // Take top 2 items
-                val topItems = searchEntries.take(2).map { entry ->
+                // Take top 2 items and verify safety
+                val topItems = searchEntries.take(5).map { entry ->
                     NewsItem(
-                        title = "[${ticker.uppercase()}] ${entry.title}", // Tag title with ticker
+                        title = "[${ticker.uppercase()}] ${entry.title}", 
                         summary = entry.description?.value ?: "",
                         link = entry.link ?: "",
                         sourceName = "Google News ($ticker)"
                     )
-                }
+                }.filter { item ->
+                    // Safety check for stock news contents
+                    val isSafe = geminiService.checkSensitivity(item.title, item.summary, "stocks")
+                    if (!isSafe) println("⛔ Stock Item Rejected for $ticker: ${item.title}")
+                    isSafe
+                }.take(2)
+                
                 specificNewsItems.addAll(topItems)
-                println("  - Fetched ${topItems.size} items for '$ticker'")
+                println("  - Fetched ${topItems.size} safe items for '$ticker'")
                 
                 // Rate limit politeness
                 Thread.sleep(500)
