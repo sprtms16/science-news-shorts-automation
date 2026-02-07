@@ -36,9 +36,17 @@ class DataInitializer(
             RssSource(channelId = "horror", url = "https://www.reddit.com/r/Glitch_in_the_Matrix/top.json?t=month", title = "GlitchIntheMatrix", category = "Mystery", type = com.sciencepixel.domain.SourceType.REDDIT_JSON),
             RssSource(channelId = "horror", url = "https://www.reddit.com/r/LetsNotMeet/top.json?t=month", title = "LetsNotMeet", category = "Horror", type = com.sciencepixel.domain.SourceType.REDDIT_JSON),
             
-            // [Horror] Japanese 2ch/5ch Matome & Kowabana
+            // [Horror] Japanese Matome & Specialized
             RssSource(channelId = "horror", url = "https://blog.livedoor.jp/nwknews/index.rdf", title = "Philosophy News (2ch/5ch)", category = "Mystery", type = com.sciencepixel.domain.SourceType.RSS),
-            RssSource(channelId = "horror", url = "https://kowabana.jp/stories.atom", title = "Kowabana (JP Horror)", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://www.kowabana.net/feed/", title = "Kowabana (JP Horror)", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://thejapanesehorror.com/feed/", title = "The Japanese Horror", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            
+            // [Horror] Western / English Creepypastas
+            RssSource(channelId = "horror", url = "https://www.creepypasta.com/feed/", title = "Creepypasta.com", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://www.creepypastastories.com/feed/", title = "Creepypasta Stories", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://scarestreet.com/feed/", title = "Scare Street", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://nightmare-magazine.com/rss-2", title = "Nightmare Magazine", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
+            RssSource(channelId = "horror", url = "https://thehorrorpress.com/feed/", title = "The Horror Press", category = "Horror", type = com.sciencepixel.domain.SourceType.RSS),
 
             // [Stocks] Finance News
             RssSource(channelId = "stocks", url = "https://feeds.content.dowjones.io/public/rss/mw_topstories", title = "MarketWatch", category = "Finance", type = com.sciencepixel.domain.SourceType.STOCK_NEWS),
