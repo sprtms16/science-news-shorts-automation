@@ -75,7 +75,7 @@ class RenderConsumer(
                 durations = event.durations,
                 subtitles = event.subtitles,
                 mood = event.mood,
-                silenceTime = event.silenceTime,
+                silenceRanges = event.silenceRanges,
                 reportImagePath = event.reportImagePath,
                 targetChannelId = event.channelId // 정확한 채널 ID 전달
             )

@@ -104,7 +104,7 @@ data class VideoAssetsReadyEvent(
     val durations: List<Double>,
     val subtitles: List<String>,
     val keywords: List<String>,
-    val silenceTime: Double? = null,
+    val silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList(),
     val reportImagePath: String? = null, // 최종 전달
     val scriptEvent: ScriptCreatedEvent?, 
     val timestamp: Long = Instant.now().toEpochMilli()

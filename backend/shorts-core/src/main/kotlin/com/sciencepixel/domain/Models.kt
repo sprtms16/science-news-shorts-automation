@@ -119,6 +119,8 @@ data class SystemSetting(
 
 data class Scene(val sentence: String, val keyword: String)
 
+data class SilenceRange(val start: Double, val end: Double)
+
 data class ScriptResponse(
     val scenes: List<Scene>,
     val mood: String,

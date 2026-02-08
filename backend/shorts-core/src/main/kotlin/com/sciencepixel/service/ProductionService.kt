@@ -26,7 +26,7 @@ class ProductionService(
         val clipPaths: List<String>,
         val durations: List<Double>,
         val subtitles: List<String>,
-        val silenceTime: Double? = null
+        val silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList()
     )
 
     fun produceAssetsOnly(
@@ -46,9 +46,9 @@ class ProductionService(
         val clipFiles = mutableListOf<File>()
         val durations = mutableListOf<Double>()
         val subtitles = mutableListOf<String>()
+        val silenceRanges = mutableListOf<com.sciencepixel.domain.SilenceRange>()
 
         var totalDuration = 0.0
-        var silenceAt: Double? = null
 
         val totalScenes = scenes.size
         println("📹 [SAGA] Phase 1: Processing scenes for $videoId (${totalScenes}개 씬)")
@@ -64,12 +64,7 @@ class ProductionService(
             val audioFile = File(workspace, "audio_$i.mp3")
             val clipFile = File(workspace, "clip_$i.mp4")
 
-            var cleanSentence = scene.sentence
-            if (cleanSentence.contains("[BGM_SILENCE]")) {
-                silenceAt = totalDuration
-                cleanSentence = cleanSentence.replace("[BGM_SILENCE]", "").trim()
-                println("🔇 BGM Silence requested at $silenceAt seconds (Scene $i)")
-            }
+            var cleanSentence = scene.sentence.replace("[BGM_SILENCE]", "").trim()
 
             // [Morning Briefing Optimization] Use report image for first 5 scenes if provided
             val useReportImage = reportImagePath != null && i < 5
@@ -97,6 +92,13 @@ class ProductionService(
                 5.0
             }
 
+            if (scene.sentence.contains("[BGM_SILENCE]")) {
+                val silenceStart = totalDuration
+                val silenceEnd = totalDuration + duration
+                silenceRanges.add(com.sciencepixel.domain.SilenceRange(silenceStart, silenceEnd))
+                println("🔇 BGM Silence requested from $silenceStart to $silenceEnd seconds (Scene $i)")
+            }
+
             editSceneWithoutSubtitle(videoFile, audioFile, duration, clipFile)
             
             clipFiles.add(clipFile)
@@ -111,7 +113,7 @@ class ProductionService(
             clipPaths = clipFiles.map { it.absolutePath },
             durations = durations,
             subtitles = subtitles,
-            silenceTime = silenceAt
+            silenceRanges = silenceRanges
         )
     }
 
@@ -122,7 +124,7 @@ class ProductionService(
         durations: List<Double>, 
         subtitles: List<String>, 
         mood: String, 
-        silenceTime: Double? = null, 
+        silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList(), 
         reportImagePath: String? = null,
         targetChannelId: String? = null // 추가
     ): String {
@@ -145,7 +147,7 @@ class ProductionService(
         // Use videoId for deterministic filename to avoid duplicates
         val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_$videoId.mp4")
         
-        burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceTime)
+        burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceRanges)
         
         logPublisher.info("shorts-controller", "Production Completed: $title", "Path: ${finalOutput.name}", traceId = videoId)
         return finalOutput.absolutePath
@@ -419,7 +421,7 @@ class ProductionService(
     }
 
     // Phase 3b: Burn subtitles and Mix BGM into final video
-    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File, silenceTime: Double? = null) {
+    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File, silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList()) {
         // Regex-based escaping for FFmpeg filter path:
         // 1. \ -> / (Windows separator Fix)
         // 2. : -> \: (FFmpeg key:val separator escape)
@@ -463,9 +465,12 @@ class ProductionService(
             cmd.addAll(listOf("-stream_loop", "-1", "-i", bgmFile.absolutePath))
             
             // Filter complex: mix voice and bgm
-            // volume filter on bgm: if silenceTime is provided, set volume to 0 after that time
-            val bgmVolumeFilter = if (silenceTime != null) {
-                "volume=0.20:enable='lt(t,$silenceTime)'"
+            // volume filter on bgm: if silenceRanges are provided, set volume to 0 during those ranges, 0.20 otherwise
+            val bgmVolumeFilter = if (silenceRanges.isNotEmpty()) {
+                val conditions = silenceRanges.joinToString("+") { range ->
+                    "between(t,${range.start},${range.end})"
+                }
+                "volume='if($conditions, 0, 0.20)':eval=frame"
             } else {
                 "volume=0.20"
             }

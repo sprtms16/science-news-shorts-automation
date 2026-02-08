@@ -114,7 +114,7 @@ class SceneConsumer(
                 keywords = event.keywords,
                 mood = event.mood,
                 reportImagePath = event.reportImagePath,
-                silenceTime = assetResult.silenceTime,
+                silenceRanges = assetResult.silenceRanges,
                 scriptEvent = event
             ))
 
