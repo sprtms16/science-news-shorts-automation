@@ -47,22 +47,18 @@ class GeminiService(
         private const val MAX_RPD = 1500
         private const val COOLDOWN_MS = 10 * 60 * 1000L // 쿨다운 10분
         
-        // 지원 모델 풀: 사용자가 요청한 모든 무료/프리뷰 모델 포함
+        // 지원 모델 풀: 실제로 대본 생성(Text-to-Text)에 사용 가능한 무료/프리뷰 모델 위주로 필터링
         // 성능 및 최신순으로 뒤에 배치하여 우선순위를 높임
         private val SUPPORTED_MODELS = listOf(
             "gemini-1.5-flash-8b",
             "gemini-2.0-flash-lite",
             "gemini-2.5-flash-lite",
-            "gemini-2.5-flash-lite-preview-09-2025",
             "gemini-1.5-flash",
             "gemini-2.0-flash",
             "gemini-2.5-flash",
-            "gemini-2.5-flash-preview-09-2025",
-            "gemini-2.5-flash-preview-tts",
-            "gemini-2.5-flash-native-audio-preview-12-2025",
             "gemini-2.5-pro",
             "gemini-3-flash-preview",
-            "gemini-2.0-pro-exp-0205" // 최신 강력 모델 추가
+            "gemini-2.0-pro-exp-0205" // 최신 강력 모델
         )
     }
 
