@@ -308,7 +308,7 @@ class ProductionService(
                 "-loop", "1", "-i", video.absolutePath,
                 "-i", audio.absolutePath,
                 "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1",
-                "-c:v", "h264_nvenc", "-t", duration.toString(),
+                "-c:v", "libx264", "-t", duration.toString(),
                 "-pix_fmt", "yuv420p", output.absolutePath
             )
         } else {
@@ -332,7 +332,7 @@ class ProductionService(
         cmd.addAll(listOf("-t", "$duration", "-vf", vfScaleFilter, "-r", "60"))
         
         // Map video (0:v) and audio (1:a) - audio is either file or silence
-        cmd.addAll(listOf("-map", "0:v", "-map", "1:a", "-c:v", "h264_nvenc", "-c:a", "aac"))
+        cmd.addAll(listOf("-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-c:a", "aac"))
         
         if (!audio.exists()) {
              // Shortest ensures it matches the duration constraint (though -t handles it too)
@@ -507,7 +507,7 @@ class ProductionService(
             cmd.addAll(listOf("-vf", subtitleFilter, "-c:a", "copy"))
         }
         
-        cmd.addAll(listOf("-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23", "-c:a", "aac", "-movflags", "+faststart", output.absolutePath))
+        cmd.addAll(listOf("-c:v", "libx264", "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags", "+faststart", output.absolutePath))
         
         println("Executing FFmpeg Production (Phase 3): ${cmd.joinToString(" ")}")
         val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
