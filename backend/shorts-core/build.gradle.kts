@@ -14,6 +14,9 @@ dependencies {
     api("com.fasterxml.jackson.module:jackson-module-kotlin")
     api("org.jetbrains.kotlin:kotlin-reflect")
     
+    // Kotlin Coroutines (비동기 처리)
+    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    
     // MongoDB
     api("org.springframework.boot:spring-boot-starter-data-mongodb")
     

@@ -1,6 +1,7 @@
 plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("com.google.cloud.tools.jib") // Jib 컨테이너화
 }
 
 dependencies {
@@ -15,4 +16,20 @@ dependencies {
     // RSS Parsing (for content extraction in ProductionService)
     implementation("com.rometools:rome:2.1.0")
     implementation("org.jsoup:jsoup:1.17.2")
+}
+
+// Jib 컨테이너 설정
+jib {
+    from {
+        image = "amazoncorretto:21-alpine"
+    }
+    to {
+        image = "shorts-worker"
+        tags = setOf("latest")
+    }
+    container {
+        jvmFlags = listOf("-Xms512m", "-Xmx1024m")
+        ports = listOf("8081")
+        mainClass = "com.sciencepixel.ShortsWorkerApplicationKt"
+    }
 }

@@ -1,6 +1,7 @@
 plugins {
     id("org.springframework.boot")
     id("io.spring.dependency-management")
+    id("com.google.cloud.tools.jib") // Jib 컨테이너화
 }
 
 dependencies {
@@ -23,4 +24,20 @@ dependencies {
     
     testImplementation("org.springframework.batch:spring-batch-test")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+}
+
+// Jib 컨테이너 설정
+jib {
+    from {
+        image = "amazoncorretto:21-alpine"
+    }
+    to {
+        image = "shorts-api"
+        tags = setOf("latest")
+    }
+    container {
+        jvmFlags = listOf("-Xms256m", "-Xmx512m")
+        ports = listOf("8080")
+        mainClass = "com.sciencepixel.ShortsApiApplicationKt"
+    }
 }

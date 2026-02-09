@@ -14,9 +14,24 @@ interface ChannelBehavior {
     val useAsyncFlow: Boolean
     
     /**
+     * 채널 표시 이름 (인트로에 사용)
+     */
+    val channelName: String get() = "Science Pixel"
+    
+    /**
      * Gemini 프롬프트에 추가할 채널 특화 지시사항
      */
     fun getExtraPrompt(today: String): String
+    
+    /**
+     * 스크립트 생성용 시스템 프롬프트 (채널별 오버라이드 가능)
+     */
+    fun getScriptSystemPrompt(): String = ""
+    
+    /**
+     * BGM 카테고리 (futuristic, suspense, corporate, epic, calm 등)
+     */
+    fun getBgmCategory(): String = "calm"
     
     /**
      * 생성 스킵 조건 (Renderer 등)
@@ -28,9 +43,6 @@ interface ChannelBehavior {
      */
     val requiresStrictDateCheck: Boolean get() = false
     
-    /**
-     * 뉴스 집계(Aggregation) 필요 여부 (Stocks 채널 등)
-     */
     /**
      * 뉴스 집계(Aggregation) 필요 여부 (Stocks 채널 등)
      */
@@ -58,11 +70,13 @@ interface ChannelBehavior {
 )
 class DefaultChannelBehavior : ChannelBehavior {
     override val channelId = "science"
+    override val channelName = "Science Pixel"
     override val isLongForm = false
     override val dailyLimit = 10
     override val useAsyncFlow = false
     
     override fun getExtraPrompt(today: String) = ""
+    override fun getBgmCategory() = "futuristic"
     
     override val defaultTags = listOf("science", "news", "shorts", "sciencepixel")
     override val defaultHashtags = "#science #news #shorts"
@@ -75,14 +89,16 @@ class DefaultChannelBehavior : ChannelBehavior {
 @ConditionalOnProperty(name = ["SHORTS_CHANNEL_ID"], havingValue = "horror")
 class HorrorChannelBehavior : ChannelBehavior {
     override val channelId = "horror"
+    override val channelName = "Horror Tales"
     override val isLongForm = false
     override val dailyLimit = 10
     override val useAsyncFlow = false
     
     override fun getExtraPrompt(today: String) = ""
+    override fun getBgmCategory() = "suspense"
     
     override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
-    override val defaultHashtags = "#공포 #괴담 #미스테리 #호러 #shorts"
+    override val defaultHashtags = "#공포 #괴담 #미스터리 #호러 #shorts"
 }
 
 /**
@@ -92,6 +108,7 @@ class HorrorChannelBehavior : ChannelBehavior {
 @ConditionalOnProperty(name = ["SHORTS_CHANNEL_ID"], havingValue = "stocks")
 class StocksChannelBehavior : ChannelBehavior {
     override val channelId = "stocks"
+    override val channelName = "Market Insight"
     override val isLongForm = true
     override val dailyLimit = 1
     override val useAsyncFlow = true
@@ -100,6 +117,7 @@ class StocksChannelBehavior : ChannelBehavior {
     
     override fun getExtraPrompt(today: String) = 
         "7. **Date Context:** Today is $today. Focus on the LATEST market news for this date."
+    override fun getBgmCategory() = "corporate"
         
     override val defaultTags = listOf("stocks", "economy", "investment", "shorts")
     override val defaultHashtags = "#주식 #경제 #재테크 #뉴스 #shorts"
@@ -112,6 +130,7 @@ class StocksChannelBehavior : ChannelBehavior {
 @ConditionalOnProperty(name = ["SHORTS_CHANNEL_ID"], havingValue = "history")
 class HistoryChannelBehavior : ChannelBehavior {
     override val channelId = "history"
+    override val channelName = "History Archive"
     override val isLongForm = true
     override val dailyLimit = 1
     override val useAsyncFlow = false
@@ -119,6 +138,7 @@ class HistoryChannelBehavior : ChannelBehavior {
     
     override fun getExtraPrompt(today: String) = 
         "7. **Date Requirement:** Today is $today. You MUST create a script about a historical event that happened on THIS DATE ($today). Explicitly mention the Date in the intro."
+    override fun getBgmCategory() = "epic"
         
     override val defaultTags = listOf("history", "mystery", "facts", "shorts")
     override val defaultHashtags = "#역사 #미스터리 #지식 #history #shorts"

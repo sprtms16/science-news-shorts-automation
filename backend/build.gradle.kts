@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     id("org.springframework.boot") version "3.2.0" apply false
     id("io.spring.dependency-management") version "1.1.4" apply false
+    id("com.google.cloud.tools.jib") version "3.4.4" apply false // Jib 컨테이너화
     kotlin("jvm") version "1.9.20" apply false
     kotlin("plugin.spring") version "1.9.20" apply false
 }
