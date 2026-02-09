@@ -70,7 +70,7 @@ interface ChannelBehavior {
 )
 class DefaultChannelBehavior : ChannelBehavior {
     override val channelId = "science"
-    override val channelName = "Science Pixel"
+    override val channelName = "사이언스픽셀"
     override val isLongForm = false
     override val dailyLimit = 10
     override val useAsyncFlow = false
@@ -89,7 +89,7 @@ class DefaultChannelBehavior : ChannelBehavior {
 @ConditionalOnProperty(name = ["SHORTS_CHANNEL_ID"], havingValue = "horror")
 class HorrorChannelBehavior : ChannelBehavior {
     override val channelId = "horror"
-    override val channelName = "Horror Tales"
+    override val channelName = "미스터리 픽셀"
     override val isLongForm = false
     override val dailyLimit = 10
     override val useAsyncFlow = false
@@ -108,7 +108,7 @@ class HorrorChannelBehavior : ChannelBehavior {
 @ConditionalOnProperty(name = ["SHORTS_CHANNEL_ID"], havingValue = "stocks")
 class StocksChannelBehavior : ChannelBehavior {
     override val channelId = "stocks"
-    override val channelName = "Market Insight"
+    override val channelName = "밸류픽셀"
     override val isLongForm = true
     override val dailyLimit = 1
     override val useAsyncFlow = true
@@ -130,7 +130,7 @@ class StocksChannelBehavior : ChannelBehavior {
 @ConditionalOnProperty(name = ["SHORTS_CHANNEL_ID"], havingValue = "history")
 class HistoryChannelBehavior : ChannelBehavior {
     override val channelId = "history"
-    override val channelName = "History Archive"
+    override val channelName = "메모리픽셀"
     override val isLongForm = true
     override val dailyLimit = 1
     override val useAsyncFlow = false
