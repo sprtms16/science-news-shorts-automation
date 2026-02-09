@@ -4,6 +4,7 @@ import com.sciencepixel.config.ChannelBehavior
 import com.sciencepixel.domain.NewsItem
 import com.sciencepixel.domain.ProductionResult
 import com.sciencepixel.domain.Scene
+import kotlinx.coroutines.*
 import org.springframework.stereotype.Service
 import java.io.File
 
@@ -48,63 +49,83 @@ class ProductionService(
         val subtitles = mutableListOf<String>()
         val silenceRanges = mutableListOf<com.sciencepixel.domain.SilenceRange>()
 
-        var totalDuration = 0.0
-
         val totalScenes = scenes.size
-        println("📹 [SAGA] Phase 1: Processing scenes for $videoId (${totalScenes}개 씬)")
+        println("📹 [SAGA] Phase 1: Processing scenes for $videoId (${totalScenes}개 씬) - 병렬 처리")
         
-        scenes.forEachIndexed { i, scene ->
-            // Calculate progress: 10% to 60% based on scene completion
-            val sceneProgress = 10 + ((i.toDouble() / totalScenes) * 50).toInt()
-            val step = "씬 ${i + 1}/${totalScenes} 생성 중 (${scene.keyword})"
-            println("📊 [$title] 진행률: $sceneProgress% - $step")
-            onProgress?.invoke(sceneProgress, step)
-            
-            val videoFile = File(workspace, "raw_$i.mp4")
-            val audioFile = File(workspace, "audio_$i.mp3")
-            val clipFile = File(workspace, "clip_$i.mp4")
+        // 병렬 처리를 위한 데이터 클래스
+        data class SceneResult(
+            val index: Int,
+            val clipFile: File,
+            val duration: Double,
+            val subtitle: String,
+            val hasSilence: Boolean
+        )
 
-            var cleanSentence = scene.sentence.replace("[BGM_SILENCE]", "").trim()
+        // 씬 처리를 코루틴으로 병렬화
+        val sceneResults = runBlocking {
+            scenes.mapIndexed { i, scene ->
+                async(Dispatchers.IO) {
+                    val sceneProgress = 10 + ((i.toDouble() / totalScenes) * 50).toInt()
+                    val step = "씬 ${i + 1}/${totalScenes} 생성 중 (${scene.keyword})"
+                    println("📊 [$title] 진행률: $sceneProgress% - $step")
+                    onProgress?.invoke(sceneProgress, step)
+                    
+                    val videoFile = File(workspace, "raw_$i.mp4")
+                    val audioFile = File(workspace, "audio_$i.mp3")
+                    val clipFile = File(workspace, "clip_$i.mp4")
 
-            // [Morning Briefing Optimization] Use report image for first 5 scenes if provided
-            val useReportImage = reportImagePath != null && i < 5
-            
-            if (useReportImage) {
-                println("🖼️ Using report image for scene $i")
-                // Copy or link report image to videoFile (FFMPEG handles image as input)
-                java.nio.file.Files.copy(
-                    java.io.File(reportImagePath!!).toPath(),
-                    videoFile.toPath(),
-                    java.nio.file.StandardCopyOption.REPLACE_EXISTING
-                )
-            } else {
-                if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: $cleanSentence", videoFile)) {
-                    println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
-                    if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
-                        return@forEachIndexed
+                    val cleanSentence = scene.sentence.replace("[BGM_SILENCE]", "").trim()
+                    val useReportImage = reportImagePath != null && i < 5
+                    
+                    if (useReportImage) {
+                        println("🖼️ Using report image for scene $i")
+                        java.nio.file.Files.copy(
+                            java.io.File(reportImagePath!!).toPath(),
+                            videoFile.toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                        )
+                    } else {
+                        if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: $cleanSentence", videoFile)) {
+                            println("⚠️ No video found for '${scene.keyword}'. Trying fallback...")
+                            pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)
+                        }
                     }
+
+                    val duration = try {
+                        audioService.generateAudio(cleanSentence, audioFile)
+                    } catch (e: Exception) {
+                        5.0
+                    }
+
+                    editSceneWithoutSubtitle(videoFile, audioFile, duration, clipFile)
+                    
+                    SceneResult(
+                        index = i,
+                        clipFile = clipFile,
+                        duration = duration,
+                        subtitle = cleanSentence,
+                        hasSilence = scene.sentence.contains("[BGM_SILENCE]")
+                    )
                 }
-            }
+            }.awaitAll()
+        }
 
-            val duration = try {
-                 audioService.generateAudio(cleanSentence, audioFile)
-            } catch (e: Exception) {
-                5.0
-            }
-
-            if (scene.sentence.contains("[BGM_SILENCE]")) {
-                val silenceStart = totalDuration
-                val silenceEnd = totalDuration + duration
-                silenceRanges.add(com.sciencepixel.domain.SilenceRange(silenceStart, silenceEnd))
-                println("🔇 BGM Silence requested from $silenceStart to $silenceEnd seconds (Scene $i)")
-            }
-
-            editSceneWithoutSubtitle(videoFile, audioFile, duration, clipFile)
+        // 결과를 인덱스 순으로 정렬하여 조합
+        val sortedResults = sceneResults.sortedBy { it.index }
+        var totalDuration = 0.0
+        
+        sortedResults.forEach { result ->
+            clipFiles.add(result.clipFile)
+            durations.add(result.duration)
+            subtitles.add(result.subtitle)
             
-            clipFiles.add(clipFile)
-            durations.add(duration)
-            subtitles.add(cleanSentence)
-            totalDuration += duration
+            if (result.hasSilence) {
+                val silenceStart = totalDuration
+                val silenceEnd = totalDuration + result.duration
+                silenceRanges.add(com.sciencepixel.domain.SilenceRange(silenceStart, silenceEnd))
+                println("🔇 BGM Silence from $silenceStart to $silenceEnd seconds (Scene ${result.index})")
+            }
+            totalDuration += result.duration
         }
         
         // Return absolute paths
