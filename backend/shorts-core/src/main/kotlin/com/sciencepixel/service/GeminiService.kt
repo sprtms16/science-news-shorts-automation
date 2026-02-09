@@ -40,15 +40,15 @@ class GeminiService(
         apiKeyString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
     
-    // 할당량 제한 정의
+    // 할당량 제한 정의 (무료 티어 기준: 15 RPM, 1M TPM, 1,500 RPD)
     companion object {
-        private const val MAX_RPM = 5
-        private const val MAX_TPM = 250_000
-        private const val MAX_RPD = 20
-        private const val COOLDOWN_MS = 10 * 60 * 1000L
+        private const val MAX_RPM = 15
+        private const val MAX_TPM = 1_000_000
+        private const val MAX_RPD = 1500
+        private const val COOLDOWN_MS = 5 * 60 * 1000L // 쿨다운 5분으로 단축
         
-        // 지원 모델 풀 (각 모델별로 별도 할당량이 존재함)
-        private val SUPPORTED_MODELS = listOf("gemini-3-flash-preview", "gemini-2.5-flash")
+        // 무료 사용 가능 모델 풀 (높은 성능의 신규 모델을 뒤에 배치하여 우선순위 높임)
+        private val SUPPORTED_MODELS = listOf("gemini-1.5-flash-8b", "gemini-1.5-flash", "gemini-2.0-flash")
     }
 
     // 각 (키 + 모델) 조합별 할당량 추적 클래스
@@ -78,12 +78,20 @@ class GeminiService(
         }
 
         @Synchronized
+        fun getCurrentTPM(): Int {
+            val now = System.currentTimeMillis()
+            tokenUsages.removeIf { now - it.first > 60_000 }
+            return tokenUsages.sumOf { it.second }
+        }
+
+        @Synchronized
         fun isAvailable(): Boolean {
             checkAndResetDaily()
             val now = System.currentTimeMillis()
             if (now - lastFailureTime < COOLDOWN_MS) return false
             if (dailyRequestCount >= MAX_RPD) return false
             if (getCurrentRPM() >= MAX_RPM) return false
+            if (getCurrentTPM() >= MAX_TPM) return false
             return true
         }
 
@@ -123,64 +131,65 @@ class GeminiService(
 
     /**
      * 스마트 키/모델 선택: 할당량이 남은 최적의 조합 선택
+     * @param excludeCombinations 이미 시도했거나 제외할 조합 세트
      */
-    private fun getSmartKeyAndModel(): KeyModelSelection? {
+    private fun getSmartKeyAndModel(excludeCombinations: Set<String> = emptySet()): KeyModelSelection? {
         if (apiKeys.isEmpty()) return null
         
-        // 사용 가능한 모든 조합 생성 후 필터링
         val availablePairs = mutableListOf<KeyModelSelection>()
         apiKeys.forEach { key ->
             SUPPORTED_MODELS.forEach { model ->
-                if (combinedQuotas["$key:$model"]?.isAvailable() == true) {
+                val combinedKey = "$key:$model"
+                if (combinedKey !in excludeCombinations && combinedQuotas[combinedKey]?.isAvailable() == true) {
                     availablePairs.add(KeyModelSelection(key, model))
                 }
             }
         }
         
-        if (availablePairs.isEmpty()) {
-            println("⚠️ All Gemini Key/Model combinations are at their limit.")
-            return null
-        }
+        if (availablePairs.isEmpty()) return null
         
-        // 남은 일일 할당량이 가장 많은 것(사용량이 적은 것) 선택, 고성능 모델(gemini-3) 우선
-        return availablePairs.sortedWith(compareBy<KeyModelSelection> { 
-            combinedQuotas["${it.apiKey}:${it.modelName}"]?.dailyRequestCount ?: 0
-        }.thenBy { 
-            // gemini-3를 우선시하도록 인덱스로 가중치
-            SUPPORTED_MODELS.indexOf(it.modelName)
-        }).firstOrNull()
+        // 1. 일일 사용량이 가장 적은 것 우선
+        // 2. 최신 모델(index가 높은 것) 우선 시도
+        return availablePairs.sortedWith(
+            compareBy<KeyModelSelection> { combinedQuotas["${it.apiKey}:${it.modelName}"]?.dailyRequestCount ?: 0 }
+            .thenByDescending { SUPPORTED_MODELS.indexOf(it.modelName) }
+        ).firstOrNull()
     }
     
     /**
      * 재시도 로직이 포함된 Gemini API 호출
+     * 모든 가용 키/모델 조합을 시도할 때까지 반복
      */
-    private fun callGeminiWithRetry(prompt: String, maxRetries: Int = 3): String? {
+    private fun callGeminiWithRetry(prompt: String, maxRetries: Int = 10): String? {
         var lastError: Exception? = null
         val triedCombinations = mutableSetOf<String>()
+        val totalPossibleCombinations = combinedQuotas.size
         
-        repeat(maxRetries) { attempt ->
-            val selection = getSmartKeyAndModel()
+        // 최대 시도 횟수를 전체 조합 수와 maxRetries 중 큰 값으로 설정하여 모든 가능성 탐색
+        val effectiveMaxAttempts = maxOf(maxRetries, totalPossibleCombinations)
+        
+        repeat(effectiveMaxAttempts) { attempt ->
+            val selection = getSmartKeyAndModel(triedCombinations)
             
             if (selection == null) {
-                println("⏳ No available Key/Model pairs. Waiting 10 seconds... (${attempt + 1}/$maxRetries)")
-                Thread.sleep(10000)
+                if (triedCombinations.size >= totalPossibleCombinations) {
+                    println("❌ All $totalPossibleCombinations Gemini Key/Model combinations exhausted.")
+                    return@repeat
+                }
+                println("⏳ No available Key/Model pairs right now. Waiting 5 seconds... (${attempt + 1}/$effectiveMaxAttempts)")
+                Thread.sleep(5000)
                 return@repeat
             }
 
             val apiKey = selection.apiKey
             val modelName = selection.modelName
             val combinedKey = "$apiKey:$modelName"
-            
-            if (combinedKey in triedCombinations && triedCombinations.size < combinedQuotas.size) {
-                 return@repeat
-            }
             triedCombinations.add(combinedKey)
             
-            val tracker = requireNotNull(combinedQuotas[combinedKey]) { "Tracker not found for $combinedKey" }
+            val tracker = combinedQuotas[combinedKey] ?: return@repeat
             tracker.recordAttempt()
             
             val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
-            
             val jsonBody = JSONObject().apply {
                 put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", prompt)))))
             }
@@ -189,38 +198,42 @@ class GeminiService(
             val request = Request.Builder().url(url).post(requestBody).build()
             
             try {
-                val response = client.newCall(request).execute()
-                val responseCode = response.code
-                val text = response.body?.string() ?: ""
-                
-                if (responseCode == 429) {
-                    println("⚠️ Rate Limit (429) for combination: $combinedKey... (Daily: ${tracker.dailyRequestCount})")
-                    tracker.recordFailure()
-                    lastError = Exception("Rate limit exceeded")
-                    response.close()
-                    return@repeat
+                client.newCall(request).execute().use { response ->
+                    val responseCode = response.code
+                    val text = response.body?.string() ?: ""
+                    
+                    when (responseCode) {
+                        200 -> {
+                            val jsonResponse = JSONObject(text)
+                            val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
+                            tracker.recordSuccess(tokens)
+                            return text
+                        }
+                        429 -> {
+                            println("⚠️ Rate Limit (429) for: $combinedKey. Trying next... (${triedCombinations.size}/$totalPossibleCombinations)")
+                            tracker.recordFailure()
+                            lastError = Exception("Rate limit exceeded (429)")
+                        }
+                        503, 504 -> {
+                            println("⚠️ Service Unavailable (503/504) for: $combinedKey. Trying next...")
+                            tracker.recordFailure()
+                            lastError = Exception("Service unavailable ($responseCode)")
+                        }
+                        else -> {
+                            println("⚠️ Gemini Error: $responseCode - $text")
+                            tracker.recordFailure()
+                            lastError = Exception("Gemini API error: $responseCode")
+                        }
+                    }
                 }
-                
-                if (responseCode == 200) {
-                    val jsonResponse = JSONObject(text)
-                    val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
-                    tracker.recordSuccess(tokens)
-                    return text
-                }
-                
-                println("⚠️ Gemini Response Code: $responseCode - $text")
-                tracker.recordFailure()
-                lastError = Exception("Gemini API error: $responseCode")
-                response.close()
-                
             } catch (e: Exception) {
-                println("❌ Gemini Network Error: ${e.message}")
+                println("❌ Gemini Connection Error: ${e.message}")
                 tracker.recordFailure()
                 lastError = e
             }
         }
         
-        println("❌ All retry attempts failed: ${lastError?.message}")
+        println("❌ All possible combinations failed. Last Error: ${lastError?.message}")
         return null
     }
 
