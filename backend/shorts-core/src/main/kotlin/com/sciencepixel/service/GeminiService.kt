@@ -50,15 +50,12 @@ class GeminiService(
         // 지원 모델 풀: 실제로 대본 생성(Text-to-Text)에 사용 가능한 무료/프리뷰 모델 위주로 필터링
         // 성능 및 최신순으로 뒤에 배치하여 우선순위를 높임
         private val SUPPORTED_MODELS = listOf(
-            "gemini-1.5-flash-8b",
             "gemini-2.0-flash-lite",
             "gemini-2.5-flash-lite",
-            "gemini-1.5-flash",
             "gemini-2.0-flash",
             "gemini-2.5-flash",
             "gemini-2.5-pro",
-            "gemini-3-flash-preview",
-            "gemini-2.0-pro-exp-0205" // 최신 강력 모델
+            "gemini-3-flash-preview" // 최신 강력 모델
         )
     }
 
