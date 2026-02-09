@@ -40,21 +40,29 @@ class GeminiService(
         apiKeyString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
     
-    // 할당량 제한 정의 (2025/2026 무료 티어 기준: 10-15 RPM, 250K-1M TPM, 250-1500 RPD)
-    // 2.0/2.5 Flash 모델은 보통 10 RPM, 250 RPD 정도로 제한이 강화되었습니다.
+    // 할당량 제한 정의 (기본값 설정, 개별 모델별 429 응답 시 쿨다운으로 대응)
     companion object {
-        private const val MAX_RPM = 10 
-        private const val MAX_TPM = 250_000 
-        private const val MAX_RPD = 250 
-        private const val COOLDOWN_MS = 5 * 60 * 1000L 
+        private const val MAX_RPM = 15 // Flash 모델 기준 (Pro는 429로 감지)
+        private const val MAX_TPM = 1_000_000
+        private const val MAX_RPD = 1500
+        private const val COOLDOWN_MS = 10 * 60 * 1000L // 쿨다운 10분
         
-        // 무료 사용 가능 모델 풀 (최신 2.5/2.0 Flash 모델 포함)
+        // 지원 모델 풀: 사용자가 요청한 모든 무료/프리뷰 모델 포함
+        // 성능 및 최신순으로 뒤에 배치하여 우선순위를 높임
         private val SUPPORTED_MODELS = listOf(
-            "gemini-1.5-flash-8b", 
-            "gemini-2.5-flash-lite", 
-            "gemini-1.5-flash", 
-            "gemini-2.0-flash", 
-            "gemini-2.5-flash"
+            "gemini-1.5-flash-8b",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash-lite",
+            "gemini-2.5-flash-lite-preview-09-2025",
+            "gemini-1.5-flash",
+            "gemini-2.0-flash",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-preview-09-2025",
+            "gemini-2.5-flash-preview-tts",
+            "gemini-2.5-flash-native-audio-preview-12-2025",
+            "gemini-2.5-pro",
+            "gemini-3-flash-preview",
+            "gemini-2.0-pro-exp-0205" // 최신 강력 모델 추가
         )
     }
 
