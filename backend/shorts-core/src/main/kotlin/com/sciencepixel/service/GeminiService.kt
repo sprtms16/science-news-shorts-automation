@@ -483,9 +483,8 @@ class GeminiService(
 
             ${
                 run {
-                    val todayParam = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M월 d일"))
-                    if (effectiveChannelId == "history") "8. **Date Requirement:** Today is $todayParam. You MUST create a script about a historical event that happened on THIS DATE ($todayParam). Explicitly mention the Date in the intro." 
-                    else if (effectiveChannelId == "stocks") "8. **Date Context:** Today is $todayParam. Focus on the LATEST market news for this date." 
+                    if (effectiveChannelId == "history") "8. **Date Requirement:** Today is {today}. You MUST create a script about a historical event that happened on THIS DATE ({today}). Explicitly mention the Date in the intro." 
+                    else if (effectiveChannelId == "stocks") "8. **Date Context:** Today is {today}. Focus on the LATEST market news for this date." 
                     else ""
                 }
             }
@@ -556,13 +555,12 @@ class GeminiService(
             "\n\n[Current Channel Success Insights (APPLY THESE)]\n$insights\n"
         } else ""
 
+        val todayStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy년 M월 d일"))
+        
         val prompt = (promptTemplate ?: getDefaultScriptPrompt(effectiveChannelId))
             .replace("{title}", title)
             .replace("{summary}", summary)
-            // Actually, simply appending to the end might be outside the JSON instructions if the prompt ends with JSON example.
-            // Better to prepend or replace a placeholder.
-            // But since our DEFAULT_SCRIPT_PROMPT puts [Output Format] at the end, appending might confuse it.
-            // Let's inject it into [Rules] section if possible, or just add it before [Output Format].
+            .replace("{today}", todayStr)
         
         // Let's modify the prompt construction slightly to be safer
         val finalPrompt = if (insights.isNotBlank()) {
