@@ -67,6 +67,7 @@ class GeminiService(
         var lastResetDate = java.time.LocalDate.now()
         var failureCount = AtomicInteger(0)
         var lastFailureTime = 0L
+        var cooldownDuration = COOLDOWN_MS
 
         @Synchronized
         fun checkAndResetDaily() {
@@ -96,7 +97,7 @@ class GeminiService(
         fun isAvailable(): Boolean {
             checkAndResetDaily()
             val now = System.currentTimeMillis()
-            if (now - lastFailureTime < COOLDOWN_MS) return false
+            if (now - lastFailureTime < cooldownDuration) return false
             if (dailyRequestCount >= MAX_RPD) return false
             if (getCurrentRPM() >= MAX_RPM) return false
             if (getCurrentTPM() >= MAX_TPM) return false
@@ -116,9 +117,10 @@ class GeminiService(
         }
 
         @Synchronized
-        fun recordFailure() {
+        fun recordFailure(duration: Long = COOLDOWN_MS) {
             failureCount.incrementAndGet()
             lastFailureTime = System.currentTimeMillis()
+            cooldownDuration = duration
         }
     }
 
@@ -156,9 +158,10 @@ class GeminiService(
         
         if (availablePairs.isEmpty()) return null
         
-        // 1. 일일 사용량이 가장 적은 것 우선
-        // 2. 최신 모델(index가 높은 것) 우선 시도
-        return availablePairs.sortedWith(
+        // 1. 지터링 적용 (동일 사용량 시 인스턴스 간 충돌 방지)
+        // 2. 일일 사용량이 가장 적은 것 우선
+        // 3. 최신 모델(index가 높은 것) 우선 시도
+        return availablePairs.shuffled().sortedWith(
             compareBy<KeyModelSelection> { combinedQuotas["${it.apiKey}:${it.modelName}"]?.dailyRequestCount ?: 0 }
             .thenByDescending { SUPPORTED_MODELS.indexOf(it.modelName) }
         ).firstOrNull()
@@ -218,18 +221,18 @@ class GeminiService(
                             return text
                         }
                         429 -> {
-                            println("⚠️ Rate Limit (429) for: $combinedKey. Trying next... (${triedCombinations.size}/$totalPossibleCombinations)")
-                            tracker.recordFailure()
+                            println("⚠️ Rate Limit (429) for: $combinedKey. Transient cooldown 1m. (${triedCombinations.size}/$totalPossibleCombinations)")
+                            tracker.recordFailure(60_000L) // 1 minute for transient rate limits
                             lastError = Exception("Rate limit exceeded (429)")
                         }
-                        503, 504 -> {
-                            println("⚠️ Service Unavailable (503/504) for: $combinedKey. Trying next...")
-                            tracker.recordFailure()
-                            lastError = Exception("Service unavailable ($responseCode)")
+                        400, 404 -> {
+                            println("🚫 Invalid Model or Request ($responseCode) for: $combinedKey. Long cooldown 1h. Skip this combination.")
+                            tracker.recordFailure(3600_000L) // 1 hour for invalid endpoints/models
+                            lastError = Exception("Permanent API error ($responseCode)")
                         }
                         else -> {
-                            println("⚠️ Gemini Error: $responseCode - $text")
-                            tracker.recordFailure()
+                            println("⚠️ Gemini Error: $responseCode - $text. Default cooldown 5m.")
+                            tracker.recordFailure(5 * 60_000L) // 5 minutes for general errors
                             lastError = Exception("Gemini API error: $responseCode")
                         }
                     }
