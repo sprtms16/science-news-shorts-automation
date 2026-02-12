@@ -171,13 +171,14 @@ class GeminiService(
      * 재시도 로직이 포함된 Gemini API 호출
      * 모든 가용 키/모델 조합을 시도할 때까지 반복
      */
-    private fun callGeminiWithRetry(prompt: String, maxRetries: Int = 10): String? {
+    private fun callGeminiWithRetry(prompt: String, channelId: String, maxRetries: Int = 10): String? {
         var lastError: Exception? = null
         val triedCombinations = mutableSetOf<String>()
         val totalPossibleCombinations = combinedQuotas.size
         
-        // 최대 시도 횟수를 전체 조합 수와 maxRetries 중 큰 값으로 설정하여 모든 가능성 탐색
-        val effectiveMaxAttempts = maxOf(maxRetries, totalPossibleCombinations)
+        // horror 채널의 경우 리소스 낭비 방지를 위해 최대 시도 횟수를 3회로 제한
+        val channelMaxRetries = if (channelId == "horror") 3 else maxRetries
+        val effectiveMaxAttempts = maxOf(channelMaxRetries, if (channelId == "horror") 3 else totalPossibleCombinations)
         
         repeat(effectiveMaxAttempts) { attempt ->
             val selection = getSmartKeyAndModel(triedCombinations)
@@ -323,7 +324,7 @@ class GeminiService(
             Example: ["Use questions in titles", "Focus on space discoveries", "Start with a shocking fact"]
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return "Failed to generate insights."
+        val responseText = callGeminiWithRetry(prompt, channelId) ?: return "Failed to generate insights."
 
         return try {
             val jsonResponse = JSONObject(responseText)
@@ -578,7 +579,7 @@ class GeminiService(
             prompt
         }
         
-        val responseText = callGeminiWithRetry(finalPrompt) ?: return ScriptResponse(emptyList(), "tech")
+        val responseText = callGeminiWithRetry(finalPrompt, effectiveChannelId) ?: return ScriptResponse(emptyList(), "tech")
         
         // ... rest of the function ... (I will keep the rest same, just replacing the top part)
 
@@ -698,7 +699,7 @@ class GeminiService(
             }
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return ScriptResponse(emptyList(), "finance")
+        val responseText = callGeminiWithRetry(prompt, "stocks") ?: return ScriptResponse(emptyList(), "finance")
 
         return try {
             val content = JSONObject(responseText)
@@ -858,7 +859,7 @@ class GeminiService(
             }
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return ScriptResponse(emptyList(), "tech")
+        val responseText = callGeminiWithRetry(prompt, effectiveChannelId) ?: return ScriptResponse(emptyList(), "tech")
 
         return try {
             val jsonResponse = JSONObject(responseText)
@@ -931,7 +932,7 @@ class GeminiService(
             ["Nvidia", "AMD", "Google"]
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return emptyList()
+        val responseText = callGeminiWithRetry(prompt, "stocks") ?: return emptyList()
         
         return try {
             val jsonResponse = JSONObject(responseText)
@@ -979,7 +980,7 @@ class GeminiService(
             Output: Black Hole space
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return "science technology"
+        val responseText = callGeminiWithRetry(prompt, "science") ?: return "science technology"
 
         return try {
             val jsonResponse = JSONObject(responseText)
@@ -1125,7 +1126,7 @@ class GeminiService(
             - 일반 대중이 이해할 수 있도록 쉽게 작성
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return GeneratedNews(
+        val responseText = callGeminiWithRetry(prompt, "science") ?: return GeneratedNews(
             title = "${topic}에 대한 놀라운 발견!",
             summary = "$topic 에 대한 새로운 연구 결과가 발표되었습니다. 이 발견은 우리의 자연에 대한 이해를 바꿀 수 있습니다."
         )
@@ -1188,7 +1189,7 @@ class GeminiService(
             - NO: It is a new topic.
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return false
+        val responseText = callGeminiWithRetry(prompt, channelId) ?: return false
         
         return try {
             val candidateText = JSONObject(responseText)
@@ -1246,7 +1247,7 @@ class GeminiService(
             Answer ONLY "SAFE" or "UNSAFE".
         """.trimIndent()
 
-        val responseText = callGeminiWithRetry(prompt) ?: return true 
+        val responseText = callGeminiWithRetry(prompt, channelId) ?: return true 
 
         return try {
             val candidateText = JSONObject(responseText)

@@ -301,45 +301,35 @@ class ProductionService(
     private fun editSceneWithoutSubtitle(video: File, audio: File, duration: Double, output: File) {
         val isImage = video.extension.lowercase() in listOf("jpg", "jpeg", "png")
         
-        val cmd = if (isImage) {
-            // Special handling for image background
-            mutableListOf(
-                "ffmpeg", "-y",
-                "-loop", "1", "-i", video.absolutePath,
-                "-i", audio.absolutePath,
-                "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1",
-                "-c:v", "h264_nvenc", "-t", duration.toString(),
-                "-pix_fmt", "yuv420p", output.absolutePath
-            )
+        val cmd = mutableListOf("ffmpeg", "-y")
+        
+        if (isImage) {
+            cmd.addAll(listOf("-loop", "1", "-i", video.absolutePath))
         } else {
-            mutableListOf(
-                "ffmpeg", "-y",
-                "-stream_loop", "-1", "-i", video.absolutePath
-            )
+            cmd.addAll(listOf("-stream_loop", "-1", "-i", video.absolutePath))
         }
         
         if (audio.exists()) {
-            cmd.add("-i")
-            cmd.add(audio.absolutePath)
+            cmd.addAll(listOf("-i", audio.absolutePath))
         } else {
-            // Generate silence if audio is missing to maintain stream consistency
-            cmd.add("-f")
-            cmd.add("lavfi")
-            cmd.add("-i")
-            cmd.add("anullsrc=channel_layout=stereo:sample_rate=44100")
+            // Generate silence if audio is missing
+            cmd.addAll(listOf("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"))
         }
         
-        cmd.addAll(listOf("-t", "$duration", "-vf", vfScaleFilter, "-r", "60"))
-        
-        // Map video (0:v) and audio (1:a) - audio is either file or silence
-        cmd.addAll(listOf("-map", "0:v", "-map", "1:a", "-c:v", "h264_nvenc", "-c:a", "aac"))
-        
-        if (!audio.exists()) {
-             // Shortest ensures it matches the duration constraint (though -t handles it too)
-             cmd.add("-shortest")
-        }
-        
-        cmd.addAll(listOf("-preset", "fast", output.absolutePath))
+        // Use nvenc for video, aac for audio with fixed sample rate and channels to prevent concat audio loss
+        cmd.addAll(listOf(
+            "-t", "$duration",
+            "-vf", vfScaleFilter,
+            "-r", "60",
+            "-pix_fmt", "yuv420p",
+            "-c:v", "h264_nvenc",
+            "-c:a", "aac",
+            "-ar", "44100",
+            "-ac", "2",
+            "-shortest",
+            "-preset", "p4",
+            output.absolutePath
+        ))
         
         println("Executing FFmpeg Scene Edit (no subs): ${cmd.joinToString(" ")}")
         val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
@@ -507,7 +497,7 @@ class ProductionService(
             cmd.addAll(listOf("-vf", subtitleFilter, "-c:a", "copy"))
         }
         
-        cmd.addAll(listOf("-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23", "-c:a", "aac", "-movflags", "+faststart", output.absolutePath))
+        cmd.addAll(listOf("-c:v", "h264_nvenc", "-preset", "p4", "-cq", "23", "-c:a", "aac", "-ar", "44100", "-ac", "2", "-movflags", "+faststart", output.absolutePath))
         
         println("Executing FFmpeg Production (Phase 3): ${cmd.joinToString(" ")}")
         val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
