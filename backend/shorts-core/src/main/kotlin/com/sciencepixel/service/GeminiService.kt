@@ -193,9 +193,10 @@ class GeminiService(
                     println("❌ All $totalPossibleCombinations Gemini Key/Model combinations exhausted.")
                     return@repeat
                 }
-                println("⏳ No available Key/Model pairs right now. Waiting 5 seconds... (${attempt + 1}/$effectiveMaxAttempts)")
-                Thread.sleep(5000)
-                return@repeat
+                val jitter = (Random.nextLong(1, 10)) * 1000L
+            println("⏳ No available Key/Model pairs right now. Waiting ${5 + jitter / 1000} seconds... (${attempt + 1}/$effectiveMaxAttempts)")
+            Thread.sleep(5000 + jitter)
+            return@repeat
             }
 
             val apiKey = selection.apiKey
@@ -227,10 +228,11 @@ class GeminiService(
                             return text
                         }
                         429 -> {
-                            println("⚠️ Rate Limit (429) for: $combinedKey. Transient cooldown 1m. (${triedCombinations.size}/$totalPossibleCombinations)")
-                            tracker.recordFailure(60_000L) // 1 minute for transient rate limits
-                            lastError = Exception("Rate limit exceeded (429)")
-                        }
+                        val jitter = Random.nextLong(1, 60) * 1000L
+                        println("⚠️ Rate Limit (429) for: $combinedKey. Transient cooldown 1m + ${jitter/1000}s jitter. (${triedCombinations.size}/$totalPossibleCombinations)")
+                        tracker.recordFailure(60_000L + jitter) // 1 minute + jitter
+                        lastError = Exception("Rate limit exceeded (429)")
+                    }
                         400, 404 -> {
                             println("🚫 Invalid Model or Request ($responseCode) for: $combinedKey. Long cooldown 1h. Skip this combination.")
                             tracker.recordFailure(3600_000L) // 1 hour for invalid endpoints/models

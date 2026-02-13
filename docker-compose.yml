@@ -113,6 +113,11 @@ services:
       - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     restart: unless-stopped
 
   shorts-horror:
@@ -145,6 +150,11 @@ services:
       - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     restart: unless-stopped
 
   shorts-stocks:
@@ -177,6 +187,11 @@ services:
       - APP_SCHEDULING_UPLOAD_CRON=0 0 18 * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8083/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     restart: unless-stopped
 
   shorts-history:
@@ -209,6 +224,11 @@ services:
       - APP_SCHEDULING_UPLOAD_CRON=0 0 7 * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8084/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 1G
     restart: unless-stopped
 
   shorts-log-service:
@@ -225,6 +245,11 @@ services:
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/shorts-logs
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - TZ=Asia/Seoul
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 800M
     restart: unless-stopped
 
   shorts-renderer:
@@ -255,9 +280,11 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
       - TZ=Asia/Seoul
-    restart: unless-stopped
+      - JAVA_OPTS=-Xmx1024m -Xms512m
     deploy:
       resources:
+        limits:
+          memory: 1536M
         reservations:
           devices:
             - driver: nvidia
