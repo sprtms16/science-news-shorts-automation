@@ -620,6 +620,51 @@ class AdminController(
         ))
     }
 
+    @PostMapping("/videos/regeneration/paced-trigger")
+    fun pacedTriggerRegeneration(@RequestParam(required = false) channelId: String?): ResponseEntity<Map<String, Any>> {
+        val effectiveChannelId = channelId ?: defaultChannelId
+        
+        // Phase 49 배포 시점 (2026-02-13 22:48) 이전의 UPLOADED/COMPLETED 영상 중 가장 오래된 것 1개 찾기
+        val phase49DeployTime = LocalDateTime.of(2026, 2, 13, 22, 48)
+        
+        // findTop5...Asc를 활용하되 status가 UPLOADED/COMPLETED인 대상을 stream으로 필터링
+        val targets = videoRepository.findByChannelIdAndStatusIn(
+            effectiveChannelId, 
+            listOf(VideoStatus.UPLOADED, VideoStatus.COMPLETED)
+        ).filter { it.updatedAt.isBefore(phase49DeployTime) }
+         .sortedBy { it.updatedAt }
+        
+        if (targets.isEmpty()) {
+            return ResponseEntity.ok(mapOf("message" to "No more old videos to regenerate for channel $effectiveChannelId"))
+        }
+        
+        val video = targets.first()
+        
+        // Reset and Trigger
+        videoRepository.save(video.copy(
+            status = VideoStatus.QUEUED,
+            regenCount = (video.regenCount ?: 0) + 1,
+            failureStep = "",
+            errorMessage = "Paced re-generation for Phase 49 optimization",
+            updatedAt = java.time.LocalDateTime.now()
+        ))
+        
+        kafkaEventPublisher.publishRssNewItem(
+            com.sciencepixel.event.RssNewItemEvent(
+                channelId = video.channelId,
+                title = video.title,
+                summary = video.summary,
+                url = video.link
+            )
+        )
+        
+        return ResponseEntity.ok(mapOf(
+            "message" to "Triggered paced re-generation for '${video.title}'",
+            "videoId" to (video.id ?: "unknown"),
+            "remainingCount" to (targets.size - 1)
+        ))
+    }
+
     @PostMapping("/videos/{id}/retry")
     fun retryVideo(@PathVariable id: String): ResponseEntity<Map<String, Any>> {
         val video = videoRepository.findById(id).orElse(null) 
