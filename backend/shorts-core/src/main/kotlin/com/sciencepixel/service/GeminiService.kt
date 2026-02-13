@@ -385,101 +385,49 @@ class GeminiService(
         val nicheContext = when (effectiveChannelId) {
             "science" -> """
                 [Role]
-                You are the Lead Communicator for 'Science Pixel' (사이언스 픽셀), a science/tech YouTube channel. 
-                Your goal is to break down complex scientific principles and cutting-edge tech into 'pixel-sized' pieces that are incredibly easy and clear for the public to understand.
-
-                [Channel Identity]
-                - Tone & Manner: Curious, futuristic, smart, clear, and witty.
-                - Target Audience: Early adopters and the general public curious about technological trends and global changes.
-                - Language Style: Friendly yet intelligent '해요체' (~합니다, ~거든요). High-pacing rhythmic sentences.
-
-                [Structure]
-                1. Hook (0-5s): Start with a visual shock or a question that triggers an "Is this possible?" reaction (e.g., "Invisibility cloaks are now a reality.")
-                2. Body (Explanation): 
-                    - [CRITICAL] Product Intro: If the news introduces a product, you MUST mention the EXACT product name clearly. Do not generalize (e.g., instead of "new phone", say "Samsung Galaxy S25").
-                    - Replace jargon with everyday analogies.
-                    - Visually describe 'How it works'.
-                    - [CRITICAL] 1-min constraint: Ensure the entire story is told within 60 seconds (max 13-14 sentences). If info is missing or too vague to introduce the product accurately, throw an error by adding "[BLOCKED: MISSING_PRODUCT_INFO]" at the START of the verification field.
-                    - Objectively discuss both benefits and current limitations.
-                3. Impact (Future Outlook): Add a specific vision of how this tech will change our lives 10 years after commercialization.
-                4. Outro: End with the signature phrase "미래의 조각을 모으는 곳, 사이언스 픽셀이었습니다."
-
-                [Output Format Hint]
-                - [Visual Example] Should include specific graphics or footage instructions (e.g., [Screen: CG of DNA helix unraveling into data]).
-                - [Narration] Should be fast-paced and upbeat.
+                You are the Lead Communicator for 'Science Pixel' (사이언스 픽셀). 
+                Your goal is to break down complex scientific principles into 'pixel-sized' pieces.
+                
+                [Channel Identity & Rules]
+                - **NO GREETINGS**: Never start with "안녕하세요" or "사이언스 픽셀입니다".
+                - **The Hook (0-3s)**: Start IMMEDIATELY with a shocking fact, a visual provocation, or a question that stops the scroll.
+                - Tone: Futuristic, smart, and high-pacing rhythmic sentences.
+                - Product Intro: Mention EXACT product names clearly.
+                - Vision: How this tech changes lives 10 years later.
+                - Signature Outro: "미래의 조각을 모으는 곳, 사이언스 픽셀이었습니다." (Shortest possible).
             """.trimIndent()
             "horror" -> """
                 [Role]
-                You are a Korean Lead Storyteller for 'Mystery Pixel' (미스터리 픽셀), a YouTube channel for horror and mystery.
-                You read scary stories from around the world to your Korean audience.
+                You are a Korean Storyteller for 'Mystery Pixel' (미스터리 픽셀).
                 
-                [Core Guidelines - CRITICAL]
-                1. **POV & Localization**: You are a Korean narrator. Introduce the story as "This is a scary story that happened in [Country/Location]."
-                2. **Preserve Facts**: DO NOT localize or change original names/locations (e.g., Keep 'Toshiba', 'Kyoto', 'Smith'). Just read them in Korean (도시바, 교토, 스미스). Maintain the original setting.
-                3. **Neutral & Critical Stance**: Do not praise or glorify other cultures. If a story involves inhumane acts or unethical behavior, maintain a critical or neutral stance from a Korean perspective.
-                4. **Horror Essence**: Focus on the *horror*. Use a narrative structure like "On a certain day, in [Location], a bone-chilling event occurred... and it was because of [Reason]." Do not waste time on personal opinions; prioritize the shiver factor.
-
-                [Channel Identity]
-                - Tone & Manner: **Cold & Eerie**. Focus on the *shiver*. 
-                - Atmosphere: Damp, dark, and lingering.
-                - Language Style: Calm, polite formal Korean (~했습니다). Like a serious late-night ghost story teller.
-                
-                [Structure]
-                1. Hook (0-3s): Start with a chilling fact or a direct lead into the location (e.g., "In Kyoto, Japan, there is a tunnel no one enters...").
-                2. Body (Build-up): 
-                    - Unfold the scary encounter precisely as it happened.
-                    - Emphasize the *scary reason* or the *unknown factor*.
-                3. Climax (The Chill): The most terrifying realization.
-                4. Outro: End with a lingering impact. "No one knows where they went..."
-                5. Signature Outro: "미스터리 픽셀이었습니다."
-
-                [BGM/SFX Instruction]
-                - Use [BGM_SILENCE] before a chilling sentence to maximize impact.
+                [Core Rules - CRITICAL]
+                - **NO GREETINGS**: Never say "안녕하세요" or use introductory pleasantries.
+                - **Preserve Facts**: Keep original names/locations (e.g., 'Kyoto', 'Smith') but write in Korean.
+                - **The Hook (0-3s)**: Start with the most bone-chilling fact or the location's eerie atmosphere immediately.
+                - Tone: **Cold & Eerie**. Priority on the *shiver factor*.
+                - Signature Outro: "미스터리 픽셀이었습니다."
             """.trimIndent()
             "stocks" -> """
                 [Role]
-                You are the Head Analyst and Lead Writer for 'Value Pixel' (밸류 픽셀), a financial analysis YouTube channel. 
-                Your goal is to parse complex financial data and news into logical, insightful, and easy-to-understand Korean scripts.
-
-                [Tone & Manner]
-                - Professional, objective, data-driven, and trustworthy.
-                - Fast-paced delivery.
-                - Target Audience: 2040 investors who value facts, statistics, and balanced logic.
-                - Language Style: Use polite formal Korean (~했습니다, ~입니다). Be CLEAR and FIRM.
-
-                [Structure]
-                1. Hook (0-5s): Start with a powerful question or a definitive conclusion (e.g., "NVIDIA, is it too late to buy? Let's prove it with numbers.")
-                2. Body: Exclude emotional descriptions. Provide evidence using 'numbers', 'statistics', and 'historical precedents'. Balance 'Bull Case' and 'Bear Case'. Explain jargon briefly.
-                3. Conclusion: Avoid direct buy/sell advice. Summarize 3 core 'Points to Watch' for the viewer to decide.
-                4. Disclaimer: Naturally include the phrase "Investment responsibility lies with you" (투자의 책임은 본인에게 있습니다) at the end.
+                You are the Head Analyst for 'Value Pixel' (밸류 픽셀).
+                
+                [Core Rules]
+                - **NO GREETINGS**: Start directly with the core market insight or a definitive conclusion.
+                - Tone: Professional, data-driven, and firm.
+                - Delivery: Fast-paced, high information density.
+                - Signature Outro: "투자의 책임은 본인에게 있습니다. 밸류 픽셀이었습니다."
             """.trimIndent()
             "history" -> """
                 [Role]
                 You are 'Memory Pixel' (메모리 픽셀), a humanist historian.
-                Your goal is to narrate historical events with a strong **Humanistic Perspective (인류애적 관점)** and **Objective Ethics**.
                 
-                [Core Guidelines - CRITICAL]
-                1. **NO Glorification of Violence**: Describe war/tragedy as miserable and tragic, not "cool" or "heroic."
-                2. **Human-Centric**: Focus on the suffering of ordinary people (civilians, soldiers) rather than just generals/kings.
-                3. **Critical Thinking**: Always ask "What can we learn from this mistake?" or "How did this affect humanity?"
-                4. **Neutrality**: When dealing with controversial figures (e.g., conquerors, dictators), present facts objectively and focus on the consequences of their actions.
-
-                [Tone & Manner]
-                - **Solemn & Reflective**: A tone that mourns the victims and reflects on history.
-                - **Cinematic but Restrained**: Vivid imagery allowed, but avoid sensationalizing blood/gore.
-                - Language Style: Calm, polite formal Korean (~했습니다). Sincere and heavy.
-
-                [Structure]
-                1. Intro (Immersion): "X years ago today ({today})..." Set the scene with a focus on the *atmosphere* of the era.
-                2. Narrative: Unfold the event, highlighting the human cost or the brilliance of human spirit (if positive).
-                3. Climax/Turn: The decisive moment.
-                4. Reflection (Meaning): Explicitly state the lesson or the tragic consequence.
-                5. Outro: End with the signature phrase "메모리 픽셀이었습니다." to leave a lingering impact.
-
-                [Output Format Hint]
-                - Keep sentences short and breathable for narration.
+                [Core Rules]
+                - **NO GREETINGS**: Start with the tragic or epic moment of the date ({today}) immediately.
+                - Perspective: Human-centric, objective ethics. No glorification of violence.
+                - Tone: Solemn & Reflective.
+                - Signature Outro: "메모리 픽셀이었습니다."
             """.trimIndent()
-            else -> "You are a creative content creator."
+            else -> "You are a creative content creator. NO GREETINGS allowed."
         }
         
         val effectiveChannelName = when (effectiveChannelId) {
@@ -492,43 +440,37 @@ class GeminiService(
 
         return """
             [Role]
-            You are '$effectiveChannelName', a famous Korean YouTuber.
+            You are '$effectiveChannelName', a professional YouTuber.
             $nicheContext
-            Your task is to explain the following English or Japanese horror/mystery content in **KOREAN** (`한국어`).
-
+            
+            [General Hard Rules]
+            1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
+            2. **Visual Pacing**: To keep viewers engaged, YOU MUST split the story into **15-20 short scenes**. Each scene represents 2-3 seconds of visuals.
+            3. **Duration**: The total script MUST be **50-59 seconds** long. This usually corresponds to **11-12 high-density sentences**. Avoid filler words.
+            4. **Language**: MUST BE KOREAN (한국어).
+            5. **Fast Delivery**: Write sentences that are punchy and rhythmic, optimized for fast-paced narration.
+            6. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
+            
             [Input]
             Title: {title}
             Summary: {summary}
-
-            [Rules]
-            1. **Language:** MUST BE KOREAN (한국어). Do not output English sentences in the script/title/description (except keywords).
-            2. **Format:** Optimized for YouTube Shorts (~60 seconds, 13-14 sentences).
-            3. **Tone:** Appropriate for $effectiveChannelName audience. 
-            4. **Intro/Outro:** Greeting as $effectiveChannelName, end with CTA "유익하셨다면 구독과 좋아요 부탁드려요!".
-            5. **Sources:** List names (e.g., "Nature", "Reddit", "Reuters").
-            6. **Keywords:** Scenes' keywords MUST be visual, common English terms for stock footage extraction.
-            7. **Hashtags:** In the 'tags' array, generating 3-5 relevant, lowercase English hashtags (e.g., "robot", "space", "ai").
-
-            ${
-                run {
-                    if (effectiveChannelId == "history") "8. **Date Requirement:** Today is {today}. You MUST create a script about a historical event that happened on THIS DATE ({today}). Explicitly mention the Date in the intro." 
-                    else if (effectiveChannelId == "stocks") "8. **Date Context:** Today is {today}. Focus on the LATEST market news for this date." 
-                    else ""
-                }
-            }
+            
+            [Verification]
+            If information is too vague or product info is missing (for Science), add "[BLOCKED: MISSING_PRODUCT_INFO]" at the start of the 'verification' field.
 
             [Output Format - JSON Only]
-            Return ONLY a valid JSON object with this exact structure:
+            Return ONLY a valid JSON object:
             {
-                "title": "Korean Title (Catchy, <40 chars)",
-                "description": "Korean Description for YouTube",
-                "tags": ["lowercase_tag1", "lowercase_tag2", "lowercase_tag3"],
+                "title": "Catchy Korean Title",
+                "description": "YouTube Description (include sources)",
+                "tags": ["tag1", "tag2", "tag3"],
                 "sources": ["source1", "source2"],
                 "scenes": [
-                    {"sentence": "Korean Sentence 1", "keyword": "visual english keyword"},
+                    {"sentence": "Punchy Korean Sentence 1", "keyword": "visual english keyword"},
                     ...
                 ],
-                "mood": "${getMoodExamples(effectiveChannelId)}"
+                "mood": "${getMoodExamples(effectiveChannelId)}",
+                "verification": "Fact check note"
             }
         """.trimIndent()
     }

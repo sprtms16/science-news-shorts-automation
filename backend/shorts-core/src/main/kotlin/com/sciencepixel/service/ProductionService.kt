@@ -92,19 +92,20 @@ class ProductionService(
                         }
                     }
                     
-                    // 오디오 생성
-                    val duration = try {
+                    // 오디오 생성 (1.15배속 적용을 위해 duration 조정)
+                    val rawDuration = try {
                         audioService.generateAudio(cleanSentence, audioFile)
                     } catch (e: Exception) {
                         5.0
                     }
+                    val effectiveDuration = rawDuration / 1.15
 
-                    editSceneWithoutSubtitle(videoFile, audioFile, duration, clipFile)
+                    editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
                     
                     SceneResult(
                         index = i,
                         clipFile = clipFile,
-                        duration = duration,
+                        duration = effectiveDuration,
                         subtitle = cleanSentence,
                         hasSilence = scene.sentence.contains("[BGM_SILENCE]")
                     )
@@ -253,18 +254,19 @@ class ProductionService(
             }
 
             // 2. Audio (Edge-TTS)
-            val duration = try {
+            val rawDuration = try {
                  audioService.generateAudio(scene.sentence, audioFile)
             } catch (e: Exception) {
                 println("⚠️ Audio generation failed: ${e.message}")
                 5.0
             }
+            val effectiveDuration = rawDuration / 1.15
 
-            // 3. Edit Scene (NO SUBTITLES - just video + audio)
-            editSceneWithoutSubtitle(videoFile, audioFile, duration, clipFile)
+            // 3. Edit Scene (1.15x speed-up applied inside)
+            editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
             
             clipFiles.add(clipFile)
-            durations.add(duration)
+            durations.add(effectiveDuration)
             subtitles.add(scene.sentence)
         }
 
@@ -328,6 +330,7 @@ class ProductionService(
             "-r", "60",
             "-pix_fmt", "yuv420p",
             "-map", "0:v", "-map", "1:a",
+            "-af", "atempo=1.15",
             "-c:v", "h264_nvenc",
             "-c:a", "aac",
             "-ar", "44100",
