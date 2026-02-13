@@ -10,6 +10,7 @@ services:
       - RUNNER_SCOPE=repo
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
+      - REPLACE_EXISTING_RUNNER=true
     security_opt:
       - apparmor:unconfined
     volumes:

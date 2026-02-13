@@ -43,7 +43,6 @@ class ScriptConsumer(
         attempts = "5",
         backoff = Backoff(delay = 300000, multiplier = 2.0, maxDelay = 3600000), // 5m, 10m, 20m, 40m, 1h
         include = [GeminiService.GeminiRetryableException::class],
-        exclude = [GeminiService.GeminiFatalException::class],
         topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE,
         dltStrategy = org.springframework.kafka.retrytopic.DltStrategy.FAIL_ON_ERROR
     )
