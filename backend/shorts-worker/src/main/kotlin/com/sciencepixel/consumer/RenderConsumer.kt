@@ -11,7 +11,13 @@ import com.sciencepixel.domain.VideoStatus
 import com.sciencepixel.service.ProductionService
 import com.sciencepixel.service.NotificationService
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.kafka.annotation.DltHandler
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.annotation.RetryableTopic
+import org.springframework.kafka.retrytopic.TopicSuffixingStrategy
+import org.springframework.kafka.support.KafkaHeaders
+import org.springframework.messaging.handler.annotation.Header
+import org.springframework.retry.annotation.Backoff
 import org.springframework.stereotype.Component
 
 @Component
@@ -30,11 +36,17 @@ class RenderConsumer(
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
+    @RetryableTopic(
+        attempts = "3",
+        backoff = Backoff(delay = 60000, multiplier = 2.0),
+        topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE,
+        include = [Exception::class]
+    )
     @KafkaListener(
         topics = [KafkaConfig.TOPIC_ASSETS_READY],
         groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-group}"
     )
-    fun consumeAssets(message: String) {
+    fun consumeAssets(message: String, @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String) {
         try {
             val event = objectMapper.readValue(message, VideoAssetsReadyEvent::class.java)
             if (channelId != "renderer" && event.channelId != channelId) return
@@ -81,14 +93,14 @@ class RenderConsumer(
             )
 
             if (finalPath.isEmpty()) {
-                println("❌ Rendering failed (empty path).")
+                println("❌ Rendering failed (empty path or 0-byte file).")
                 history?.let {
                     videoHistoryRepository.save(it.copy(
                         status = VideoStatus.FAILED,
                         failureStep = "RENDER",
                         progress = 0,
-                        currentStep = "렌더링 실패",
-                        errorMessage = "Rendering produced empty file path",
+                        currentStep = "렌더링 실패 (0바이트 또는 파일 생성 실패)",
+                        errorMessage = "Rendering produced empty file path or 0-byte output",
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                 }
@@ -125,6 +137,24 @@ class RenderConsumer(
                     ))
                 }
             }
+        }
+    }
+
+    @DltHandler
+    fun handleDlt(message: String, @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String) {
+        println("💀 [RenderConsumer] Message moved to DLT topic $topic: $message")
+        try {
+            val event = objectMapper.readValue(message, VideoAssetsReadyEvent::class.java)
+            videoHistoryRepository.findById(event.videoId).ifPresent { v ->
+                videoHistoryRepository.save(v.copy(
+                    status = VideoStatus.FAILED,
+                    failureStep = "RENDER_DLT",
+                    errorMessage = "Failed after worker retries in RenderConsumer",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            }
+        } catch (e: Exception) {
+            println("❌ Error processing DLT message: ${e.message}")
         }
     }
 }

@@ -172,6 +172,11 @@ class ProductionService(
         
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceRanges)
         
+        if (!finalOutput.exists() || finalOutput.length() == 0L) {
+            println("❌ [ProductionService] Finalization failed: Output file missing or 0 bytes")
+            return ""
+        }
+
         logPublisher.info("shorts-controller", "Production Completed: $title", "Path: ${finalOutput.name}", traceId = videoId)
         return finalOutput.absolutePath
     }
@@ -335,8 +340,13 @@ class ProductionService(
         println("Executing FFmpeg Scene Edit (no subs): ${cmd.joinToString(" ")}")
         val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
         val processOutput = process.inputStream.bufferedReader().readText()
-        if (process.waitFor() != 0) {
-            println("FFmpeg Error: $processOutput")
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
+            println("FFmpeg Error (exit $exitCode): $processOutput")
+        } else {
+            if (!output.exists() || output.length() == 0L) {
+                println("❌ FFmpeg Scene Edit failed: Output file missing or 0 bytes (${output.absolutePath})")
+            }
         }
     }
 
@@ -430,7 +440,11 @@ class ProductionService(
         if (exitCode != 0) {
             println("FFmpeg Merge Error (exit $exitCode): $processOutput")
         } else {
-            println("✅ FFmpeg Merge Complete: ${output.absolutePath}")
+            if (output.exists() && output.length() > 0) {
+                println("✅ FFmpeg Merge Complete: ${output.absolutePath} (${output.length()} bytes)")
+            } else {
+                println("❌ FFmpeg Merge failed: Output file missing or 0 bytes (${output.absolutePath})")
+            }
         }
     }
 
@@ -507,7 +521,12 @@ class ProductionService(
         if (exitCode != 0) {
             println("FFmpeg Production Error (exit $exitCode): $processOutput")
         } else {
-            println("✅ Final Video Created Successfully: ${output.absolutePath}")
+            // [Safety] Final File Check
+            if (output.exists() && output.length() > 0) {
+                println("✅ Final Video Created Successfully: ${output.absolutePath} (${output.length()} bytes)")
+            } else {
+                println("❌ FFmpeg reported success but output file is missing or 0 bytes: ${output.absolutePath}")
+            }
         }
     }
 }

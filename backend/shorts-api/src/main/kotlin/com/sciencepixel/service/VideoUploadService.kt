@@ -79,8 +79,21 @@ class VideoUploadService(
                 return
             }
 
-            // 1. Validation
-            if (file.length() < 1024 * 1024) {
+            // 1. Validation (Strict File Size)
+            if (file.length() == 0L) {
+                println("❌ Upload BLOCKED: 0-byte video file detected! (${video.title})")
+                repository.save(video.copy(
+                    status = VideoStatus.UPLOAD_FAILED,
+                    failureStep = "UPLOAD_VALIDATION",
+                    errorMessage = "0-byte video file detected",
+                    updatedAt = LocalDateTime.now()
+                ))
+                return
+            }
+
+            if (file.length() < 50 * 1024) { // 50KB minimum threshold
+                 println("⚠️ Warning: Very small video file (${file.length()} bytes). Proceeding but logging warning.")
+            } else if (file.length() < 1024 * 1024) {
                  println("⚠️ Warning: Small video file (${file.length()} bytes).")
             }
 
