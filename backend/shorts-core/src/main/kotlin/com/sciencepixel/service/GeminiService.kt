@@ -391,7 +391,7 @@ class GeminiService(
                 Your goal is to break down complex scientific principles into 'pixel-sized' pieces.
                 
                 [Channel Identity & Rules]
-                - **NO GREETINGS**: Never start with "안녕하세요" or "사이언스 픽셀입니다".
+                - **NO GREETINGS**: Never start with "안녕하세요" or "사이언스 픽셀입니다". Start IMMEDIATELY with the core news.
                 - **The Hook (0-3s)**: Start IMMEDIATELY with a shocking fact, a visual provocation, or a question that stops the scroll.
                 - Tone: Futuristic, smart, and high-pacing rhythmic sentences.
                 - Product Intro: Mention EXACT product names clearly.
@@ -447,10 +447,10 @@ class GeminiService(
             
             [General Hard Rules]
             1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
-            2. **Visual Pacing**: To keep viewers engaged, YOU MUST split the story into **15-20 short scenes**. Each scene represents 2-3 seconds of visuals.
-            3. **Duration**: The total script MUST be **50-59 seconds** long. This usually corresponds to **11-12 high-density sentences**. Avoid filler words.
+            2. **Visual Pacing**: YOU MUST split the story into **exactly 14 short scenes**. Each scene represents ~4 seconds of visuals.
+            3. **Duration**: The total script MUST be **50-59 seconds** long. This corresponds to the 14 scenes. Avoid filler words.
             4. **Language**: MUST BE KOREAN (한국어).
-            5. **Fast Delivery**: Write sentences that are punchy and rhythmic, optimized for fast-paced narration.
+            5. **Fast Delivery**: Write sentences that are punchy and rhythmic, optimized for fast-paced narration (1.15x speed).
             6. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
             
             [Input]
