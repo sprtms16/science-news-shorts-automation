@@ -322,6 +322,7 @@ class ProductionService(
             "-vf", vfScaleFilter,
             "-r", "60",
             "-pix_fmt", "yuv420p",
+            "-map", "0:v", "-map", "1:a",
             "-c:v", "h264_nvenc",
             "-c:a", "aac",
             "-ar", "44100",
