@@ -17,12 +17,17 @@ import java.util.concurrent.atomic.AtomicInteger
 
 @Service
 class GeminiService(
-    @Value("\${gemini.api-key}") private val apiKeyString: String,
-    @Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String,
+    @org.springframework.beans.factory.annotation.Value("\${gemini.api-key}") private val apiKeyString: String,
+    @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String,
     private val promptRepository: com.sciencepixel.repository.SystemPromptRepository,
     private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository,
-    private val youtubeVideoRepository: com.sciencepixel.repository.YoutubeVideoRepository
+    private val youtubeVideoRepository: com.sciencepixel.repository.YoutubeVideoRepository,
+    private val channelBehavior: com.sciencepixel.config.ChannelBehavior
 ) {
+    // Custom Exceptions for Kafka Retries
+    class GeminiRetryableException(message: String) : RuntimeException(message)
+    class GeminiFatalException(message: String) : RuntimeException(message)
+
     private val client = OkHttpClient.Builder().readTimeout(60, TimeUnit.SECONDS).build()
     
     private fun getChannelName(targetChannelId: String? = null): String {
@@ -246,7 +251,14 @@ class GeminiService(
         }
         
         println("❌ All possible combinations failed. Last Error: ${lastError?.message}")
-        return null
+        
+        // Kafka 기반 재시도를 위해 구체적인 예외 발생
+        val errorMsg = lastError?.message ?: "Unknown Gemini Error"
+        if (errorMsg.contains("Rate limit") || errorMsg.contains("500") || errorMsg.contains("Connection")) {
+            throw GeminiRetryableException("Gemini transient failure: $errorMsg")
+        } else {
+            throw GeminiFatalException("Gemini permanent failure: $errorMsg")
+        }
     }
 
     // Default Prompts (Fallbacks)
@@ -384,8 +396,10 @@ class GeminiService(
                 [Structure]
                 1. Hook (0-5s): Start with a visual shock or a question that triggers an "Is this possible?" reaction (e.g., "Invisibility cloaks are now a reality.")
                 2. Body (Explanation): 
-                    - Replace jargon with everyday analogies (e.g., "Quantum computers are like solving a maze simultaneously").
+                    - [CRITICAL] Product Intro: If the news introduces a product, you MUST mention the EXACT product name clearly. Do not generalize (e.g., instead of "new phone", say "Samsung Galaxy S25").
+                    - Replace jargon with everyday analogies.
                     - Visually describe 'How it works'.
+                    - [CRITICAL] 1-min constraint: Ensure the entire story is told within 60 seconds (max 13-14 sentences). If info is missing or too vague to introduce the product accurately, throw an error by adding "[BLOCKED: MISSING_PRODUCT_INFO]" at the START of the verification field.
                     - Objectively discuss both benefits and current limitations.
                 3. Impact (Future Outlook): Add a specific vision of how this tech will change our lives 10 years after commercialization.
                 4. Outro: End with the signature phrase "미래의 조각을 모으는 곳, 사이언스 픽셀이었습니다."
@@ -396,27 +410,31 @@ class GeminiService(
             """.trimIndent()
             "horror" -> """
                 [Role]
-                You are the Lead Storyteller for 'Mystery Pixel' (미스터리 픽셀), a YouTube channel specializing in horror and mystery stories.
-                Your goal is to adapt raw material (Reddit horror, Japanese 2ch/5ch ghost stories, true mystery, unsolved incidents) into **"Korean Emotional Horror" (한국적 감성 공포)** scripts.
-                Focus on **"Han" (한, deep sorrow/resentment)** and **"Reality-based Horror" (현실 밀착형 공포)** rather than generic Western slashers or jump scares.
+                You are a Korean Lead Storyteller for 'Mystery Pixel' (미스터리 픽셀), a YouTube channel for horror and mystery.
+                You read scary stories from around the world to your Korean audience.
+                
+                [Core Guidelines - CRITICAL]
+                1. **POV & Localization**: You are a Korean narrator. Introduce the story as "This is a scary story that happened in [Country/Location]."
+                2. **Preserve Facts**: DO NOT localize or change original names/locations (e.g., Keep 'Toshiba', 'Kyoto', 'Smith'). Just read them in Korean (도시바, 교토, 스미스). Maintain the original setting.
+                3. **Neutral & Critical Stance**: Do not praise or glorify other cultures. If a story involves inhumane acts or unethical behavior, maintain a critical or neutral stance from a Korean perspective.
+                4. **Horror Essence**: Focus on the *horror*. Use a narrative structure like "On a certain day, in [Location], a bone-chilling event occurred... and it was because of [Reason]." Do not waste time on personal opinions; prioritize the shiver factor.
 
                 [Channel Identity]
-                - Tone & Manner: **Emotional & Tragic**. Not just scary, but sad and lingering. The "ghost" usually has a heartbreaking backstory.
-                - Atmosphere: Damp, cold, dark, and lonely feelings fitting Korean sentiment.
-                - Target Audience: Adults who appreciate psychological depth and the sadness behind the horror.
-                - Language Style: Calm, polite formal Korean (~했습니다). Like a late-night radio ghost story teller. Low and serious tone.
-
+                - Tone & Manner: **Cold & Eerie**. Focus on the *shiver*. 
+                - Atmosphere: Damp, dark, and lingering.
+                - Language Style: Calm, polite formal Korean (~했습니다). Like a serious late-night ghost story teller.
+                
                 [Structure]
-                1. Hook (0-3s): Start with a relatable daily situation or a question about resentment/loneliness (e.g., "Have you ever felt someone watching you in an empty room?").
+                1. Hook (0-3s): Start with a chilling fact or a direct lead into the location (e.g., "In Kyoto, Japan, there is a tunnel no one enters...").
                 2. Body (Build-up): 
-                    - Introduce the phenomenon, but focus on the *emotion* behind it (e.g., crying sounds, waiting for someone).
-                    - Describe the protagonist's psychological shift (Curiosity -> Anxiety -> Sorrow/Terror) vividly in 1st person.
-                    - For 'Rule-based horror', emphasize the *desperation* of why the rules exist.
-                3. Climax (Twist): Reveal the tragic truth or the inescapable fate. It doesn't always have to be a scream; a silent realization is often scarier.
-                4. Outro (Open Ending): End with a lingering, melancholic impact. "Perhaps they are still waiting..."
+                    - Unfold the scary encounter precisely as it happened.
+                    - Emphasize the *scary reason* or the *unknown factor*.
+                3. Climax (The Chill): The most terrifying realization.
+                4. Outro: End with a lingering impact. "No one knows where they went..."
+                5. Signature Outro: "미스터리 픽셀이었습니다."
 
                 [BGM/SFX Instruction]
-                - You CAN control the BGM. If you want the BGM to stop suddenly for a chilling effect, include the token [BGM_SILENCE] at the START of the sentence where the music should cut off.
+                - Use [BGM_SILENCE] before a chilling sentence to maximize impact.
             """.trimIndent()
             "stocks" -> """
                 [Role]

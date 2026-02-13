@@ -11,7 +11,13 @@ import com.sciencepixel.repository.VideoHistoryRepository
 import com.sciencepixel.service.ProductionService
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import org.springframework.kafka.annotation.DltHandler
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.annotation.RetryableTopic
+import org.springframework.kafka.retrytopic.TopicSuffixingStrategy
+import org.springframework.kafka.support.KafkaHeaders
+import org.springframework.messaging.handler.annotation.Header
+import org.springframework.retry.annotation.Backoff
 import org.springframework.stereotype.Component
 
 @Component
@@ -29,11 +35,17 @@ class SceneConsumer(
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
+    @RetryableTopic(
+        attempts = "3",
+        backoff = Backoff(delay = 60000, multiplier = 2.0),
+        topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE,
+        include = [Exception::class]
+    )
     @KafkaListener(
         topics = [KafkaConfig.TOPIC_SCRIPT_CREATED],
         groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-group}"
     )
-    fun consumeScript(message: String) {
+    fun consumeScript(message: String, @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String) {
         try {
             val event = objectMapper.readValue(message, ScriptCreatedEvent::class.java)
             if (channelId != "renderer" && event.channelId != channelId) return
@@ -135,6 +147,24 @@ class SceneConsumer(
                     ))
                 }
             }
+        }
+    }
+
+    @DltHandler
+    fun handleDlt(message: String, @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String) {
+        println("💀 [SceneConsumer] Message moved to DLT topic $topic: $message")
+        try {
+            val event = objectMapper.readValue(message, ScriptCreatedEvent::class.java)
+            videoHistoryRepository.findById(event.videoId).ifPresent { v ->
+                videoHistoryRepository.save(v.copy(
+                    status = VideoStatus.FAILED,
+                    failureStep = "ASSETS_DLT",
+                    errorMessage = "Failed after worker retries in SceneConsumer",
+                    updatedAt = java.time.LocalDateTime.now()
+                ))
+            }
+        } catch (e: Exception) {
+            println("❌ Error processing DLT message: ${e.message}")
         }
     }
 }

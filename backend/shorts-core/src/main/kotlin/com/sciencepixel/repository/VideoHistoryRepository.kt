@@ -40,4 +40,5 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
     // Retry Logic Queries
     fun findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId: String, status: VideoStatus): List<VideoHistory>
     fun findByChannelIdAndStatusAndUpdatedAtBefore(channelId: String, status: VideoStatus, time: java.time.LocalDateTime): List<VideoHistory>
+    fun findFirstByChannelIdAndStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(channelId: String, status: VideoStatus, time: java.time.LocalDateTime): VideoHistory?
 }

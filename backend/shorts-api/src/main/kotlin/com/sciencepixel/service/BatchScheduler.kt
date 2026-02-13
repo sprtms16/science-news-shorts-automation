@@ -133,6 +133,43 @@ class BatchScheduler(
         recoverStuckUploads()
     }
 
+    // Phase 46: Paced Auto-Retry for persistent failures (Every 30 mins)
+    @Scheduled(cron = "0 0/30 * * * *")
+    fun pacedAutoRetryFailedJobs() {
+        if (channelBehavior.shouldSkipGeneration()) return
+        
+        println("⏰ [$channelId] Starting Paced Auto-Retry Check (30 min interval)...")
+        
+        // 1시간 이상 경과한 FAILED 영상 중 가장 오래된 건 1개 추출
+        val oneHourAgo = java.time.LocalDateTime.now().minusHours(1)
+        val targetVideo = videoHistoryRepository.findFirstByChannelIdAndStatusAndUpdatedAtBeforeOrderByUpdatedAtAsc(
+            channelId,
+            VideoStatus.FAILED,
+            oneHourAgo
+        )
+        if (targetVideo == null || targetVideo.failureStep == "SAFETY" || targetVideo.failureStep == "DUPLICATE") {
+            return
+        }
+
+        // Check Daily Limit before trigger
+        val startOfDay = java.time.LocalDate.now().atStartOfDay()
+        val successStatuses = listOf(VideoStatus.SCRIPTING, VideoStatus.ASSETS_QUEUED, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
+        val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
+
+        if (dailyCount >= channelBehavior.dailyLimit) {
+            println("⏳ [$channelId] [Paced-Auto-Retry] Skipping - Daily Limit Reached ($dailyCount/${channelBehavior.dailyLimit}).")
+            return
+        }
+
+        println("🔄 [$channelId] [Paced-Auto-Retry] Rescuing persistent failure: ${targetVideo.title}")
+        
+        videoHistoryRepository.save(targetVideo.copy(
+            status = VideoStatus.RETRY_QUEUED,
+            errorMessage = "Auto-rescued after 1hr persistent failure (Paced Retry)",
+            updatedAt = java.time.LocalDateTime.now()
+        ))
+    }
+
     // New: Rescue Orphaned QUEUED items (Stuck > 1 hour)
     private fun recoverOrphanedQueuedJobs() {
         // Find items stuck in QUEUED for more than 1 hour
@@ -178,6 +215,16 @@ class BatchScheduler(
     private fun recoverFailedGenerations() {
         // Find FAILED jobs
         val failedVideos = videoHistoryRepository.findTop5ByChannelIdAndStatusOrderByUpdatedAtAsc(channelId, VideoStatus.FAILED)
+        if (failedVideos.isEmpty()) return
+
+        // Check Daily Limit
+        val startOfDay = java.time.LocalDate.now().atStartOfDay()
+        val successStatuses = listOf(VideoStatus.SCRIPTING, VideoStatus.ASSETS_QUEUED, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
+        val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
+
+        if (dailyCount >= channelBehavior.dailyLimit) {
+            return
+        }
         
         failedVideos.filter { it.failureStep != "UPLOAD_FAIL" && it.failureStep != "SAFETY" && it.failureStep != "DUPLICATE" && (it.regenCount ?: 0) < 3 }
             .forEach { video ->
@@ -266,7 +313,7 @@ class BatchScheduler(
             VideoStatus.RENDERING
         )
         val stuckJobs = videoHistoryRepository.findByChannelIdAndStatusIn(channelId, processingStatuses)
-            .filter { it.updatedAt.isBefore(timeoutThreshold) && it.regenCount > 0 } // Only retries
+            .filter { it.updatedAt.isBefore(timeoutThreshold) } // Any job (regenCount >= 0)
         
         if (stuckJobs.isNotEmpty()) {
             println("⚠️ [$channelId] Found ${stuckJobs.size} stuck retries > 30m. Processing stuck detection...")

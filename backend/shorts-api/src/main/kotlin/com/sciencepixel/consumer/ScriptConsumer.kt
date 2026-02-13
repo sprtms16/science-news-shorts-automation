@@ -11,7 +11,13 @@ import com.sciencepixel.service.GeminiService
 import com.sciencepixel.service.JobClaimService
 import com.sciencepixel.service.LogPublisher
 import com.fasterxml.jackson.databind.ObjectMapper
+import org.springframework.kafka.annotation.DltHandler
 import org.springframework.kafka.annotation.KafkaListener
+import org.springframework.kafka.annotation.RetryableTopic
+import org.springframework.kafka.retrytopic.TopicSuffixingStrategy
+import org.springframework.kafka.support.KafkaHeaders
+import org.springframework.messaging.handler.annotation.Header
+import org.springframework.retry.annotation.Backoff
 import org.springframework.stereotype.Component
 import java.time.LocalDateTime
 import java.util.*
@@ -33,6 +39,14 @@ class ScriptConsumer(
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
 
+    @RetryableTopic(
+        attempts = "5",
+        backoff = Backoff(delay = 300000, multiplier = 2.0, maxDelay = 3600000), // 5m, 10m, 20m, 40m, 1h
+        include = [GeminiService.GeminiRetryableException::class],
+        exclude = [GeminiService.GeminiFatalException::class],
+        topicSuffixingStrategy = TopicSuffixingStrategy.SUFFIX_WITH_INDEX_VALUE,
+        dltStrategy = org.springframework.kafka.retrytopic.DltStrategy.FAIL_ON_ERROR
+    )
     @KafkaListener(
         topics = [KafkaConfig.TOPIC_RSS_NEW_ITEM],
         groupId = "\${spring.kafka.consumer.group-id:\${SHORTS_CHANNEL_ID:science}-group}"
@@ -95,6 +109,18 @@ class ScriptConsumer(
 
             // 2. Call Gemini
             println("🤖 generating script for: ${event.title}...")
+
+            // [Optimization] Cleanup existing temp directory before starting (Prevent Disk Leak)
+            try {
+                val tempDir = java.io.File("shared-data/videos/${event.channelId}/${history.id}")
+                if (tempDir.exists()) {
+                    println("🧹 [$channelId] Cleaning up stale temp directory: ${tempDir.absolutePath}")
+                    tempDir.deleteRecursively()
+                }
+            } catch (e: Exception) {
+                println("⚠️ [$channelId] Failed to cleanup temp directory: ${e.message}")
+            }
+
             val content = event.summary ?: event.title
             val scriptResponse = geminiService.writeScript(event.title, content)
 
@@ -137,22 +163,45 @@ class ScriptConsumer(
             logPublisher.info("shorts-controller", "Script Generated: ${scriptResponse.title}", "Scenes: ${scriptResponse.scenes.size}ea", traceId = updatedHistory.id)
             println("✅ [$channelId] Script created & event published: ${event.title}")
 
+        } catch (e: GeminiService.GeminiRetryableException) {
+            println("⏳ [$channelId] Gemini Temporary Failure, triggering Kafka Retry: ${e.message}")
+            throw e // re-throw to trigger Kafka Retry
         } catch (e: Exception) {
-            val isSafety = e.message?.contains("GEMINI_SAFETY_BLOCKED") == true
+            val isSafety = e.message?.contains("GEMINI_SAFETY_BLOCKED") == true || e is GeminiService.GeminiFatalException
             
-            logPublisher.error("shorts-controller", if (isSafety) "Safety Blocked" else "Script Generation Failed", "Error: ${e.message}")
+            logPublisher.error("shorts-controller", if (isSafety) "Safety/Fatal Blocked" else "Script Generation Failed", "Error: ${e.message}")
             println("❌ [$channelId] Error: ${e.message}")
             
             // Mark as FAILED or BLOCKED in DB
+            val event = try { objectMapper.readValue(message, RssNewItemEvent::class.java) } catch(ex: Exception) { null }
+            event?.let { 
+                videoHistoryRepository.findByChannelIdAndLink(channelId, it.url)?.let { v ->
+                    videoHistoryRepository.save(v.copy(
+                        status = if (isSafety) VideoStatus.BLOCKED else VideoStatus.FAILED, 
+                        failureStep = if (isSafety) "SAFETY" else "SCRIPT",
+                        errorMessage = e.message ?: "Unknown Script Generation Error",
+                        updatedAt = LocalDateTime.now()
+                    ))
+                }
+            }
+        }
+    }
+
+    @DltHandler
+    fun handleDlt(message: String, @Header(KafkaHeaders.RECEIVED_TOPIC) topic: String) {
+        println("💀 [$channelId] Message moved to DLT after all retries: $topic")
+        try {
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
             videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)?.let { 
                 videoHistoryRepository.save(it.copy(
-                    status = if (isSafety) VideoStatus.BLOCKED else VideoStatus.FAILED, 
-                    failureStep = if (isSafety) "SAFETY" else "SCRIPT",
-                    errorMessage = e.message ?: "Unknown Script Generation Error",
+                    status = VideoStatus.FAILED, 
+                    failureStep = "SCRIPT_RETRY_EXHAUSTED",
+                    errorMessage = "Gemini API retries exhausted in Kafka",
                     updatedAt = LocalDateTime.now()
                 ))
             }
+        } catch (e: Exception) {
+            println("❌ Error in DLT Handler: ${e.message}")
         }
     }
 
