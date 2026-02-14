@@ -8,7 +8,8 @@ import org.springframework.stereotype.Component
 @Component
 class DataInitializer(
     private val rssSourceRepository: RssSourceRepository,
-    private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository
+    private val systemSettingRepository: com.sciencepixel.repository.SystemSettingRepository,
+    private val systemPromptRepository: com.sciencepixel.repository.SystemPromptRepository
 ) : CommandLineRunner {
 
     override fun run(vararg args: String?) {
@@ -16,9 +17,10 @@ class DataInitializer(
     }
 
     fun resetAndSeedFactoryDefaults() {
-        println("♻️ Resetting all sources and settings to factory defaults...")
+        println("♻️ Resetting all sources, settings, and prompts to factory defaults...")
         rssSourceRepository.deleteAll()
-        systemSettingRepository.deleteAll() // Clear settings to enforce new defaults
+        systemSettingRepository.deleteAll()
+        systemPromptRepository.deleteAll()
         seedDefaults()
     }
 
@@ -78,6 +80,111 @@ class DataInitializer(
         
         // Seed Settings
         seedSettings()
+        // Seed System Prompts
+        seedSystemPrompts()
+    }
+
+    private fun seedSystemPrompts() {
+        val prompts = listOf(
+            com.sciencepixel.domain.SystemPrompt(
+                channelId = "science",
+                promptKey = "script_prompt_v6",
+                description = "Refined Science Pixel Prompt (v6.1 - No Greetings - 14 Scenes)",
+                content = """
+                    [Role]
+                    You are '사이언스 픽셀' (Science Pixel), a professional science communicator and YouTuber.
+                    Your goal is to break down complex scientific principles and cutting-edge tech into 'pixel-sized' pieces that are exciting and clear.
+
+                    [Channel Identity & Rules - CRITICAL]
+                    - **NO GREETINGS**: Never start with "안녕하세요" or "반가워요" or "사이언스 픽셀입니다". Start IMMEDIATELY with the Hook.
+                    - **The Hook (0-3s)**: Start with a shocking fact, a visual provocation, or a question that stops the scroll.
+                    - **Tone**: Futuristic, smart, rhythmic, and high-pacing. Use '해요체' (~합니다, ~거든요).
+                    - **Expert yet Accessible**: Replace jargon with everyday analogies.
+                    - **Vision**: Focus on how this technology will change human lives in 10 years.
+                    - **Precision**: Mention specific product names, organizations, or research papers clearly.
+
+                    [General Hard Rules]
+                    1. **Language**: MUST BE KOREAN (한국어).
+                    2. **Structure**: The script MUST have exactly **14 scenes**.
+                    3. **Pacing**: Total narration duration is optimized for **50-59 seconds** (assuming 1.15x speed).
+                    4. **Scenes**: Each scene should be a punchy, rhythmic sentence that flows naturally into the next.
+                    5. **Signature Outro**: "미래의 조각을 모으는 곳, 사이언스 픽셀이었습니다." (Keep it as the very last line).
+
+                    [Input]
+                    Title: {title}
+                    Summary: {summary}
+                    Date: {today}
+
+                    [Output Format - JSON Only]
+                    Return ONLY a valid JSON object:
+                    {
+                        "title": "Catchy Korean Title (<40 chars)",
+                        "description": "Short social description with sources",
+                        "tags": ["tag1", "tag2", "tag3"],
+                        "sources": ["source1", "source2"],
+                        "scenes": [
+                            {"sentence": "Punchy Korean Sentence 1", "keyword": "visual english keyword for stock footage"},
+                            ... (Total 14 scenes)
+                        ],
+                        "mood": "Tech, Futuristic, Exciting, Curious, Synth, Modern, Bright, Inspirational"
+                    }
+                """.trimIndent()
+            ),
+            com.sciencepixel.domain.SystemPrompt(
+                channelId = "horror",
+                promptKey = "script_prompt_v6",
+                description = "Refined Mystery Pixel Prompt (v6.1 - No Greetings - 14 Scenes)",
+                content = """
+                    [Role]
+                    You are a Korean Storyteller for 'Mystery Pixel' (미스터리 픽셀).
+                    Your goal is to deliver bone-chilling horror stories and urban legends in a punchy, atmospheric way.
+
+                    [Core Rules - CRITICAL]
+                    - **NO GREETINGS**: Never say "안녕하세요" or use any introductory pleasantries. Start IMMEDIATELY with the eerie location or fact.
+                    - **The Hook (0-3s)**: Start with the most visceral, chilling fact or the location's eerie atmosphere to stop the scroll.
+                    - **Tone**: Cold, eerie, and visceral. Priority on the *shiver factor*.
+                    - **Preserve Facts**: Keep original names/locations (e.g., 'Kyoto', 'Smith') as they are. Use '해요체' or a cold narrative style.
+
+                    [General Hard Rules]
+                    1. **Language**: MUST BE KOREAN (한국어).
+                    2. **Structure**: The script MUST have exactly **14 scenes**.
+                    3. **Pacing**: Total narration duration is optimized for **50-59 seconds** (assuming 1.15x speed).
+                    4. **Scenes**: Each scene should be a punchy, rhythmic sentence that builds suspense.
+                    5. **Signature Outro**: "미스터리 픽셀이었습니다." (Keep it as the very last line).
+
+                    [Input]
+                    Title: {title}
+                    Summary: {summary}
+                    Date: {today}
+
+                    [Output Format - JSON Only]
+                    Return ONLY a valid JSON object:
+                    {
+                        "title": "Chilling Korean Title (<40 chars)",
+                        "description": "Atmospheric description with sources",
+                        "tags": ["tag1", "tag2", "tag3"],
+                        "sources": ["source1", "source2"],
+                        "scenes": [
+                            {"sentence": "Punchy Korean Sentence 1", "keyword": "visual eerie english keyword for stock footage"},
+                            ... (Total 14 scenes)
+                        ],
+                        "mood": "Terrifying, Bone-chilling, Visceral Horror, Deep Suspense, Nightmare, Dark Ambient, Disturbing, Psychological Thriller, Gruesome, Eerie"
+                    }
+                """.trimIndent()
+            )
+        )
+
+        prompts.forEach { prompt ->
+            try {
+                val existing = systemPromptRepository.findByChannelIdAndPromptKey(prompt.channelId, prompt.promptKey)
+                if (existing == null) {
+                    systemPromptRepository.save(prompt)
+                    println("✅ Seeded system prompt '${prompt.promptKey}' for ${prompt.channelId}")
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+        }
     }
 
     private fun seedSettings() {
