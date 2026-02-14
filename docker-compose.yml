@@ -279,6 +279,8 @@ services:
       - APP_FEATURE_CONSUMER_RENDER=true
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
       - TZ=Asia/Seoul
       - JAVA_OPTS=-Xmx1024m -Xms512m
     deploy:
