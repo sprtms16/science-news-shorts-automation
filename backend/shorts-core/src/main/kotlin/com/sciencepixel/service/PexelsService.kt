@@ -30,7 +30,13 @@ class PexelsService(
 
         try {
             client.newCall(request).execute().use { response ->
-                val bodyString = response.body?.string() ?: "{}"
+                val bodyString = try {
+                    response.body?.string() ?: "{}"
+                } catch (e: Exception) {
+                    println("❌ Error reading Pexels response body: ${e.message}")
+                    "{}"
+                }
+                
                 println("📡 Pexels Response Code: ${response.code}")
                 // println("📡 Pexels Body: ${bodyString.take(500)}...") // Commented out to prevent crash
 
