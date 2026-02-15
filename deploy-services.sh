@@ -29,13 +29,16 @@ docker image prune -f
 echo "🔨 Building images..."
 docker-compose build --parallel
 
-# Start app services with forced recreation (Excluding github-runner)
-echo "🔄 Restarting services..."
-docker-compose up -d --force-recreate \
-  zookeeper kafka mongo ai-media-service \
+# 1. Ensure infrastructure services are running (won't restart if already up and unchanged)
+echo "📦 Starting infrastructure services..."
+docker-compose up -d zookeeper kafka mongo ai-media-service tailscale
+
+# 2. Force recreate only application services (without restarting dependencies)
+echo "🚀 Deploying application services..."
+docker-compose up -d --force-recreate --no-deps \
   shorts-science shorts-horror shorts-stocks shorts-history \
   shorts-log-service shorts-renderer renderer-autoscaler \
-  frontend-server tailscale
+  frontend-server
 
 echo ""
 echo "✅ Deployment complete!"
