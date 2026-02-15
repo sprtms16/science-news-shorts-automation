@@ -38,23 +38,20 @@ jobs:
           echo "SECRET_HISTORY_B64=$(echo -n "$SECRET_HISTORY" | base64 -w 0)" >> .env
 
       - name: Deploy to Docker Compose
-        env:
-          DOCKER_BUILDKIT: 1
-          COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           # Clean up old images
           docker image prune -f
 
-          # Build images in parallel with BuildKit (faster builds and better caching)
+          # Build images in parallel first
           docker-compose build --parallel
 
-          # 1. Ensure infrastructure services are running (won't restart if already up and unchanged)
-          echo "📦 Starting infrastructure services..."
-          docker-compose up -d zookeeper kafka mongo ai-media-service tailscale
-
-          # 2. Force recreate only application services (without restarting dependencies)
-          echo "🚀 Deploying application services..."
-          docker-compose up -d --force-recreate --no-deps \
+          # Start app services with forced recreation (Excluding github-runner to avoid build interruption)
+          docker-compose up -d --force-recreate \
+            zookeeper kafka mongo ai-media-service \
             shorts-science shorts-horror shorts-stocks shorts-history \
             shorts-log-service shorts-renderer renderer-autoscaler \
-            frontend-server
+            frontend-server tailscale
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -f .env

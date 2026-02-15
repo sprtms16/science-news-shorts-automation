@@ -20,6 +20,7 @@ import java.io.FileInputStream
 import java.io.InputStreamReader
 import java.util.Collections
 import java.util.concurrent.CountDownLatch
+import org.slf4j.LoggerFactory
 
 @Service
 class YoutubeService(
@@ -29,6 +30,10 @@ class YoutubeService(
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String,
     @org.springframework.beans.factory.annotation.Value("\${YOUTUBE_REDIRECT_URI:http://localhost:8080/callback}") private val redirectUri: String
 ) {
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(YoutubeService::class.java)
+    }
 
     private val JSON_FACTORY = JacksonFactory.getDefaultInstance()
     private val TOKENS_DIRECTORY_PATH = "tokens/$channelId"
@@ -60,7 +65,8 @@ class YoutubeService(
     private fun getUploadsPlaylistId(youtube: YouTube): String {
         cachedUploadsPlaylistId?.let { return it }
         val channelResponse = youtube.channels().list(listOf("contentDetails")).setMine(true).execute()
-        val uploadsId = channelResponse.items.first().contentDetails.relatedPlaylists.uploads
+        val uploadsId = channelResponse.items?.firstOrNull()?.contentDetails?.relatedPlaylists?.uploads
+            ?: throw IllegalStateException("No YouTube channel found for the authenticated user. Verify OAuth credentials for channel '$channelId'.")
         cachedUploadsPlaylistId = uploadsId
         return uploadsId
     }
@@ -129,7 +135,7 @@ class YoutubeService(
             }
             
             if (exactMatch) {
-                println("⚠️ Exact duplicate found locally for channel $channelId: $title")
+                logger.warn("Exact duplicate found locally for channel {}: {}", channelId, title)
                 return true
             }
             
@@ -142,7 +148,7 @@ class YoutubeService(
             val similarVideo = allVideos.find { video ->
                 val similarity = calculateSimilarity(title, video.title)
                 if (similarity >= threshold) {
-                    println("⚠️ Similar duplicate found in channel $channelId: '${video.title}' (Score: $similarity) similar to '$title'")
+                    logger.warn("Similar duplicate found in channel {}: '{}' (Score: {}) similar to '{}'", channelId, video.title, similarity, title)
                     true
                 } else {
                     false
@@ -152,7 +158,7 @@ class YoutubeService(
             return similarVideo != null
 
         } catch (e: Exception) {
-            println("⚠️ Error checking channel duplicates from local DB: ${e.message}")
+            logger.warn("Error checking channel duplicates from local DB: {}", e.message)
             return false // Fallback
         }
     }
@@ -200,12 +206,12 @@ class YoutubeService(
         
         val inStream = when {
             !channelSecretB64.isNullOrBlank() -> {
-                println("✅ [$effectiveChannelId] Using client_secret from $channelEnvName")
+                logger.info("[{}] Using client_secret from {}", effectiveChannelId, channelEnvName)
                 val decoded = java.util.Base64.getDecoder().decode(channelSecretB64)
                 java.io.ByteArrayInputStream(decoded)
             }
             !genericSecretB64.isNullOrBlank() -> {
-                println("✅ [$effectiveChannelId] Using client_secret from YOUTUBE_CLIENT_SECRET_JSON_B64")
+                logger.info("[{}] Using client_secret from YOUTUBE_CLIENT_SECRET_JSON_B64", effectiveChannelId)
                 val decoded = java.util.Base64.getDecoder().decode(genericSecretB64)
                 java.io.ByteArrayInputStream(decoded)
             }
@@ -222,11 +228,11 @@ class YoutubeService(
                 val credentialFile = File(credentialPath)
                 
                 if (credentialFile.exists()) {
-                    println("✅ [$effectiveChannelId] Found client_secret at: $credentialPath")
+                    logger.info("[{}] Found client_secret at: {}", effectiveChannelId, credentialPath)
                     FileInputStream(credentialFile)
                 } else {
                     // Priority 4: Classpath resource (for JAR packaging)
-                    println("⚠️ [$effectiveChannelId] File not found at $credentialPath, trying classpath...")
+                    logger.warn("[{}] File not found at {}, trying classpath...", effectiveChannelId, credentialPath)
                     YoutubeService::class.java.getResourceAsStream(CREDENTIALS_FILE_PATH) 
                         ?: throw RuntimeException("❌ client_secret.json not found. Set $channelEnvName or YOUTUBE_CLIENT_SECRET_JSON_B64 env var, or mount at $credentialPath")
                 }
@@ -250,36 +256,36 @@ class YoutubeService(
         val effectiveChannelId = targetChannelId ?: channelId
         val flow = getFlow(targetChannelId)
         
-        println("🔑 [$effectiveChannelId] Loading credentials from tokens/$effectiveChannelId...")
+        logger.info("[{}] Loading credentials from tokens/{}", effectiveChannelId, effectiveChannelId)
         
         // Try to load existing credential
         var credential = flow.loadCredential("user")
         
         if (credential == null) {
-            println("⚠️ [$effectiveChannelId] No stored credential found!")
+            logger.warn("[{}] No stored credential found!", effectiveChannelId)
         } else {
-            println("✅ [$effectiveChannelId] Credential loaded. RefreshToken: ${credential.refreshToken?.take(20)}..., ExpiresIn: ${credential.expiresInSeconds}s")
+            logger.info("[{}] Credential loaded. RefreshToken: {}..., ExpiresIn: {}s", effectiveChannelId, credential.refreshToken?.take(20), credential.expiresInSeconds)
         }
         
         // Check if credential exists and is valid (or refreshable)
         if (credential != null && (credential.refreshToken != null || credential.expiresInSeconds == null || credential.expiresInSeconds > 60)) {
-            println("✅ [$effectiveChannelId] Credential is valid, using existing token.")
+            logger.info("[{}] Credential is valid, using existing token.", effectiveChannelId)
             return credential
         }
         
         // Try to refresh if possible
         try {
             if (credential != null && credential.refreshToken != null) {
-                println("🔄 [$effectiveChannelId] Attempting to refresh token...")
+                logger.info("[{}] Attempting to refresh token...", effectiveChannelId)
                 if (credential.refreshToken()) {
-                    println("✅ [$effectiveChannelId] Token refreshed successfully!")
+                    logger.info("[{}] Token refreshed successfully!", effectiveChannelId)
                     return credential
                 } else {
-                    println("⚠️ [$effectiveChannelId] Token refresh returned false.")
+                    logger.warn("[{}] Token refresh returned false.", effectiveChannelId)
                 }
             }
         } catch (e: Exception) {
-            println("⚠️ [$effectiveChannelId] Refresh failed: ${e.message}")
+            logger.warn("[{}] Refresh failed: {}", effectiveChannelId, e.message)
         }
 
         // Needs new Auth
@@ -307,9 +313,9 @@ class YoutubeService(
         val effectiveChannelId = targetChannelId ?: channelId
         val authUrl = getAuthorizationUrl(effectiveChannelId)
         
-        println("👉 [$effectiveChannelId] Please open the following URL to authorize:")
-        println(authUrl)
-        println("Waiting for callback on $redirectUri ...")
+        logger.info("[{}] Please open the following URL to authorize:", effectiveChannelId)
+        logger.info("{}", authUrl)
+        logger.info("Waiting for callback on {} ...", redirectUri)
 
         // 🔔 Discord/Telegram 알림 전송
         notificationService.notifyAuthRequired(effectiveChannelId, authUrl)
@@ -319,29 +325,28 @@ class YoutubeService(
 
     // Called by OAuthController
     fun exchangeCodeForToken(code: String) {
-        println("🔑 Exchanging code for token via Google Lib...")
+        logger.info("Exchanging code for token via Google Lib...")
         try {
             val flow = getFlow()
             val tokenResponse = flow.newTokenRequest(code).setRedirectUri(redirectUri).execute()
             flow.createAndStoreCredential(tokenResponse, "user")
-            println("✅ Credential saved successfully to $TOKENS_DIRECTORY_PATH")
+            logger.info("Credential saved successfully to {}", TOKENS_DIRECTORY_PATH)
         } catch (e: Exception) {
-            println("❌ Failed to exchange code: ${e.message}")
-            e.printStackTrace()
+            logger.error("Failed to exchange code: {}", e.message, e)
             throw e
         }
     }
 
     fun uploadVideo(file: File, title: String, description: String, tags: List<String>, thumbnailFile: File? = null, targetChannelId: String? = null): String {
         val effectiveChannelId = targetChannelId ?: channelId
-        println("📡 [$effectiveChannelId] Connecting to YouTube API (Google Client)...")
+        logger.info("[{}] Connecting to YouTube API (Google Client)...", effectiveChannelId)
         val credential = getCredentials(effectiveChannelId) // might throw
         
         val youtube = YouTube.Builder(
             GoogleNetHttpTransport.newTrustedTransport(), JSON_FACTORY, credential
         ).setApplicationName(APPLICATION_NAME).build()
 
-        println("📤 [$effectiveChannelId] Preparing Upload: $title")
+        logger.info("[{}] Preparing Upload: {}", effectiveChannelId, title)
 
         val video = Video()
         
@@ -376,7 +381,7 @@ class YoutubeService(
         } catch (e: GoogleJsonResponseException) {
             val errors = e.details?.errors ?: emptyList()
             if (errors.any { it.reason == "quotaExceeded" || it.reason == "uploadLimitExceeded" }) {
-                println("🛑 [$effectiveChannelId] YouTube Quota Exceeded detected during upload.")
+                logger.error("[{}] YouTube Quota Exceeded detected during upload.", effectiveChannelId)
                 quotaTracker.setSuspended("Quota Exceeded Error from YouTube API ($effectiveChannelId)")
             }
             throw e
@@ -384,17 +389,17 @@ class YoutubeService(
             throw e
         }
         
-        println("✅ [$effectiveChannelId] YouTube Upload Complete! ID: ${response.id}")
+        logger.info("[{}] YouTube Upload Complete! ID: {}", effectiveChannelId, response.id)
         
         // Custom Thumbnail Upload
         if (thumbnailFile != null && thumbnailFile.exists()) {
             try {
-                println("🖼️ [$effectiveChannelId] Uploading Custom Thumbnail...")
+                logger.info("[{}] Uploading Custom Thumbnail...", effectiveChannelId)
                 val thumbContent = InputStreamContent("image/jpeg", FileInputStream(thumbnailFile))
                 youtube.thumbnails().set(response.id, thumbContent).execute()
-                println("✅ [$effectiveChannelId] Thumbnail Set Successfully!")
+                logger.info("[{}] Thumbnail Set Successfully!", effectiveChannelId)
             } catch (e: Exception) {
-                println("⚠️ [$effectiveChannelId] Failed to upload thumbnail: ${e.message}")
+                logger.warn("[{}] Failed to upload thumbnail: {}", effectiveChannelId, e.message)
             }
         }
         
@@ -402,7 +407,7 @@ class YoutubeService(
     }
 
     fun updateVideoMetadata(videoId: String, title: String? = null, description: String? = null, targetChannelId: String? = null) {
-        println("📡 Updating YouTube metadata for video ID: $videoId (Channel: ${targetChannelId ?: channelId})")
+        logger.info("Updating YouTube metadata for video ID: {} (Channel: {})", videoId, targetChannelId ?: channelId)
         val youtube = getYoutubeClient(targetChannelId)
 
         // 1. Get existing video snippet

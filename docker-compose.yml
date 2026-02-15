@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   github-runner:
     image: myoung34/github-runner:latest
@@ -33,6 +39,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging: *default-logging
     restart: unless-stopped
 
   kafka:
@@ -59,6 +66,7 @@ services:
       timeout: 3s
       retries: 30
       start_period: 45s
+    logging: *default-logging
     restart: unless-stopped
 
   ai-media-service:
@@ -137,6 +145,7 @@ services:
       resources:
         limits:
           memory: 1G
+    logging: *default-logging
     restart: unless-stopped
 
   shorts-horror:
@@ -177,6 +186,7 @@ services:
       resources:
         limits:
           memory: 1G
+    logging: *default-logging
     restart: unless-stopped
 
   shorts-stocks:
@@ -217,6 +227,7 @@ services:
       resources:
         limits:
           memory: 1G
+    logging: *default-logging
     restart: unless-stopped
 
   shorts-history:
@@ -257,6 +268,7 @@ services:
       resources:
         limits:
           memory: 1G
+    logging: *default-logging
     restart: unless-stopped
 
   shorts-log-service:
@@ -278,6 +290,7 @@ services:
       resources:
         limits:
           memory: 800M
+    logging: *default-logging
     restart: unless-stopped
 
   shorts-renderer:
@@ -347,6 +360,7 @@ services:
       - CHECK_INTERVAL=30
       - COOLDOWN_PERIOD=60
       - TZ=Asia/Seoul
+    logging: *default-logging
     restart: unless-stopped
 
   frontend-server:
@@ -357,6 +371,7 @@ services:
     depends_on:
       - tailscale
       - shorts-science
+    logging: *default-logging
     restart: unless-stopped
 
   tailscale:
