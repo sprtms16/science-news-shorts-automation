@@ -68,14 +68,20 @@ class PexelsService(
                 for (i in 0 until videos.length()) {
                     val v = videos.getJSONObject(i)
                     val thumb = v.getString("image") // Thumbnail URL
-                    
-                    
-                    logger.info("Candidate #{}: checking vision... (SKIPPING for Debug)", i)
+
+                    logger.info("Candidate #{}: Checking vision relevance...", i)
                     logger.info("Thumbnail: {}", thumb)
 
-                    // ** VISION CHECK (Bypassed) **
-                    if (true) { // geminiService.verifyImage(thumb, context)
-                        logger.info("Vision Check Passed (Bypassed)!")
+                    // ** VISION CHECK (ACTIVE) **
+                    val isRelevant = try {
+                        geminiService.checkVideoRelevance(thumb, context)
+                    } catch (e: Exception) {
+                        logger.warn("Vision Check Error: {}. Skipping this candidate.", e.message)
+                        false
+                    }
+
+                    if (isRelevant) {
+                        logger.info("✅ Vision Check Passed!")
                         // Find HD Link
                         val files = v.getJSONArray("video_files")
                         for (j in 0 until files.length()) {
@@ -88,7 +94,7 @@ class PexelsService(
                         }
                         if (bestVideoUrl.isNotEmpty()) break
                     } else {
-                        logger.error("Vision Check Failed.")
+                        logger.info("❌ Vision Check Failed. Trying next candidate...")
                     }
                 }
             }

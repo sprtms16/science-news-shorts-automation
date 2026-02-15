@@ -231,26 +231,26 @@ class GeminiService(
                             return text
                         }
                         429 -> {
-                        val jitter = Random.nextLong(1, 60) * 1000L
-                        logger.warn("Rate Limit (429) for: {}. Transient cooldown 1m + {}s jitter. ({}/{})", combinedKey, jitter/1000, triedCombinations.size, totalPossibleCombinations)
-                        tracker.recordFailure(60_000L + jitter) // 1 minute + jitter
-                        lastError = Exception("Rate limit exceeded (429)")
-                    }
+                            val jitter = Random.nextLong(1, 120) * 1000L // Increased jitter range
+                            logger.warn("⚠️ Rate Limit (429) for: {}. Applying significant cooldown (10m + jitter). ({}/{})", combinedKey, jitter/1000, triedCombinations.size, totalPossibleCombinations)
+                            tracker.recordFailure(COOLDOWN_MS + jitter) // Full 10 min cooldown + jitter
+                            lastError = Exception("Rate limit exceeded (429)")
+                        }
                         400, 404 -> {
-                            logger.warn("Invalid Model or Request ({}) for: {}. Long cooldown 1h. Skip this combination.", responseCode, combinedKey)
-                            tracker.recordFailure(3600_000L) // 1 hour for invalid endpoints/models
+                            logger.warn("🚫 Invalid Model or Request ({}) for: {}. Long cooldown 24h. Skip this combination.", responseCode, combinedKey)
+                            tracker.recordFailure(24 * 3600_000L) // 24 hours for invalid endpoints/models
                             lastError = Exception("Permanent API error ($responseCode)")
                         }
                         else -> {
-                            logger.warn("Gemini Error: {} - {}. Default cooldown 5m.", responseCode, text)
-                            tracker.recordFailure(5 * 60_000L) // 5 minutes for general errors
+                            logger.warn("⚠️ Gemini Error: {} - {}. Default cooldown 15m.", responseCode, text)
+                            tracker.recordFailure(15 * 60_000L) // 15 minutes for general errors
                             lastError = Exception("Gemini API error: $responseCode")
                         }
                     }
                 }
             } catch (e: Exception) {
-                logger.error("Gemini Connection Error: {}", e.message)
-                tracker.recordFailure()
+                logger.error("❌ Gemini Connection Error: {}", e.message)
+                tracker.recordFailure(60_000L) // 1 min for connection errors
                 lastError = e
             }
         }
@@ -450,11 +450,17 @@ class GeminiService(
             
             [General Hard Rules]
             1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
-            2. **Visual Pacing**: YOU MUST split the story into **exactly 14 short scenes**. Each scene represents ~4 seconds of visuals.
-            3. **Duration**: The total script MUST be **50-59 seconds** long. This corresponds to the 14 scenes. Avoid filler words.
-            4. **Language**: MUST BE KOREAN (한국어).
-            5. **Fast Delivery**: Write sentences that are punchy and rhythmic, optimized for fast-paced narration (1.15x speed).
-            6. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
+            2. **Scene Count**: YOU MUST split the story into **exactly 18 scenes**. No more, no less.
+            3. **Sentence Length**: Each scene's sentence MUST be **30-40 Korean characters (글자)** long.
+               This is CRITICAL for timing. Count your characters carefully.
+               BAD (too short, 12자): "이건 놀라운 발견입니다."
+               BAD (too long, 50자): "이 발견은 기존의 물리학 법칙을 완전히 뒤집을 수 있는 혁명적인 연구 결과로 평가받고 있습니다."
+               GOOD (35자): "이 발견은 기존 물리학의 법칙을 완전히 뒤집을 수 있는 연구 결과입니다."
+            4. **Duration**: The total script MUST be **50-55 seconds** when read aloud at normal Korean speech speed.
+               At 1.15x playback speed this produces a 43-48 second video. Target approximately 540-720 total Korean characters.
+            5. **Language**: MUST BE KOREAN (한국어).
+            6. **Fast Delivery**: Write sentences that are dense and rhythmic, optimized for 1.15x narration speed. Do NOT use filler words, but do NOT make sentences too short either.
+            7. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
             
             [Input]
             Title: {title}

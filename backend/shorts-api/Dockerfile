@@ -5,12 +5,19 @@ WORKDIR /app
 # Copy root build files
 COPY build.gradle.kts settings.gradle.kts ./
 
-# Copy all modules
+# Copy module build files for dependency resolution (cached layer)
+COPY shorts-core/build.gradle.kts ./shorts-core/build.gradle.kts
+COPY shorts-api/build.gradle.kts ./shorts-api/build.gradle.kts
+
+# Download dependencies (cached layer - only invalidated when dependencies change)
+RUN gradle :shorts-api:dependencies --parallel --no-daemon || true
+
+# Copy all modules source code
 COPY shorts-core ./shorts-core
 COPY shorts-api ./shorts-api
 
-# Build the API module
-RUN gradle :shorts-api:clean :shorts-api:build -x test --no-daemon
+# Build the API module (without clean for faster builds)
+RUN gradle :shorts-api:build -x test --parallel --no-daemon
 
 # Runtime Stage
 FROM eclipse-temurin:17-jdk-jammy

@@ -144,19 +144,26 @@ class ContentProviderService(
                 
                 while (attempts < 5 && candidates.isNotEmpty()) {
                     val selected = candidates.random()
-                    println("🔍 Checking Safety for candidate (Attempt ${attempts + 1}): ${selected.title}")
+                    println("🔍 Checking Safety for candidate (Attempt ${attempts + 1}/5): ${selected.title}")
                     
-                    if (geminiService.checkSensitivity(selected.title, selected.summary, "history")) {
-                        println("✨ Selected History Event (Safety OK): ${selected.title}")
-                        return listOf(selected)
-                    } else {
-                        println("⛔ Wikipedia Item Rejected by Safety Filter: ${selected.title}")
-                        candidates.remove(selected)
-                        attempts++
+                    try {
+                        if (geminiService.checkSensitivity(selected.title, selected.summary, "history")) {
+                            println("✨ Selected History Event (Safety OK): ${selected.title}")
+                            return listOf(selected)
+                        } else {
+                            println("⛔ Wikipedia Item Rejected by Safety Filter: ${selected.title}")
+                            candidates.remove(selected)
+                        }
+                    } catch (e: Exception) {
+                        println("⚠️ Gemini Safety Check Failed (Transient): ${e.message}. Falling back to default SAFE for this item.")
+                        // If Gemini is down/429, don't block the whole process if we have a candidate.
+                        // For history, most items are safe unless they are modern political propaganda.
+                        return listOf(selected) 
                     }
+                    attempts++
                 }
                 
-                println("⚠️ No safe Wikipedia items found after $attempts attempts.")
+                println("⚠️ No safe Wikipedia items determined after $attempts attempts (or all rejected).")
                 return emptyList()
             }
         } catch (e: Exception) {

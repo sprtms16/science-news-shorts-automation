@@ -133,20 +133,35 @@ class SceneConsumer(
             println("✅ [$channelId] Assets ready & event published: ${event.videoId}")
 
         } catch (e: Exception) {
-            println("❌ [SceneConsumer] Error: ${e.message}")
-            e.printStackTrace()
+            val errorType = when (e) {
+                is java.util.concurrent.TimeoutException -> "TIMEOUT"
+                is IllegalArgumentException -> "INVALID_INPUT"
+                is java.io.IOException -> "IO_ERROR"
+                is RuntimeException -> "RUNTIME_ERROR"
+                else -> "UNKNOWN_ERROR"
+            }
+
+            println("❌ [SceneConsumer] Error [$errorType]: ${e.message}")
+            println("   Exception Type: ${e.javaClass.simpleName}")
+            println("   Stack trace (last 10 lines):")
+            e.stackTrace.take(10).forEach { println("   $it") }
+
             // Try to mark as FAILED
             val event = try { objectMapper.readValue(message, ScriptCreatedEvent::class.java) } catch(ex: Exception) { null }
-            event?.let { 
+            event?.let {
                 videoHistoryRepository.findById(it.videoId).ifPresent { v ->
+                    val detailedError = "[$errorType] ${e.message ?: "Unknown error"}\nCause: ${e.cause?.message ?: "N/A"}"
                     videoHistoryRepository.save(v.copy(
-                        status = VideoStatus.FAILED, 
+                        status = VideoStatus.FAILED,
                         failureStep = "ASSETS",
-                        errorMessage = e.message ?: "Unknown Asset Generation Error",
+                        errorMessage = detailedError.take(500), // Limit length
                         updatedAt = java.time.LocalDateTime.now()
                     ))
                 }
             }
+
+            // Re-throw for retry mechanism
+            throw e
         }
     }
 
