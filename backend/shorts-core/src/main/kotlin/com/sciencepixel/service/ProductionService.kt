@@ -149,8 +149,18 @@ class ProductionService(
                             println("🎥 [Scene $i] Downloading video for keyword: ${scene.keyword}")
                             if (!pexelsService.downloadVerifiedVideo(scene.keyword, "$title context: $cleanSentence", videoFile)) {
                                 println("⚠️ [Scene $i] No video found for '${scene.keyword}'. Trying fallback...")
-                                if (!pexelsService.downloadVerifiedVideo("science technology", "fallback context", videoFile)) {
-                                    println("❌ [Scene $i] Fallback video download also failed")
+
+                                // 채널별 Fallback 키워드 설정
+                                val fallbackKeyword = when (effectiveChannelId) {
+                                    "science" -> "science technology"      // 사이언스 픽셀: 과학/기술
+                                    "stocks" -> "business finance"          // 밸류 픽셀: 금융/비즈니스
+                                    "horror" -> "dark mystery"              // 미스터리 픽셀: 공포/미스터리
+                                    "history" -> "ancient civilization"     // 메모리 픽셀: 역사/문명
+                                    else -> "technology innovation"
+                                }
+
+                                if (!pexelsService.downloadVerifiedVideo(fallbackKeyword, "fallback context for $effectiveChannelId", videoFile)) {
+                                    println("❌ [Scene $i] Fallback video download also failed for channel: $effectiveChannelId")
                                     throw RuntimeException("Failed to download video for scene $i")
                                 }
                             }
