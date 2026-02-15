@@ -38,11 +38,14 @@ jobs:
           echo "SECRET_HISTORY_B64=$(echo -n "$SECRET_HISTORY" | base64 -w 0)" >> .env
 
       - name: Deploy to Docker Compose
+        env:
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1
         run: |
           # Clean up old images
           docker image prune -f
-          
-          # Build images in parallel first
+
+          # Build images in parallel with BuildKit (faster builds and better caching)
           docker-compose build --parallel
 
           # Start app services with forced recreation (Excluding github-runner to avoid build interruption)
