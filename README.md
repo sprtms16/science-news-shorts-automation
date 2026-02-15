@@ -111,6 +111,137 @@ graph TD
    - **Controller API**: `http://localhost:8080/swagger-ui.html` (if enabled) or check logs.
    - **Kafka UI** (Optional): `http://localhost:9000` (if configured).
 
+## 🚀 Deployment
+
+이 프로젝트는 **GitHub Actions 자동 배포**와 **로컬 수동 배포** 두 가지 방식을 모두 지원합니다.
+
+### 환경 변수 설정
+
+배포 전에 환경 변수를 설정해야 합니다.
+
+1. `.env.example` 파일을 복사하여 `.env` 파일 생성:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. `.env` 파일을 열어 실제 값으로 수정:
+   ```bash
+   # API Keys
+   GEMINI_API_KEY=your_actual_gemini_api_key
+   PEXELS_API_KEY=your_actual_pexels_api_key
+
+   # Infrastructure
+   TAILSCALE_AUTHKEY=your_actual_tailscale_authkey
+   DISCORD_WEBHOOK_URL=your_actual_discord_webhook_url
+
+   # GitHub Personal Access Token (for self-hosted runner)
+   GITHUB_PAT=your_actual_github_pat
+
+   # YouTube OAuth Client Secrets (Base64 encoded JSON)
+   SECRET_SCIENCE_B64=your_base64_encoded_science_secret
+   SECRET_HORROR_B64=your_base64_encoded_horror_secret
+   SECRET_STOCKS_B64=your_base64_encoded_stocks_secret
+   SECRET_HISTORY_B64=your_base64_encoded_history_secret
+   ```
+
+   **YouTube Secret Base64 인코딩 방법:**
+   ```bash
+   echo -n '{"installed": {...}}' | base64 -w 0
+   ```
+
+### GitHub Actions 자동 배포
+
+`develop` 브랜치에 Push하면 자동으로 배포가 실행됩니다.
+
+```bash
+git add .
+git commit -m "feat: your changes"
+git push origin develop
+```
+
+**배포 프로세스:**
+1. Self-hosted runner가 코드 변경 감지
+2. Docker 이미지 빌드 (병렬 처리)
+3. 서비스 재시작 (github-runner 제외)
+4. 배포 완료 알림
+
+**참고:** GitHub Actions는 `github-runner` 컨테이너를 제외한 모든 서비스를 배포합니다.
+
+### 로컬 배포 스크립트
+
+로컬 환경에서 직접 배포할 수 있는 3가지 스크립트를 제공합니다:
+
+#### 1. 서비스 배포 (GitHub Actions와 동일)
+
+Runner를 제외한 모든 서비스를 재배포합니다.
+
+```bash
+chmod +x deploy-services.sh
+./deploy-services.sh
+```
+
+**용도:**
+- GitHub Actions 배포와 동일한 방식으로 로컬에서 서비스 배포
+- Runner는 변경하지 않고 다른 서비스만 업데이트할 때
+
+**배포되는 서비스:**
+- zookeeper, kafka, mongo
+- ai-media-service
+- shorts-science, shorts-horror, shorts-stocks, shorts-history
+- shorts-log-service, shorts-renderer, renderer-autoscaler
+- frontend-server, tailscale
+
+#### 2. Runner 재시작
+
+GitHub Actions Runner만 재시작합니다.
+
+```bash
+chmod +x deploy-runner.sh
+./deploy-runner.sh
+```
+
+**용도:**
+- 타임존 변경 등 환경 변수 업데이트 시
+- Runner 설정 변경 후 적용
+- Runner 로그 확인 (자동으로 최근 20줄 출력)
+
+#### 3. 전체 시스템 배포
+
+Runner를 포함한 모든 서비스를 재배포합니다.
+
+```bash
+chmod +x deploy-all.sh
+./deploy-all.sh
+```
+
+**용도:**
+- 로컬 개발 환경 초기 설정
+- 전체 시스템 업데이트
+- Docker Compose 설정 대규모 변경 시
+
+### 배포 스크립트 특징
+
+모든 배포 스크립트는 다음 기능을 제공합니다:
+
+- ✅ `.env` 파일 존재 여부 자동 확인
+- ✅ 누락 시 사용자에게 경고 및 중단 옵션 제공
+- ✅ Docker 이미지 병렬 빌드로 배포 속도 최적화
+- ✅ 오래된 이미지 자동 정리 (디스크 공간 절약)
+- ✅ 배포 완료 후 서비스 상태 자동 출력
+
+### 배포 후 확인
+
+```bash
+# 모든 서비스 상태 확인
+docker-compose ps
+
+# 특정 서비스 로그 확인
+docker-compose logs -f shorts-science
+
+# Runner 로그 확인
+docker-compose logs -f github-runner
+```
+
 ## 💡 Smart Logic Highlights
 ### 1. Quota-Aware Scheduling & Gemini Guard
 - YouTube API의 일일 할당량(Quota) 제한을 고려하여, **'One-by-One'** 방식의 순차 업로드를 구현했습니다.
