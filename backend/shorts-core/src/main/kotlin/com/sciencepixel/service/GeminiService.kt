@@ -229,26 +229,26 @@ class GeminiService(
                             return text
                         }
                         429 -> {
-                        val jitter = Random.nextLong(1, 60) * 1000L
-                        println("⚠️ Rate Limit (429) for: $combinedKey. Transient cooldown 1m + ${jitter/1000}s jitter. (${triedCombinations.size}/$totalPossibleCombinations)")
-                        tracker.recordFailure(60_000L + jitter) // 1 minute + jitter
-                        lastError = Exception("Rate limit exceeded (429)")
-                    }
+                            val jitter = Random.nextLong(1, 120) * 1000L // Increased jitter range
+                            println("⚠️ Rate Limit (429) for: $combinedKey. Applying significant cooldown (10m + jitter). (${triedCombinations.size}/$totalPossibleCombinations)")
+                            tracker.recordFailure(COOLDOWN_MS + jitter) // Full 10 min cooldown + jitter
+                            lastError = Exception("Rate limit exceeded (429)")
+                        }
                         400, 404 -> {
-                            println("🚫 Invalid Model or Request ($responseCode) for: $combinedKey. Long cooldown 1h. Skip this combination.")
-                            tracker.recordFailure(3600_000L) // 1 hour for invalid endpoints/models
+                            println("🚫 Invalid Model or Request ($responseCode) for: $combinedKey. Long cooldown 24h. Skip this combination.")
+                            tracker.recordFailure(24 * 3600_000L) // 24 hours for invalid endpoints/models
                             lastError = Exception("Permanent API error ($responseCode)")
                         }
                         else -> {
-                            println("⚠️ Gemini Error: $responseCode - $text. Default cooldown 5m.")
-                            tracker.recordFailure(5 * 60_000L) // 5 minutes for general errors
+                            println("⚠️ Gemini Error: $responseCode - $text. Default cooldown 15m.")
+                            tracker.recordFailure(15 * 60_000L) // 15 minutes for general errors
                             lastError = Exception("Gemini API error: $responseCode")
                         }
                     }
                 }
             } catch (e: Exception) {
                 println("❌ Gemini Connection Error: ${e.message}")
-                tracker.recordFailure()
+                tracker.recordFailure(60_000L) // 1 min for connection errors
                 lastError = e
             }
         }

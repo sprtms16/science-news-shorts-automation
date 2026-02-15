@@ -173,12 +173,20 @@ class ProductionService(
         
         burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceRanges)
         
-        if (!finalOutput.exists() || finalOutput.length() == 0L) {
-            println("❌ [ProductionService] Finalization failed: Output file missing or 0 bytes")
+        if (!finalOutput.exists()) {
+            println("❌ [ProductionService] Finalization failed: Output file DOES NOT EXIST at ${finalOutput.absolutePath}")
+            return ""
+        }
+        
+        if (finalOutput.length() == 0L) {
+            println("❌ [ProductionService] Finalization failed: Output file is 0 BYTES at ${finalOutput.absolutePath}")
             return ""
         }
 
+        println("✅ [ProductionService] Final Video Ready: ${finalOutput.name} (${finalOutput.length() / 1024} KB)")
         logPublisher.info("shorts-controller", "Production Completed: $title", "Path: ${finalOutput.name}", traceId = videoId)
+        
+        // Ensure we return the absolute path for uploader to find
         return finalOutput.absolutePath
     }
 
