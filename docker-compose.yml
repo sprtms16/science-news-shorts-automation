@@ -11,6 +11,7 @@ services:
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
       - REPLACE_EXISTING_RUNNER=true
+      - TZ=Asia/Seoul
     security_opt:
       - apparmor:unconfined
     volumes:
@@ -24,6 +25,7 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
       ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,stat,srvr"
+      TZ: Asia/Seoul
     ports:
       - "2181:2181"
     healthcheck:
@@ -50,6 +52,7 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      TZ: Asia/Seoul
     healthcheck:
       test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list" ]
       interval: 15s
@@ -364,6 +367,7 @@ services:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_EXTRA_ARGS=--hostname=shorts-admin
       - TS_SERVE_CONFIG=/config/serve.json
+      - TZ=Asia/Seoul
     ports:
       - "3000:80"
     volumes:
