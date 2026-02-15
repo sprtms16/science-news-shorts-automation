@@ -27,7 +27,7 @@ services:
     ports:
       - "2181:2181"
     healthcheck:
-      test: [ "CMD", "bash", "-c", "echo 'ruok' | nc localhost 2181 | grep 'imok'" ]
+      test: [ "CMD", "/usr/bin/nc", "-z", "localhost", "2181" ]
       interval: 10s
       timeout: 5s
       retries: 5
