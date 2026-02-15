@@ -7,13 +7,25 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.net.URL
+import java.util.concurrent.TimeUnit
+import org.slf4j.LoggerFactory
 
 @Service
 class PexelsService(
     @Value("\${pexels.api-key}") private val apiKey: String,
     private val geminiService: GeminiService
 ) {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(PexelsService::class.java)
+    }
+
+    private val MAX_DOWNLOAD_BYTES = 50L * 1024 * 1024 // 50MB limit
 
     fun downloadVerifiedVideo(keyword: String, context: String, outputFile: File): Boolean {
         // 1. Search Pexels
@@ -23,8 +35,8 @@ class PexelsService(
             .addHeader("Authorization", apiKey)
             .build()
             
-            println("🔎 Pexels Searching: '$keyword'")
-            println("🔑 Pexels API Key: ${if (apiKey.isNotBlank()) "YES (${apiKey.take(3)}...)" else "NO"}")
+            logger.info("Pexels Searching: '{}'", keyword)
+            logger.info("Pexels API Key: {}", if (apiKey.isNotBlank()) "YES (${apiKey.take(3)}...)" else "NO")
 
         var bestVideoUrl = ""
 
@@ -33,25 +45,24 @@ class PexelsService(
                 val bodyString = try {
                     response.body?.string() ?: "{}"
                 } catch (e: Exception) {
-                    println("❌ Error reading Pexels response body: ${e.message}")
+                    logger.error("Error reading Pexels response body: {}", e.message)
                     "{}"
                 }
                 
-                println("📡 Pexels Response Code: ${response.code}")
-                // println("📡 Pexels Body: ${bodyString.take(500)}...") // Commented out to prevent crash
+                logger.info("Pexels Response Code: {}", response.code)
 
                 if (!response.isSuccessful) {
-                    println("❌ Pexels API Error: ${response.message}")
+                    logger.error("Pexels API Error: {}", response.message)
                     return false
                 }
                 
                 val videos = JSONObject(bodyString).optJSONArray("videos")
                 if (videos == null || videos.length() == 0) {
-                    println("⚠️ No videos found in API response for '$keyword'")
+                    logger.warn("No videos found in API response for '{}'", keyword)
                     return false
                 }
                 
-                println("🎥 Found ${videos.length()} candidates for '$keyword'")
+                logger.info("Found {} candidates for '{}'", videos.length(), keyword)
 
                 // 2. Loop & Verify
                 for (i in 0 until videos.length()) {
@@ -59,42 +70,53 @@ class PexelsService(
                     val thumb = v.getString("image") // Thumbnail URL
                     
                     
-                    println("  Candidate #$i: checking vision... (SKIPPING for Debug)")
-                    println("  Thumbnail: $thumb")
+                    logger.info("Candidate #{}: checking vision... (SKIPPING for Debug)", i)
+                    logger.info("Thumbnail: {}", thumb)
 
                     // ** VISION CHECK (Bypassed) **
                     if (true) { // geminiService.verifyImage(thumb, context)
-                        println("  ✅ Vision Check Passed (Bypassed)!")
+                        logger.info("Vision Check Passed (Bypassed)!")
                         // Find HD Link
                         val files = v.getJSONArray("video_files")
                         for (j in 0 until files.length()) {
                             val f = files.getJSONObject(j)
                             if (f.getInt("width") >= 720) {
                                 bestVideoUrl = f.getString("link")
-                                println("  ✅ Found HD Link: $bestVideoUrl")
+                                logger.info("Found HD Link: {}", bestVideoUrl)
                                 break
                             }
                         }
                         if (bestVideoUrl.isNotEmpty()) break
                     } else {
-                        println("  ❌ Vision Check Failed.")
+                        logger.error("Vision Check Failed.")
                     }
                 }
             }
         } catch (e: Exception) {
-            println("❌ Pexels Network/Parsing Error: ${e.message}")
-            e.printStackTrace()
+            logger.error("Pexels Network/Parsing Error: {}", e.message, e)
             return false
         }
 
         if (bestVideoUrl.isEmpty()) {
-            println("⚠️ No relevant video found for '$keyword'.")
+            logger.warn("No relevant video found for '{}'.", keyword)
             return false
         }
 
-        // 3. Download
-        URL(bestVideoUrl).openStream().use { input ->
-            outputFile.outputStream().use { output -> input.copyTo(output) }
+        // 3. Download with size limit
+        val downloadRequest = Request.Builder().url(bestVideoUrl).build()
+        client.newCall(downloadRequest).execute().use { downloadResponse ->
+            if (!downloadResponse.isSuccessful) {
+                logger.error("Pexels Download Error: {}", downloadResponse.code)
+                return false
+            }
+            val contentLength = downloadResponse.body?.contentLength() ?: -1
+            if (contentLength > MAX_DOWNLOAD_BYTES) {
+                logger.warn("Video too large ({}MB), skipping", contentLength / 1024 / 1024)
+                return false
+            }
+            downloadResponse.body?.byteStream()?.use { input ->
+                outputFile.outputStream().use { output -> input.copyTo(output) }
+            }
         }
         return true
     }
@@ -107,12 +129,12 @@ class PexelsService(
             .addHeader("Authorization", apiKey)
             .build()
 
-        println("🔎 Pexels Photo Search: '$keyword'")
+        logger.info("Pexels Photo Search: '{}'", keyword)
 
         return try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    println("❌ Pexels Photo Error: ${response.code}")
+                    logger.error("Pexels Photo Error: {}", response.code)
                     return null
                 }
                 
@@ -121,7 +143,7 @@ class PexelsService(
                 val photos = json.optJSONArray("photos")
                 
                 if (photos == null || photos.length() == 0) {
-                    println("⚠️ No photos found for '$keyword'")
+                    logger.warn("No photos found for '{}'", keyword)
                     return null
                 }
                 
@@ -130,11 +152,11 @@ class PexelsService(
                 val src = photo.getJSONObject("src")
                 val url = src.getString("large2x") // High res URL
                 
-                println("✅ Found Thumbnail Candidate: $url")
+                logger.info("Found Thumbnail Candidate: {}", url)
                 url
             }
         } catch (e: Exception) {
-            println("❌ Pexels Photo Exception: ${e.message}")
+            logger.error("Pexels Photo Exception: {}", e.message)
             null
         }
     }

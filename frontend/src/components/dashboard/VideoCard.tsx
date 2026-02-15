@@ -13,6 +13,7 @@ import {
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { VideoHistory } from '../../types';
+import { showInfo } from '../../lib/toast';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
     return twMerge(clsx(inputs));
@@ -29,7 +30,7 @@ interface VideoCardProps {
     t: any;
 }
 
-export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, onRetry, t }, ref) => {
+export const VideoCard = React.memo(React.forwardRef<HTMLDivElement, VideoCardProps>(({ video, onDownload, onRegenerateMetadata, onManualUpload, onUpdateStatus, onDelete, onRetry, t }, ref) => {
     const statusColors: Record<string, { bg: string, text: string, border: string, icon: any, label: string }> = {
         'SCRIPTING': { bg: 'bg-amber-500/10', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-500/20', icon: <RefreshCw size={12} className="animate-spin" />, label: 'Scripting' },
         'ASSETS_QUEUED': { bg: 'bg-indigo-500/10', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-500/20', icon: <Clock size={12} />, label: 'Assets Queued' },
@@ -48,15 +49,15 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
 
     const copyTitle = () => {
         navigator.clipboard.writeText(video.title);
-        alert(t.copyTitle);
+        showInfo(t.copyTitle);
     };
 
     const copyDescription = () => {
         const tagsStr = video.tags?.map(t => `#${t}`).join(' ') || '';
-        const sourcesStr = video.sources?.length ? `\n\n📚 출처: ${video.sources.join(', ')}` : '';
+        const sourcesStr = video.sources?.length ? `\n\n출처: ${video.sources.join(', ')}` : '';
         const fullText = `${video.description || video.summary}${sourcesStr}\n\n${tagsStr}`;
         navigator.clipboard.writeText(fullText);
-        alert('설명+출처+태그가 복사되었습니다!');
+        showInfo('설명+출처+태그가 복사되었습니다!');
     };
 
     const getSourceUrl = (source: string) => {
@@ -108,7 +109,7 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
                                 </button>
                             </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2 font-medium" dangerouslySetInnerHTML={{ __html: video.summary }} />
+                            <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-2 font-medium">{video.summary}</p>
                         </div>
                     </div>
 
@@ -239,6 +240,6 @@ export const VideoCard = React.forwardRef<HTMLDivElement, VideoCardProps>(({ vid
             </div>
         </div>
     );
-});
+}));
 
 VideoCard.displayName = 'VideoCard';

@@ -64,12 +64,12 @@ class CleanupService(
     fun deleteVideoFile(filePath: String): Boolean {
         if (filePath.isBlank()) return false
         val file = File(filePath)
+        val allowedBase = File(sharedDataPath).canonicalPath
+        if (!file.canonicalPath.startsWith(allowedBase)) {
+            println("🛡️ [Security] Blocked deletion outside shared-data: ${file.canonicalPath}")
+            return false
+        }
         if (file.exists()) {
-            // Safety: Ensure we only delete files related to this channel or shared-data
-            // Simple check: does path contain channelId? (e.g. /app/shared-data/videos/science/...)
-            // Unless it's an absolute path outside?
-            // For now, allow deletion if it exists, as it's Admin requested.
-            // But let's log it.
             println("🗑️ [Manual/Admin] Deleting file: ${file.absolutePath}")
             return file.delete()
         }

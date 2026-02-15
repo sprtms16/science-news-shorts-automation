@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { showSuccess, showError, confirmAction } from '../lib/toast';
 import '../App.css';
 
 interface BgmEntity {
@@ -17,13 +18,7 @@ const BgmManager: React.FC = () => {
     const [isDragging, setIsDragging] = useState(false);
     const [bgmList, setBgmList] = useState<BgmEntity[]>([]);
 
-    useEffect(() => {
-        fetchBgmList();
-        const interval = setInterval(fetchBgmList, 3000); // Poll every 3 seconds
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchBgmList = async () => {
+    const fetchBgmList = useCallback(async () => {
         try {
             const res = await fetch('/api/science/admin/bgm/list');
             if (res.ok) {
@@ -33,7 +28,13 @@ const BgmManager: React.FC = () => {
         } catch (e) {
             console.error("Failed to fetch BGM list", e);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchBgmList();
+        const interval = setInterval(fetchBgmList, 3000);
+        return () => clearInterval(interval);
+    }, [fetchBgmList]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -77,48 +78,48 @@ const BgmManager: React.FC = () => {
 
             if (response.ok) {
                 const data = await response.json();
-                setSelectedFiles([]); // Clear selection after success
-                fetchBgmList(); // Immediate refresh
-                alert(`Upload Queued! (New: ${data.uploaded}, Duplicates: ${data.duplicates})`);
+                setSelectedFiles([]);
+                fetchBgmList();
+                showSuccess(`Upload Queued! (New: ${data.uploaded}, Duplicates: ${data.duplicates})`);
             } else {
-                alert("Upload failed: " + response.statusText);
+                showError("Upload failed: " + response.statusText);
             }
         } catch (error) {
             console.error("Error uploading:", error);
-            alert("Upload error. Check console.");
+            showError("Upload error. Check console.");
         } finally {
             setUploading(false);
         }
     };
 
     const handleRetry = async (id: string) => {
-        if (!confirm("Retry AI verification for this item?")) return;
+        if (!await confirmAction("Retry AI verification for this item?")) return;
         try {
             const res = await fetch(`/api/science/admin/bgm/retry/${id}`, { method: 'POST' });
             if (res.ok) {
-                alert("Retry initiated!");
+                showSuccess("Retry initiated!");
                 fetchBgmList();
             } else {
-                alert("Retry failed");
+                showError("Retry failed");
             }
         } catch (e) {
             console.error(e);
-            alert("Retry Error");
+            showError("Retry Error");
         }
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this BGM? This cannot be undone.")) return;
+        if (!await confirmAction("Are you sure you want to delete this BGM? This cannot be undone.")) return;
         try {
             const res = await fetch(`/api/science/admin/bgm/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 fetchBgmList();
             } else {
-                alert("Delete failed");
+                showError("Delete failed");
             }
         } catch (e) {
             console.error(e);
-            alert("Delete Error");
+            showError("Delete Error");
         }
     };
 
@@ -135,11 +136,11 @@ const BgmManager: React.FC = () => {
             if (res.ok) {
                 fetchBgmList();
             } else {
-                alert("Update failed");
+                showError("Update failed");
             }
         } catch (e) {
             console.error(e);
-            alert("Update Error");
+            showError("Update Error");
         }
     };
 

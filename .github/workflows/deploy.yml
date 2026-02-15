@@ -41,7 +41,7 @@ jobs:
         run: |
           # Clean up old images
           docker image prune -f
-          
+
           # Build images in parallel first
           docker-compose build --parallel
 
@@ -51,3 +51,7 @@ jobs:
             shorts-science shorts-horror shorts-stocks shorts-history \
             shorts-log-service shorts-renderer renderer-autoscaler \
             frontend-server tailscale
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -f .env

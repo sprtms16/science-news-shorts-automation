@@ -5,9 +5,13 @@ import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
 import java.io.File
+import org.slf4j.LoggerFactory
 
 @Service
 class AudioService {
+    companion object {
+        private val logger = LoggerFactory.getLogger(AudioService::class.java)
+    }
     private val client = OkHttpClient.Builder()
         .connectTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(120, java.util.concurrent.TimeUnit.SECONDS)
@@ -50,9 +54,9 @@ class AudioService {
             if (sourceFile.exists()) {
                 sourceFile.copyTo(outputFile, overwrite = true)
                 sourceFile.delete() // Clean up temp file from shared-data root
-                println("🔊 TTS saved to workspace: ${outputFile.name}")
+                logger.info("TTS saved to workspace: {}", outputFile.name)
             } else {
-                 println("⚠️ Audio file not found at ${sourceFile.absolutePath}")
+                throw IllegalStateException("TTS audio file not found: ${sourceFile.absolutePath}")
             }
             
             return resJson.optDouble("duration", 5.0) // Mock duration if not enabled in Python yet
@@ -78,17 +82,17 @@ class AudioService {
                 val files = localDir.listFiles { _, name -> name.endsWith(".mp3", ignoreCase = true) || name.endsWith(".wav", ignoreCase = true) }
                 if (files != null && files.isNotEmpty()) {
                     val randomFile = files.random()
-                    println("💿 Using Local BGM ($category): ${randomFile.name}")
+                    logger.info("Using Local BGM ({}): {}", category, randomFile.name)
                     randomFile.copyTo(outputFile, overwrite = true)
                     return true
                 }
             }
         } catch (e: Exception) {
-            println("⚠️ Local BGM Selection Failed: ${e.message}")
+            logger.warn("Local BGM Selection Failed: {}", e.message)
         }
 
         // 2. Fallback to AI Generation
-        println("🎵 Requesting AI BGM: '$prompt' ($duration sec)")
+        logger.info("Requesting AI BGM: '{}' ({} sec)", prompt, duration)
         val json = JSONObject().put("prompt", prompt).put("duration", duration).toString()
         val request = Request.Builder()
             .url(BGM_SERVICE_URL)
@@ -98,7 +102,7 @@ class AudioService {
         try {
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
-                    println("❌ BGM Generation Error: ${response.message}")
+                    logger.error("BGM Generation Error: {}", response.message)
                     return false
                 }
                 
@@ -110,12 +114,12 @@ class AudioService {
                 if (sourceFile.exists()) {
                     sourceFile.copyTo(outputFile, overwrite = true)
                     sourceFile.delete()
-                    println("✅ AI BGM saved: ${outputFile.name}")
+                    logger.info("AI BGM saved: {}", outputFile.name)
                     return true
                 }
             }
         } catch (e: Exception) {
-            println("❌ BGM Network Error: ${e.message}")
+            logger.error("BGM Network Error: {}", e.message)
         }
         return false
     }

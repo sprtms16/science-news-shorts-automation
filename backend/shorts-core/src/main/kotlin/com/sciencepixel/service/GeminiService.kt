@@ -13,6 +13,7 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.random.Random
+import org.slf4j.LoggerFactory
 
 
 
@@ -48,6 +49,7 @@ class GeminiService(
     
     // 할당량 제한 정의 (기본값 설정, 개별 모델별 429 응답 시 쿨다운으로 대응)
     companion object {
+        private val logger = LoggerFactory.getLogger(GeminiService::class.java)
         private const val MAX_RPM = 15 // Flash 모델 기준 (Pro는 429로 감지)
         private const val MAX_TPM = 1_000_000
         private const val MAX_RPD = 1500
@@ -67,8 +69,8 @@ class GeminiService(
 
     // 각 (키 + 모델) 조합별 할당량 추적 클래스
     private class QuotaTracker {
-        val requestTimestamps = mutableListOf<Long>()
-        val tokenUsages = mutableListOf<Pair<Long, Int>>()
+        val requestTimestamps = java.util.concurrent.CopyOnWriteArrayList<Long>()
+        val tokenUsages = java.util.concurrent.CopyOnWriteArrayList<Pair<Long, Int>>()
         var dailyRequestCount = 0
         var lastResetDate = java.time.LocalDate.now()
         var failureCount = AtomicInteger(0)
@@ -81,7 +83,7 @@ class GeminiService(
             if (today != lastResetDate) {
                 dailyRequestCount = 0
                 lastResetDate = today
-                println("📅 Daily quota reset for a model combination.")
+                logger.info("Daily quota reset for a model combination.")
             }
         }
 
@@ -139,8 +141,8 @@ class GeminiService(
                 combinedQuotas["$key:$model"] = QuotaTracker()
             }
         }
-        println("🔑 Gemini API Keys Loaded: ${apiKeys.size}개, Models: ${SUPPORTED_MODELS.size}개")
-        println("🚀 Total Daily Capacity: ${apiKeys.size * SUPPORTED_MODELS.size * MAX_RPD} requests")
+        logger.info("Gemini API Keys Loaded: {} keys, Models: {}", apiKeys.size, SUPPORTED_MODELS.size)
+        logger.info("Total Daily Capacity: {} requests", apiKeys.size * SUPPORTED_MODELS.size * MAX_RPD)
     }
 
     data class KeyModelSelection(val apiKey: String, val modelName: String)
@@ -191,11 +193,11 @@ class GeminiService(
             
             if (selection == null) {
                 if (triedCombinations.size >= totalPossibleCombinations) {
-                    println("❌ All $totalPossibleCombinations Gemini Key/Model combinations exhausted.")
+                    logger.error("All {} Gemini Key/Model combinations exhausted.", totalPossibleCombinations)
                     return@repeat
                 }
                 val jitter = (Random.nextLong(1, 10)) * 1000L
-            println("⏳ No available Key/Model pairs right now. Waiting ${5 + jitter / 1000} seconds... (${attempt + 1}/$effectiveMaxAttempts)")
+            logger.warn("No available Key/Model pairs right now. Waiting {} seconds... ({}/{})", 5 + jitter / 1000, attempt + 1, effectiveMaxAttempts)
             Thread.sleep(5000 + jitter)
             return@repeat
             }
@@ -230,30 +232,30 @@ class GeminiService(
                         }
                         429 -> {
                         val jitter = Random.nextLong(1, 60) * 1000L
-                        println("⚠️ Rate Limit (429) for: $combinedKey. Transient cooldown 1m + ${jitter/1000}s jitter. (${triedCombinations.size}/$totalPossibleCombinations)")
+                        logger.warn("Rate Limit (429) for: {}. Transient cooldown 1m + {}s jitter. ({}/{})", combinedKey, jitter/1000, triedCombinations.size, totalPossibleCombinations)
                         tracker.recordFailure(60_000L + jitter) // 1 minute + jitter
                         lastError = Exception("Rate limit exceeded (429)")
                     }
                         400, 404 -> {
-                            println("🚫 Invalid Model or Request ($responseCode) for: $combinedKey. Long cooldown 1h. Skip this combination.")
+                            logger.warn("Invalid Model or Request ({}) for: {}. Long cooldown 1h. Skip this combination.", responseCode, combinedKey)
                             tracker.recordFailure(3600_000L) // 1 hour for invalid endpoints/models
                             lastError = Exception("Permanent API error ($responseCode)")
                         }
                         else -> {
-                            println("⚠️ Gemini Error: $responseCode - $text. Default cooldown 5m.")
+                            logger.warn("Gemini Error: {} - {}. Default cooldown 5m.", responseCode, text)
                             tracker.recordFailure(5 * 60_000L) // 5 minutes for general errors
                             lastError = Exception("Gemini API error: $responseCode")
                         }
                     }
                 }
             } catch (e: Exception) {
-                println("❌ Gemini Connection Error: ${e.message}")
+                logger.error("Gemini Connection Error: {}", e.message)
                 tracker.recordFailure()
                 lastError = e
             }
         }
         
-        println("❌ All possible combinations failed. Last Error: ${lastError?.message}")
+        logger.error("All possible combinations failed. Last Error: {}", lastError?.message)
         
         // Kafka 기반 재시도를 위해 구체적인 예외 발생
         val errorMsg = lastError?.message ?: "Unknown Gemini Error"
@@ -375,10 +377,10 @@ class GeminiService(
                 description = "AI-generated success patterns from high-performing videos ($channelId)"
             ))
             
-            println("📈 Channel Growth Analysis Complete for $channelId:\n$finalInsights")
+            logger.info("Channel Growth Analysis Complete for {}:\n{}", channelId, finalInsights)
             finalInsights
         } catch (e: Exception) {
-            println("❌ Growth Analysis Error for $channelId: ${e.message}")
+            logger.error("Growth Analysis Error for {}: {}", channelId, e.message)
             "Error parsing insights."
         }
     }
@@ -507,7 +509,7 @@ class GeminiService(
         )
         
         promptRepository.save(promptToSave)
-        println("✅ Refreshed System Prompt '$promptId' for channel '$effectiveChannelId'")
+        logger.info("Refreshed System Prompt '{}' for channel '{}'", promptId, effectiveChannelId)
     }
 
     // 1. 한국어 대본 작성
@@ -517,7 +519,7 @@ class GeminiService(
         var promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
         
         if (promptTemplate == null) {
-            println("ℹ️ Prompt '$promptId' for $effectiveChannelId not found in DB. Saving default.")
+            logger.info("Prompt '{}' for {} not found in DB. Saving default.", promptId, effectiveChannelId)
             refreshSystemPrompts(effectiveChannelId)
             promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
         }
@@ -556,17 +558,17 @@ class GeminiService(
                 val promptFeedback = jsonResponse.optJSONObject("promptFeedback")
                 val blockReason = promptFeedback?.optString("blockReason")
                 if (blockReason != null) {
-                    println("🛡️ Gemini Blocked by Safety: $blockReason")
+                    logger.warn("Gemini Blocked by Safety: {}", blockReason)
                     throw Exception("GEMINI_SAFETY_BLOCKED: $blockReason")
                 }
-                println("⚠️ No candidates in Gemini response. Possible safety block without detail.")
+                logger.warn("No candidates in Gemini response. Possible safety block without detail.")
                 throw Exception("GEMINI_NO_CANDIDATES")
             }
 
             val candidate = candidates.getJSONObject(0)
             val finishReason = candidate.optString("finishReason")
             if (finishReason == "SAFETY") {
-                println("🛡️ Gemini Candidate blocked by SAFETY")
+                logger.warn("Gemini Candidate blocked by SAFETY")
                 throw Exception("GEMINI_SAFETY_BLOCKED")
             }
 
@@ -612,11 +614,11 @@ class GeminiService(
             }
             val mood = parsedContent.optString("mood", "tech")
             
-            println("✅ Script Generated: ${scenes.size} scenes, Mood: $mood, Title: $titleRes")
+            logger.info("Script Generated: {} scenes, Mood: {}, Title: {}", scenes.size, mood, titleRes)
             ScriptResponse(scenes, mood, titleRes, descRes, tagsList, sourcesList)
         } catch (e: Exception) {
-            println("❌ Script Parse Error: ${e.message}")
-            println("Response: ${responseText.take(500)}")
+            logger.error("Script Parse Error: {}", e.message)
+            logger.error("Response: {}", responseText.take(500))
             ScriptResponse(emptyList(), "tech", title = title, description = summary, tags = listOf("Science", "Technology", "Shorts"))
         }
     }
@@ -693,7 +695,7 @@ class GeminiService(
                 sources = parsedContent.optJSONArray("sources")?.let { arr -> (0 until arr.length()).map { arr.getString(it) } } ?: emptyList()
             )
         } catch (e: Exception) {
-            println("❌ Morning Script Parse Error: ${e.message}")
+            logger.error("Morning Script Parse Error: {}", e.message)
             ScriptResponse(emptyList(), "finance")
         }
     }
@@ -716,7 +718,7 @@ class GeminiService(
 
         val selection = getSmartKeyAndModel()
         if (selection == null) {
-            println("⚠️ Vision Check: No available Key/Model pairs.")
+            logger.warn("Vision Check: No available Key/Model pairs.")
             return true
         }
         
@@ -751,34 +753,35 @@ class GeminiService(
             val requestBody = RequestBody.create("application/json".toMediaType(), jsonBody.toString())
             val request = Request.Builder().url(url).post(requestBody).build()
 
-            val response = client.newCall(request).execute()
-            val text = response.body?.string() ?: ""
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string() ?: ""
 
-            if (response.code == 200) {
-                val jsonResponse = JSONObject(text)
-                val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
-                tracker.recordSuccess(tokens)
-                
-                val answer = jsonResponse
-                    .getJSONArray("candidates")
-                    .getJSONObject(0)
-                    .getJSONObject("content")
-                    .getJSONArray("parts")
-                    .getJSONObject(0)
-                    .getString("text")
-                    .trim()
-                    .uppercase()
+                if (response.code == 200) {
+                    val jsonResponse = JSONObject(text)
+                    val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
+                    tracker.recordSuccess(tokens)
 
-                val isRelevant = answer.contains("YES")
-                println("  Vision Check: $keyword -> $answer (Relevant: $isRelevant)")
-                isRelevant
-            } else {
-                println("⚠️ Vision API Error: ${response.code} - $text")
-                tracker.recordFailure()
-                true
+                    val answer = jsonResponse
+                        .getJSONArray("candidates")
+                        .getJSONObject(0)
+                        .getJSONObject("content")
+                        .getJSONArray("parts")
+                        .getJSONObject(0)
+                        .getString("text")
+                        .trim()
+                        .uppercase()
+
+                    val isRelevant = answer.contains("YES")
+                    logger.info("Vision Check: {} -> {} (Relevant: {})", keyword, answer, isRelevant)
+                    isRelevant
+                } else {
+                    logger.warn("Vision API Error: {} - {}", response.code, text)
+                    tracker.recordFailure()
+                    true
+                }
             }
         } catch (e: Exception) {
-            println("  Vision Error for '$keyword': ${e.message}")
+            logger.warn("Vision Error for '{}': {}", keyword, e.message)
             tracker.recordFailure()
             true // Default to true on error
         }
@@ -871,7 +874,7 @@ class GeminiService(
             // Do NOT generate scenes. Return empty scenes.
             ScriptResponse(emptyList(), "tech", titleRes, descRes, tagsList, sourcesList)
         } catch (e: Exception) {
-            println("❌ Metadata Regen Error: ${e.message}")
+            logger.error("Metadata Regen Error: {}", e.message)
             ScriptResponse(emptyList(), "tech", currentTitle, currentSummary, listOf("SciencePixel", "Shorts"))
         }
     }
@@ -915,10 +918,10 @@ class GeminiService(
             for (i in 0 until jsonArray.length()) {
                 list.add(jsonArray.getString(i))
             }
-            println("📈 Extracted Trending Tickers: $list")
+            logger.info("Extracted Trending Tickers: {}", list)
             list
         } catch (e: Exception) {
-            println("❌ Ticker Extraction Error: ${e.message}")
+            logger.error("Ticker Extraction Error: {}", e.message)
             emptyList()
         }
     }
@@ -961,7 +964,7 @@ class GeminiService(
             // Basic cleanup
             text.filter { it.isLetterOrDigit() || it.isWhitespace() }.take(50)
         } catch (e: Exception) {
-            println("❌ Keyword Extraction Error: ${e.message}")
+            logger.error("Keyword Extraction Error: {}", e.message)
             "science technology"
         }
     }
@@ -986,13 +989,12 @@ class GeminiService(
 
         val selection = getSmartKeyAndModel() ?: return "calm"
         val apiKey = selection.apiKey
-        // Use Flash model for speed/cost effectiveness on audio
-        val modelName = "gemini-2.0-flash-exp" 
-        
-        val tracker = requireNotNull(combinedQuotas["$apiKey:${selection.modelName}"]) { "Tracker not found for $apiKey" }
+        val modelName = selection.modelName
+
+        val tracker = requireNotNull(combinedQuotas["$apiKey:$modelName"]) { "Tracker not found for $apiKey:$modelName" }
         tracker.recordAttempt()
 
-        val url = "https://generativelanguage.googleapis.com/v1beta/models/${selection.modelName}:generateContent?key=$apiKey"
+        val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
 
         return try {
             val fileBytes = audioFile.readBytes()
@@ -1015,34 +1017,35 @@ class GeminiService(
             val requestBody = RequestBody.create("application/json".toMediaType(), jsonBody.toString())
             val request = Request.Builder().url(url).post(requestBody).build()
 
-            val response = client.newCall(request).execute()
-            val text = response.body?.string() ?: ""
+            client.newCall(request).execute().use { response ->
+                val text = response.body?.string() ?: ""
 
-            if (response.code == 200) {
-                val jsonResponse = JSONObject(text)
-                val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
-                tracker.recordSuccess(tokens)
+                if (response.code == 200) {
+                    val jsonResponse = JSONObject(text)
+                    val tokens = jsonResponse.optJSONObject("usageMetadata")?.optInt("totalTokenCount", 0) ?: 0
+                    tracker.recordSuccess(tokens)
 
-                val answer = jsonResponse.getJSONArray("candidates")
-                    .getJSONObject(0)
-                    .getJSONObject("content")
-                    .getJSONArray("parts")
-                    .getJSONObject(0)
-                    .getString("text")
-                    .trim()
-                    .lowercase()
-                    .replace("\n", "")
-                    .replace("```", "")
-                
-                val validCategories = setOf("futuristic", "suspense", "corporate", "epic", "calm")
-                validCategories.find { answer.contains(it) } ?: "calm"
-            } else {
-                println("⚠️ Audio Classification Error: ${response.code} - $text")
-                tracker.recordFailure()
-                "calm"
+                    val answer = jsonResponse.getJSONArray("candidates")
+                        .getJSONObject(0)
+                        .getJSONObject("content")
+                        .getJSONArray("parts")
+                        .getJSONObject(0)
+                        .getString("text")
+                        .trim()
+                        .lowercase()
+                        .replace("\n", "")
+                        .replace("```", "")
+
+                    val validCategories = setOf("futuristic", "suspense", "corporate", "epic", "calm")
+                    validCategories.find { answer.contains(it) } ?: "calm"
+                } else {
+                    logger.warn("Audio Classification Error: {} - {}", response.code, text)
+                    tracker.recordFailure()
+                    "calm"
+                }
             }
         } catch (e: Exception) {
-            println("❌ Audio Analysis Exception: ${e.message}")
+            logger.error("Audio Analysis Exception: {}", e.message)
             tracker.recordFailure()
             "calm"
         }
@@ -1113,8 +1116,7 @@ class GeminiService(
                 summary = parsedContent.getString("summary")
             )
         } catch (e: Exception) {
-            println("❌ Error generating science news: ${e.message}")
-            e.printStackTrace()
+            logger.error("Error generating science news: {}", e.message, e)
             GeneratedNews(
                 title = "${topic}에 대한 놀라운 발견!",
                 summary = "$topic 에 대한 새로운 연구 결과가 발표되었습니다. 이 발견은 우리의 자연에 대한 이해를 바꿀 수 있습니다."
@@ -1167,11 +1169,11 @@ class GeminiService(
             
             val isDuplicate = candidateText.contains("YES")
             if (isDuplicate) {
-                println("🤖 Gemini Semantic Check ($channelId): DUPLICATE detected for '$newTitle'")
+                logger.info("Gemini Semantic Check ({}): DUPLICATE detected for '{}'", channelId, newTitle)
             }
             isDuplicate
         } catch (e: Exception) {
-            println("❌ Similarity Check Error for $channelId: ${e.message}")
+            logger.error("Similarity Check Error for {}: {}", channelId, e.message)
             false 
         }
     }
@@ -1225,11 +1227,11 @@ class GeminiService(
             
             val isUnsafe = candidateText.contains("UNSAFE")
             if (isUnsafe) {
-                println("⛔ Safety Filter ($channelId): UNSAFE topic detected for '$title'")
+                logger.warn("Safety Filter ({}): UNSAFE topic detected for '{}'", channelId, title)
             }
             !isUnsafe // Return TRUE if SAFE
         } catch (e: Exception) {
-            println("❌ Safety Check Error for $channelId: ${e.message}")
+            logger.error("Safety Check Error for {}: {}", channelId, e.message)
             true // Default to SAFE
         }
     }
