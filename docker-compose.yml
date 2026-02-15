@@ -55,9 +55,10 @@ services:
       TZ: Asia/Seoul
     healthcheck:
       test: [ "CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list" ]
-      interval: 15s
+      interval: 10s
       timeout: 10s
-      retries: 10
+      retries: 20
+      start_period: 60s
     restart: unless-stopped
 
   ai-media-service:
