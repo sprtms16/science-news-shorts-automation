@@ -175,7 +175,7 @@ class ProductionService(
                             throw RuntimeException("Video file invalid for scene $i")
                         }
 
-                        // 오디오 생성 (atempo=1.15가 FFmpeg에서 적용되므로 duration 조정 불필요)
+                        // 오디오 생성 (atempo=1.15가 FFmpeg에서 적용되므로 duration 조정 필요)
                         println("🎙️ [Scene $i] Generating audio: $cleanSentence")
                         val rawDuration = try {
                             audioService.generateAudio(cleanSentence, audioFile)
@@ -183,7 +183,8 @@ class ProductionService(
                             println("⚠️ [Scene $i] Audio generation failed: ${e.message}. Using default duration 5.0s")
                             5.0
                         }
-                        val effectiveDuration = rawDuration
+                        // atempo=1.15 적용 시 실제 재생 시간이 짧아지므로 SRT 타이밍 조정
+                        val effectiveDuration = rawDuration / 1.15
 
                         println("✂️ [Scene $i] Editing scene (duration: ${String.format("%.2f", effectiveDuration)}s)")
                         editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
@@ -417,14 +418,15 @@ class ProductionService(
                 }
             }
 
-            // 2. Audio (Edge-TTS) - atempo=1.15가 FFmpeg에서 적용되므로 duration 조정 불필요
+            // 2. Audio (Edge-TTS) - atempo=1.15가 FFmpeg에서 적용되므로 duration 조정 필요
             val rawDuration = try {
                  audioService.generateAudio(scene.sentence, audioFile)
             } catch (e: Exception) {
                 println("⚠️ Audio generation failed: ${e.message}")
                 5.0
             }
-            val effectiveDuration = rawDuration
+            // atempo=1.15 적용 시 실제 재생 시간이 짧아지므로 SRT 타이밍 조정
+            val effectiveDuration = rawDuration / 1.15
 
             // 3. Edit Scene (1.15x speed-up applied inside)
             editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
