@@ -536,15 +536,19 @@ class ProductionService(
     }
 
     // Helper function to calculate visual width of text (CJK characters are 2x wider)
-    private fun visualWidth(text: String): Int = text.sumOf {
-        when {
-            it.code in 0xAC00..0xD7AF -> 2  // 한글 (가-힣)
-            it.code in 0x3131..0x318E -> 2  // 한글 자모
-            it.code in 0x4E00..0x9FFF -> 2  // 한자 (CJK Unified Ideographs)
-            it.code in 0x3040..0x309F -> 2  // 히라가나
-            it.code in 0x30A0..0x30FF -> 2  // 가타카나
-            else -> 1  // 영문, 숫자, 기호
+    private fun visualWidth(text: String): Int {
+        var width = 0
+        for (char in text) {
+            width += when {
+                char.code in 0xAC00..0xD7AF -> 2  // 한글 (가-힣)
+                char.code in 0x3131..0x318E -> 2  // 한글 자모
+                char.code in 0x4E00..0x9FFF -> 2  // 한자 (CJK Unified Ideographs)
+                char.code in 0x3040..0x309F -> 2  // 히라가나
+                char.code in 0x30A0..0x30FF -> 2  // 가타카나
+                else -> 1  // 영문, 숫자, 기호
+            }
         }
+        return width
     }
 
     // Helper function to wrap text into chunks of max 2 lines (considering CJK character width)
