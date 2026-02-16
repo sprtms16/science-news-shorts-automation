@@ -18,6 +18,10 @@ services:
       - LABELS=self-hosted,linux,x64
       - REPLACE_EXISTING_RUNNER=true
       - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     security_opt:
       - apparmor:unconfined
     volumes:
@@ -34,6 +38,10 @@ services:
       TZ: Asia/Seoul
     ports:
       - "2181:2181"
+    deploy:
+      resources:
+        limits:
+          memory: 768M
     healthcheck:
       test: [ "CMD", "/usr/bin/nc", "-z", "localhost", "2181" ]
       interval: 10s
@@ -85,6 +93,8 @@ services:
       - ~/.cache/huggingface:/root/.cache/huggingface # Model Caching
     deploy:
       resources:
+        limits:
+          memory: 8G
         reservations:
           devices:
             - driver: nvidia
@@ -103,6 +113,10 @@ services:
       - "27017:27017"
     environment:
       - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
@@ -149,7 +163,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 768M
     logging: *default-logging
     restart: unless-stopped
 
@@ -190,7 +204,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 768M
     logging: *default-logging
     restart: unless-stopped
 
@@ -231,7 +245,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 768M
     logging: *default-logging
     restart: unless-stopped
 
@@ -272,7 +286,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 768M
     logging: *default-logging
     restart: unless-stopped
 
@@ -294,7 +308,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 800M
+          memory: 512M
     logging: *default-logging
     restart: unless-stopped
 
@@ -335,7 +349,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 16G
+          memory: 12G
         reservations:
           devices:
             - driver: nvidia
@@ -365,6 +379,10 @@ services:
       - CHECK_INTERVAL=30
       - COOLDOWN_PERIOD=60
       - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     logging: *default-logging
     restart: unless-stopped
 
@@ -376,6 +394,10 @@ services:
     depends_on:
       - tailscale
       - shorts-science
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     logging: *default-logging
     restart: unless-stopped
 
@@ -389,6 +411,10 @@ services:
       - TS_EXTRA_ARGS=--hostname=shorts-admin
       - TS_SERVE_CONFIG=/config/serve.json
       - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     ports:
       - "3000:80"
     volumes:
