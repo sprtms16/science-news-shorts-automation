@@ -345,11 +345,11 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - TZ=Asia/Seoul
-      - JAVA_OPTS=-Xmx8192m -Xms4096m
+      - JAVA_OPTS=-Xmx6144m -Xms3072m
     deploy:
       resources:
         limits:
-          memory: 12G
+          memory: 20G
         reservations:
           devices:
             - driver: nvidia
