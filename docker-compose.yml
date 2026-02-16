@@ -136,7 +136,7 @@ services:
       mongo:
         condition: service_started
       kafka:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - shorts-shared-data:/app/shared-data
       - ./backend/client_secret:/app/client_secret # YouTube OAuth credentials
@@ -178,7 +178,7 @@ services:
       mongo:
         condition: service_started
       kafka:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - shorts-shared-data:/app/shared-data
       - ./backend/client_secret:/app/client_secret
@@ -219,7 +219,7 @@ services:
       mongo:
         condition: service_started
       kafka:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - shorts-shared-data:/app/shared-data
       - ./backend/client_secret:/app/client_secret
@@ -260,7 +260,7 @@ services:
       mongo:
         condition: service_started
       kafka:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - shorts-shared-data:/app/shared-data
       - ./backend/client_secret:/app/client_secret
@@ -324,7 +324,7 @@ services:
       mongo:
         condition: service_started
       kafka:
-        condition: service_healthy
+        condition: service_started
     volumes:
       - shorts-shared-data:/app/shared-data
       - ./backend/client_secret:/app/client_secret
