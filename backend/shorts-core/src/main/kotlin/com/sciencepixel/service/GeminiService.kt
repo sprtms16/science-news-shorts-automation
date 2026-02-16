@@ -451,8 +451,8 @@ class GeminiService(
             [General Hard Rules]
             1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
             2. **Scene Count**: YOU MUST split the story into **exactly 18 scenes**. No more, no less.
-            3. **Sentence Length**: Each scene's sentence MUST be **30-40 Korean characters (글자)** long.
-               This is CRITICAL for timing. Count your characters carefully.
+            3. **Sentence Length**: Each scene's sentence MUST be **25-45 Korean characters (글자)** long.
+               This is CRITICAL for timing. Aim for 30-40 characters when possible, but 25-45 is acceptable.
                BAD (too short, 12자): "이건 놀라운 발견입니다."
                BAD (too long, 50자): "이 발견은 기존의 물리학 법칙을 완전히 뒤집을 수 있는 혁명적인 연구 결과로 평가받고 있습니다."
                GOOD (35자): "이 발견은 기존 물리학의 법칙을 완전히 뒤집을 수 있는 연구 결과입니다."
@@ -636,14 +636,14 @@ class GeminiService(
                 if (attempt < maxAttempts) continue else break
             }
 
-            // === 검증 2: 각 씬 글자 수 30-40 ===
+            // === 검증 2: 각 씬 글자 수 25-45 (완화된 범위) ===
             val invalidScenes = scriptResponse.scenes.mapIndexedNotNull { i, scene ->
                 val len = scene.sentence.length
-                if (len < 30 || len > 40) i to len else null
+                if (len < 25 || len > 45) i to len else null
             }
 
             if (invalidScenes.isNotEmpty()) {
-                logger.warn("⚠️ Scene length validation failed: {} scenes out of 30-40 char range: {}. Retry $attempt/$maxAttempts",
+                logger.warn("⚠️ Scene length validation failed: {} scenes out of 25-45 char range: {}. Retry $attempt/$maxAttempts",
                     invalidScenes.size, invalidScenes.take(3))
                 if (attempt < maxAttempts) continue else break
             }
