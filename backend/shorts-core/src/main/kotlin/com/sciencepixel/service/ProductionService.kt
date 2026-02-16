@@ -118,10 +118,11 @@ class ProductionService(
             val hasSilence: Boolean
         )
 
-        // 씬 처리를 코루틴으로 병렬화
+        // 씬 처리를 코루틴으로 병렬화 (동시 처리 수 제한: 메모리 부족 방지)
+        val limitedDispatcher = Dispatchers.IO.limitedParallelism(2)
         val sceneResults = runBlocking {
             scenes.mapIndexed { i, scene ->
-                async(Dispatchers.IO) {
+                async(limitedDispatcher) {
                     try {
                         val sceneProgress = 10 + ((i.toDouble() / totalScenes) * 50).toInt()
                         val step = "씬 ${i + 1}/${totalScenes} 생성 중 (${scene.keyword})"
