@@ -521,112 +521,149 @@ class GeminiService(
     // 1. 한국어 대본 작성
     fun writeScript(title: String, summary: String, targetChannelId: String? = null): ScriptResponse {
         val effectiveChannelId = targetChannelId ?: channelId
-        val promptId = "script_prompt_v6" 
+        val promptId = "script_prompt_v6"
         var promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
-        
+
         if (promptTemplate == null) {
             logger.info("Prompt '{}' for {} not found in DB. Saving default.", promptId, effectiveChannelId)
             refreshSystemPrompts(effectiveChannelId)
             promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
         }
-        
+
         // Inject Growth Insights
         val insights = systemSettingRepository.findByChannelIdAndKey(effectiveChannelId, "CHANNEL_GROWTH_INSIGHTS")?.value ?: ""
-        val insightsSection = if (insights.isNotBlank()) {
-            "\n\n[Current Channel Success Insights (APPLY THESE)]\n$insights\n"
-        } else ""
 
         val todayStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy년 M월 d일"))
-        
+
         val prompt = (promptTemplate ?: getDefaultScriptPrompt(effectiveChannelId))
             .replace("{title}", title)
             .replace("{summary}", summary)
             .replace("{today}", todayStr)
-        
-        // Let's modify the prompt construction slightly to be safer
+
         val finalPrompt = if (insights.isNotBlank()) {
             prompt.replace("[Rules]", "[Channel Success Insights]\n$insights\n\n[Rules]")
         } else {
             prompt
         }
-        
-        val responseText = callGeminiWithRetry(finalPrompt, effectiveChannelId) ?: return ScriptResponse(emptyList(), "tech")
-        
-        // ... rest of the function ... (I will keep the rest same, just replacing the top part)
 
-        
-        return try {
-            val jsonResponse = JSONObject(responseText)
-            val candidates = jsonResponse.optJSONArray("candidates")
-            
-            if (candidates == null || candidates.length() == 0) {
-                // Check if blocked by safety
-                val promptFeedback = jsonResponse.optJSONObject("promptFeedback")
-                val blockReason = promptFeedback?.optString("blockReason")
-                if (blockReason != null) {
-                    logger.warn("Gemini Blocked by Safety: {}", blockReason)
-                    throw Exception("GEMINI_SAFETY_BLOCKED: $blockReason")
+        // === 검증 & 재시도 로직 ===
+        var attempt = 0
+        val maxAttempts = 3
+
+        while (attempt < maxAttempts) {
+            attempt++
+
+            val responseText = callGeminiWithRetry(finalPrompt, effectiveChannelId)
+            if (responseText == null) {
+                logger.warn("Gemini API returned null. Retry $attempt/$maxAttempts")
+                if (attempt < maxAttempts) continue else return ScriptResponse(emptyList(), "tech")
+            }
+
+            val scriptResponse = try {
+                val jsonResponse = JSONObject(responseText)
+                val candidates = jsonResponse.optJSONArray("candidates")
+
+                if (candidates == null || candidates.length() == 0) {
+                    val promptFeedback = jsonResponse.optJSONObject("promptFeedback")
+                    val blockReason = promptFeedback?.optString("blockReason")
+                    if (blockReason != null) {
+                        logger.warn("Gemini Blocked by Safety: {}", blockReason)
+                        throw Exception("GEMINI_SAFETY_BLOCKED: $blockReason")
+                    }
+                    logger.warn("No candidates in Gemini response. Possible safety block without detail.")
+                    throw Exception("GEMINI_NO_CANDIDATES")
                 }
-                logger.warn("No candidates in Gemini response. Possible safety block without detail.")
-                throw Exception("GEMINI_NO_CANDIDATES")
-            }
 
-            val candidate = candidates.getJSONObject(0)
-            val finishReason = candidate.optString("finishReason")
-            if (finishReason == "SAFETY") {
-                logger.warn("Gemini Candidate blocked by SAFETY")
-                throw Exception("GEMINI_SAFETY_BLOCKED")
-            }
-
-            val content = candidate
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-                .trim()
-                .removePrefix("```json")
-                .removeSuffix("```")
-                .trim()
-
-            val parsedContent = JSONObject(content)
-            
-            // Safe Parsing
-            val titleRes = parsedContent.optString("title", title)
-            val descRes = parsedContent.optString("description", summary)
-            
-            // Tags
-            val tagsList = mutableListOf<String>()
-            val tagsArray = parsedContent.optJSONArray("tags")
-            if (tagsArray != null) {
-                for (i in 0 until tagsArray.length()) {
-                    tagsList.add(tagsArray.getString(i))
+                val candidate = candidates.getJSONObject(0)
+                val finishReason = candidate.optString("finishReason")
+                if (finishReason == "SAFETY") {
+                    logger.warn("Gemini Candidate blocked by SAFETY")
+                    throw Exception("GEMINI_SAFETY_BLOCKED")
                 }
-            }
-            
-            // Sources
-            val sourcesList = mutableListOf<String>()
-            val sourcesArray = parsedContent.optJSONArray("sources")
-            if (sourcesArray != null) {
-                for (i in 0 until sourcesArray.length()) {
-                    sourcesList.add(sourcesArray.getString(i))
+
+                val content = candidate
+                    .getJSONObject("content")
+                    .getJSONArray("parts")
+                    .getJSONObject(0)
+                    .getString("text")
+                    .trim()
+                    .removePrefix("```json")
+                    .removeSuffix("```")
+                    .trim()
+
+                val parsedContent = JSONObject(content)
+
+                val titleRes = parsedContent.optString("title", title)
+                val descRes = parsedContent.optString("description", summary)
+
+                val tagsList = mutableListOf<String>()
+                val tagsArray = parsedContent.optJSONArray("tags")
+                if (tagsArray != null) {
+                    for (i in 0 until tagsArray.length()) {
+                        tagsList.add(tagsArray.getString(i))
+                    }
                 }
+
+                val sourcesList = mutableListOf<String>()
+                val sourcesArray = parsedContent.optJSONArray("sources")
+                if (sourcesArray != null) {
+                    for (i in 0 until sourcesArray.length()) {
+                        sourcesList.add(sourcesArray.getString(i))
+                    }
+                }
+
+                val scenesArray = parsedContent.getJSONArray("scenes")
+                val scenes = (0 until scenesArray.length()).map { i ->
+                    val scene = scenesArray.getJSONObject(i)
+                    Scene(scene.getString("sentence"), scene.getString("keyword"))
+                }
+                val mood = parsedContent.optString("mood", "tech")
+
+                ScriptResponse(scenes, mood, titleRes, descRes, tagsList, sourcesList)
+            } catch (e: Exception) {
+                logger.error("Script Parse Error (attempt $attempt/$maxAttempts): {}", e.message)
+                logger.error("Response: {}", responseText.take(500))
+                if (attempt < maxAttempts) continue else return ScriptResponse(emptyList(), "tech", title = title, description = summary, tags = listOf("Science", "Technology", "Shorts"))
             }
 
-            // Scenes
-            val scenesArray = parsedContent.getJSONArray("scenes")
-            val scenes = (0 until scenesArray.length()).map { i ->
-                val scene = scenesArray.getJSONObject(i)
-                Scene(scene.getString("sentence"), scene.getString("keyword"))
+            // === 검증 1: 씬 개수 = 18 ===
+            if (scriptResponse.scenes.size != 18) {
+                logger.warn("⚠️ Scene count validation failed: {} scenes (expected 18). Retry $attempt/$maxAttempts", scriptResponse.scenes.size)
+                if (attempt < maxAttempts) continue else break
             }
-            val mood = parsedContent.optString("mood", "tech")
-            
-            logger.info("Script Generated: {} scenes, Mood: {}, Title: {}", scenes.size, mood, titleRes)
-            ScriptResponse(scenes, mood, titleRes, descRes, tagsList, sourcesList)
-        } catch (e: Exception) {
-            logger.error("Script Parse Error: {}", e.message)
-            logger.error("Response: {}", responseText.take(500))
-            ScriptResponse(emptyList(), "tech", title = title, description = summary, tags = listOf("Science", "Technology", "Shorts"))
+
+            // === 검증 2: 각 씬 글자 수 30-40 ===
+            val invalidScenes = scriptResponse.scenes.mapIndexedNotNull { i, scene ->
+                val len = scene.sentence.length
+                if (len < 30 || len > 40) i to len else null
+            }
+
+            if (invalidScenes.isNotEmpty()) {
+                logger.warn("⚠️ Scene length validation failed: {} scenes out of 30-40 char range: {}. Retry $attempt/$maxAttempts",
+                    invalidScenes.size, invalidScenes.take(3))
+                if (attempt < maxAttempts) continue else break
+            }
+
+            // === 검증 3: 예상 길이 ===
+            val totalChars = scriptResponse.scenes.sumOf { it.sentence.length }
+            val estimatedRawDuration = totalChars / 10.0  // ~10 한국어 글자/초
+            val adjustedDuration = estimatedRawDuration / 1.15
+
+            logger.info("✓ Script validation passed: 18 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.15x")
+
+            if (adjustedDuration < 43 || adjustedDuration > 58) {
+                logger.warn("⚠️ Duration estimate borderline: ${String.format("%.1f", adjustedDuration)}s (target 50-55s). Retry $attempt/$maxAttempts")
+                if (attempt < maxAttempts) continue else break
+            }
+
+            // === 검증 성공! ===
+            logger.info("Script Generated: {} scenes, Mood: {}, Title: {}", scriptResponse.scenes.size, scriptResponse.mood, scriptResponse.title)
+            return scriptResponse
         }
+
+        // === 모든 재시도 실패 ===
+        logger.error("❌ Script generation failed validation after $maxAttempts attempts")
+        throw RuntimeException("Script validation failed: Scene count/duration out of acceptable range after $maxAttempts retries")
     }
 
     /**

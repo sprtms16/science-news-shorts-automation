@@ -1,7 +1,9 @@
 package com.sciencepixel.service
 
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.repository.PexelsVideoCacheRepository
 import com.sciencepixel.domain.VideoStatus
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.io.File
 import java.time.LocalDateTime
@@ -10,6 +12,7 @@ import java.time.ZoneId
 @Service
 class CleanupService(
     private val repository: VideoHistoryRepository,
+    private val pexelsCacheRepository: PexelsVideoCacheRepository,
     @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
 ) {
     private val sharedDataPath = "shared-data"
@@ -128,7 +131,7 @@ class CleanupService(
 
         val threshold = System.currentTimeMillis() - (24 * 60 * 60 * 1000)
         var count = 0
-        
+
          bgmDir.listFiles()?.forEach { file ->
             if (file.isFile && file.lastModified() < threshold) {
                 if (file.delete()) count++
@@ -137,14 +140,58 @@ class CleanupService(
         println("✅ BGM Cleanup: Removed $count temp files.")
     }
 
+    /**
+     * Clean up old Pexels video cache (unused for 30+ days)
+     * Runs daily at 3 AM
+     */
+    @Scheduled(cron = "0 0 3 * * *")
+    fun cleanupOldPexelsCache() {
+        println("🧹 Cleaning up old Pexels cache (unused for 30+ days)...")
+        val threshold = LocalDateTime.now().minusDays(30)
+        val oldVideos = pexelsCacheRepository.findByLastUsedAtBefore(threshold)
+
+        var deletedCount = 0
+        var deletedSize = 0L
+
+        oldVideos.forEach { cached ->
+            try {
+                val file = File(cached.filePath)
+                if (file.exists()) {
+                    val fileSize = file.length()
+                    if (file.delete()) {
+                        pexelsCacheRepository.delete(cached)
+                        deletedCount++
+                        deletedSize += fileSize
+                        println("🗑️ Deleted cached video: ${cached.pexelsVideoId} (${cached.keyword})")
+                    } else {
+                        println("⚠️ Failed to delete cache file: ${file.absolutePath}")
+                    }
+                } else {
+                    // File doesn't exist, remove DB entry anyway
+                    pexelsCacheRepository.delete(cached)
+                    deletedCount++
+                    println("🗑️ Removed orphaned cache DB entry: ${cached.pexelsVideoId}")
+                }
+            } catch (e: Exception) {
+                println("❌ Error cleaning up cache '${cached.pexelsVideoId}': ${e.message}")
+            }
+        }
+
+        val deletedSizeMB = String.format("%.2f", deletedSize / 1024.0 / 1024.0)
+        println("✅ Pexels Cache Cleanup: $deletedCount videos removed (${deletedSizeMB} MB)")
+    }
+
     fun cleanupAllTemporaryFiles() {
         cleanupOrphanedVideos()
         cleanupOldWorkspaces()
         cleanupAiBgm()
+        cleanupOldPexelsCache()
     }
 
     /**
      * Identify and delete video files that have no corresponding record in the database
+     * IMPORTANT: This only scans shared-data/videos/$channelId
+     * The pexels-cache directory is managed separately by cleanupOldPexelsCache()
      */
     fun cleanupOrphanedVideos() {
         println("🧹 [$channelId] Scanning for orphaned video files in shared-data/videos/$channelId...")
@@ -154,15 +201,21 @@ class CleanupService(
         // Fetch ALL videos to ensure we don't delete false positives
         val allVideos = repository.findByChannelId(channelId)
         val registeredPaths = allVideos.mapNotNull { it.filePath }.filter { it.isNotBlank() }.map { File(it).absolutePath }.toSet()
-        
+
         // Also protect based on "known filenames" from DB even if path isn't exact match (e.g. relative vs absolute)
         val registeredFilenames = allVideos.mapNotNull { it.filePath }.filter { it.isNotBlank() }.map { File(it).name }.toSet()
 
         var count = 0
         videoDir.listFiles()?.forEach { file ->
+            // SAFETY: Explicitly skip pexels-cache directory (should not be in videos/ but be defensive)
+            if (file.absolutePath.contains("pexels-cache")) {
+                println("🛡️ Skipping pexels-cache file: ${file.name}")
+                return@forEach
+            }
+
             // CRITICAL: NEVER delete if file matches a known DB record's filename (even if path differs slightly)
             val isKnownFile = file.absolutePath in registeredPaths || file.name in registeredFilenames
-            
+
             if (file.isFile && !isKnownFile) {
                 // SAFETY: Increase threshold to 24 hours (was 30 mins)
                 // This ensures we never delete a file that is "just being created" or "DB update pending"

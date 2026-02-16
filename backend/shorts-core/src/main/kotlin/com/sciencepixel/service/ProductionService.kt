@@ -21,14 +21,17 @@ class ProductionService(
     private val isLongForm = channelBehavior.isLongForm
     private val videoWidth = if (isLongForm) 1920 else 1080
     private val videoHeight = if (isLongForm) 1080 else 1920
-    private val vfScaleFilter = "scale=$videoWidth:$videoHeight:force_original_aspect_ratio=increase,crop=$videoWidth:$videoHeight"
+    // 블러 배경 필터: 원본 영상 비율 유지하면서 빈 공간은 블러 처리된 배경으로 채움
+    private val vfScaleFilter = "split[bg][fg];[bg]scale=$videoWidth:$videoHeight:force_original_aspect_ratio=increase,crop=$videoWidth:$videoHeight,boxblur=20[bgblur];[fg]scale=$videoWidth:$videoHeight:force_original_aspect_ratio=decrease[fgscaled];[bgblur][fgscaled]overlay=(W-w)/2:(H-h)/2"
     private var useGpuCodec = true // GPU 코덱 사용 여부 (첫 실패 시 false로 전환)
     data class AssetsResult(
         val mood: String,
         val clipPaths: List<String>,
         val durations: List<Double>,
         val subtitles: List<String>,
-        val silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList()
+        val silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList(),
+        val totalRawDuration: Double = 0.0,    // 속도 조정 전 총 길이
+        val adjustedDuration: Double = 0.0     // 1.15x 적용 후 길이 (목표 50-55초)
     )
 
     /**
@@ -171,7 +174,7 @@ class ProductionService(
                             throw RuntimeException("Video file invalid for scene $i")
                         }
 
-                        // 오디오 생성 (1.15배속 적용을 위해 duration 조정)
+                        // 오디오 생성 (atempo=1.15가 FFmpeg에서 적용되므로 duration 조정 불필요)
                         println("🎙️ [Scene $i] Generating audio: $cleanSentence")
                         val rawDuration = try {
                             audioService.generateAudio(cleanSentence, audioFile)
@@ -179,7 +182,7 @@ class ProductionService(
                             println("⚠️ [Scene $i] Audio generation failed: ${e.message}. Using default duration 5.0s")
                             5.0
                         }
-                        val effectiveDuration = rawDuration / 1.15
+                        val effectiveDuration = rawDuration
 
                         println("✂️ [Scene $i] Editing scene (duration: ${String.format("%.2f", effectiveDuration)}s)")
                         editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
@@ -217,14 +220,54 @@ class ProductionService(
             }
             totalDuration += result.duration
         }
-        
-        // Return absolute paths
+
+        // ========== DURATION VALIDATION ==========
+        val totalRawDuration = durations.sum()
+        val adjustedDuration = totalRawDuration / 1.15
+
+        // Check for TTS service failure (all durations = 5.0s default)
+        val allDefaultDurations = durations.all { it == 5.0 }
+        if (allDefaultDurations && durations.size > 5) {
+            println("❌ [DURATION] TTS service down: all ${durations.size} scenes = 5.0s")
+            throw RuntimeException("TTS service failure: all audio durations are default values")
+        }
+
+        // Check for abnormal individual scene durations
+        durations.forEachIndexed { i, dur ->
+            if (dur > 6.0) println("⚠️ [DURATION] Scene $i abnormal: ${String.format("%.2f", dur)}s")
+            if (dur < 1.5) println("⚠️ [DURATION] Scene $i too short: ${String.format("%.2f", dur)}s")
+        }
+
+        // Determine duration status
+        val durationStatus = when {
+            adjustedDuration < 48.0 -> "TOO_SHORT"
+            adjustedDuration > 57.0 -> "TOO_LONG"
+            adjustedDuration < 50.0 || adjustedDuration > 55.0 -> "BORDERLINE"
+            else -> "OPTIMAL"
+        }
+
+        println("=== DURATION VALIDATION ===")
+        println("Video: $title (ID: $videoId)")
+        println("Scenes: ${scenes.size}")
+        println("Raw Duration: ${String.format("%.2f", totalRawDuration)}s")
+        println("Adjusted (1.15x): ${String.format("%.2f", adjustedDuration)}s")
+        println("Status: $durationStatus")
+
+        if (durationStatus in listOf("TOO_SHORT", "TOO_LONG")) {
+            println("⚠️ [DURATION] Duration ${durationStatus}: ${String.format("%.2f", adjustedDuration)}s (target 50-55s)")
+            // Note: Not throwing exception - allowing borderline cases to proceed
+            // Validation is logged for monitoring purposes
+        }
+
+        // Return absolute paths with duration metadata
         return AssetsResult(
-            mood = mood, 
+            mood = mood,
             clipPaths = clipFiles.map { it.absolutePath },
             durations = durations,
             subtitles = subtitles,
-            silenceRanges = silenceRanges
+            silenceRanges = silenceRanges,
+            totalRawDuration = totalRawDuration,
+            adjustedDuration = adjustedDuration
         )
     }
 
@@ -373,14 +416,14 @@ class ProductionService(
                 }
             }
 
-            // 2. Audio (Edge-TTS)
+            // 2. Audio (Edge-TTS) - atempo=1.15가 FFmpeg에서 적용되므로 duration 조정 불필요
             val rawDuration = try {
                  audioService.generateAudio(scene.sentence, audioFile)
             } catch (e: Exception) {
                 println("⚠️ Audio generation failed: ${e.message}")
                 5.0
             }
-            val effectiveDuration = rawDuration / 1.15
+            val effectiveDuration = rawDuration
 
             // 3. Edit Scene (1.15x speed-up applied inside)
             editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
@@ -492,26 +535,44 @@ class ProductionService(
         return executeFFmpeg(cmd, output, "Scene Edit (codec: $videoCodec)", 5)
     }
 
-    // Helper function to wrap text into chunks of max 2 lines
+    // Helper function to calculate visual width of text (CJK characters are 2x wider)
+    private fun visualWidth(text: String): Int = text.sumOf {
+        when {
+            it.code in 0xAC00..0xD7AF -> 2  // 한글 (가-힣)
+            it.code in 0x3131..0x318E -> 2  // 한글 자모
+            it.code in 0x4E00..0x9FFF -> 2  // 한자 (CJK Unified Ideographs)
+            it.code in 0x3040..0x309F -> 2  // 히라가나
+            it.code in 0x30A0..0x30FF -> 2  // 가타카나
+            else -> 1  // 영문, 숫자, 기호
+        }
+    }
+
+    // Helper function to wrap text into chunks of max 2 lines (considering CJK character width)
     private fun wrapTextToChunks(text: String, maxCharsPerLine: Int = if (isLongForm) 40 else 22): List<String> {
         val words = text.split(" ")
         val lines = mutableListOf<String>()
         var currentLine = StringBuilder()
-        
+        var currentWidth = 0
+
         for (word in words) {
+            val wordWidth = visualWidth(word)
+
             if (currentLine.isEmpty()) {
                 currentLine.append(word)
-            } else if (currentLine.length + 1 + word.length <= maxCharsPerLine) {
+                currentWidth = wordWidth
+            } else if (currentWidth + 1 + wordWidth <= maxCharsPerLine) {
                 currentLine.append(" ").append(word)
+                currentWidth += 1 + wordWidth
             } else {
                 lines.add(currentLine.toString())
                 currentLine = StringBuilder(word)
+                currentWidth = wordWidth
             }
         }
         if (currentLine.isNotEmpty()) {
             lines.add(currentLine.toString())
         }
-        
+
         // Group lines into triplets (max 3 lines per subtitle display)
         return lines.chunked(3).map { it.joinToString("\n") }
     }

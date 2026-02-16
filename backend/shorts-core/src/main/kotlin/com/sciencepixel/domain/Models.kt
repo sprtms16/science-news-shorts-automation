@@ -161,3 +161,31 @@ data class YoutubeVideoResponse(
     val videos: List<YoutubeVideoStat>,
     val nextPageToken: String?
 )
+
+/**
+ * Pexels 비디오 캐시
+ * 다운로드한 Pexels 영상을 영구 저장하여 재사용
+ */
+@Document(collection = "pexels_cache")
+@CompoundIndexes(
+    CompoundIndex(name = "keyword_idx", def = "{'keyword': 1}"),
+    CompoundIndex(name = "pexels_id_idx", def = "{'pexelsVideoId': 1}", unique = true),
+    CompoundIndex(name = "last_used_idx", def = "{'lastUsedAt': 1}")
+)
+data class PexelsVideoCache(
+    @Id
+    val id: String? = null,
+    val keyword: String,          // 검색 키워드 (예: "black hole", "DNA")
+    val pexelsVideoId: String,    // Pexels 고유 비디오 ID (중복 방지)
+    val filePath: String,         // 절대 경로: shared-data/pexels-cache/common/[hash]/[video_id].mp4
+    val thumbnailUrl: String,     // Pexels 썸네일 URL
+    val width: Int,               // 영상 너비
+    val height: Int,              // 영상 높이
+    val duration: Double = 0.0,   // 영상 길이 (초)
+    val downloadedAt: LocalDateTime = LocalDateTime.now(),
+    val lastUsedAt: LocalDateTime = LocalDateTime.now(), // 마지막 사용 시간 (정리용)
+    val usageCount: Int = 0,      // 재사용 횟수
+    val visionCheckPassed: Boolean = true,
+    val visionCheckContext: String = "",
+    val channelId: String = "common" // "common" = 전역 캐시, 또는 채널별
+)
