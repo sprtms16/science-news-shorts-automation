@@ -37,7 +37,7 @@ class GeminiService(
             "science" -> "사이언스 픽셀"
             "horror" -> "미스터리 픽셀"
             "stocks" -> "밸류 픽셀"
-            "history" -> "히스토리 픽셀"
+            "history" -> "메모리 픽셀"
             else -> "AI 쇼츠 마스터"
         }
     }
@@ -425,7 +425,7 @@ class GeminiService(
             "history" -> """
                 [Role]
                 You are 'Memory Pixel' (메모리 픽셀), a humanist historian.
-                
+
                 [Core Rules]
                 - **NO GREETINGS**: Start with the tragic or epic moment of the date ({today}) immediately.
                 - Perspective: Human-centric, objective ethics. No glorification of violence.
@@ -459,8 +459,12 @@ class GeminiService(
             4. **Duration**: The total script MUST be **50-55 seconds** when read aloud at normal Korean speech speed.
                At 1.15x playback speed this produces a 43-48 second video. Target approximately 540-720 total Korean characters.
             5. **Language**: MUST BE KOREAN (한국어).
-            6. **Fast Delivery**: Write sentences that are dense and rhythmic, optimized for 1.15x narration speed. Do NOT use filler words, but do NOT make sentences too short either.
-            7. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
+            6. **Tone & Speech Style**: Use formal/polite Korean (존댓말) throughout ALL scenes.
+               End sentences with formal endings: -습니다, -입니다, -됩니다, -있습니다.
+               NEVER use informal speech (반말) like -해, -야, -다, -네, -지.
+               Example: "이것은 놀라운 발견입니다" (GOOD) vs "이것은 놀라운 발견이다" (BAD).
+            7. **Fast Delivery**: Write sentences that are dense and rhythmic, optimized for 1.15x narration speed. Do NOT use filler words, but do NOT make sentences too short either.
+            8. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
             
             [Input]
             Title: {title}
