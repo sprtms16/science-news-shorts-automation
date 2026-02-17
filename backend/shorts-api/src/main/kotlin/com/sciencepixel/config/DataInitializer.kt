@@ -280,11 +280,9 @@ class DataInitializer(
 
         prompts.forEach { prompt ->
             try {
-                val existing = systemPromptRepository.findByChannelIdAndPromptKey(prompt.channelId, prompt.promptKey)
-                if (existing == null) {
-                    systemPromptRepository.save(prompt)
-                    println("✅ Seeded system prompt '${prompt.promptKey}' for ${prompt.channelId}")
-                }
+                systemPromptRepository.deleteAllByChannelIdAndPromptKey(prompt.channelId, prompt.promptKey)
+                systemPromptRepository.save(prompt)
+                println("✅ Seeded system prompt '${prompt.promptKey}' for ${prompt.channelId}")
             } catch (e: Exception) {
                 // Ignore
             }

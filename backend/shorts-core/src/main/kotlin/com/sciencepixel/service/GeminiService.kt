@@ -506,7 +506,7 @@ class GeminiService(
         
         val content = getDefaultScriptPrompt(effectiveChannelId)
         
-        val existing = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)
+        val existing = promptRepository.findFirstByChannelIdAndPromptKey(effectiveChannelId, promptId)
         val promptToSave = existing?.copy(
             content = content,
             description = "Refreshed Niche-aware Script Prompt for $effectiveChannelId",
@@ -526,12 +526,12 @@ class GeminiService(
     fun writeScript(title: String, summary: String, targetChannelId: String? = null): ScriptResponse {
         val effectiveChannelId = targetChannelId ?: channelId
         val promptId = "script_prompt_v6"
-        var promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
+        var promptTemplate = promptRepository.findFirstByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
 
         if (promptTemplate == null) {
             logger.info("Prompt '{}' for {} not found in DB. Saving default.", promptId, effectiveChannelId)
             refreshSystemPrompts(effectiveChannelId)
-            promptTemplate = promptRepository.findByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
+            promptTemplate = promptRepository.findFirstByChannelIdAndPromptKey(effectiveChannelId, promptId)?.content
         }
 
         // Inject Growth Insights
