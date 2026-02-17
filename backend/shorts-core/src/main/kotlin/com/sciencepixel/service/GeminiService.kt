@@ -184,9 +184,8 @@ class GeminiService(
         val triedCombinations = mutableSetOf<String>()
         val totalPossibleCombinations = combinedQuotas.size
         
-        // horror 채널의 경우 리소스 낭비 방지를 위해 최대 시도 횟수를 3회로 제한
-        val channelMaxRetries = if (channelId == "horror") 3 else maxRetries
-        val effectiveMaxAttempts = maxOf(channelMaxRetries, if (channelId == "horror") 3 else totalPossibleCombinations)
+        // 모든 채널이 동일하게 전체 API 키/모델 조합을 시도
+        val effectiveMaxAttempts = totalPossibleCombinations
         
         repeat(effectiveMaxAttempts) { attempt ->
             val selection = getSmartKeyAndModel(triedCombinations)
