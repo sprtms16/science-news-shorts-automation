@@ -8,25 +8,43 @@ services:
   github-runner:
     image: myoung34/github-runner:latest
     container_name: shorts-github-runner
-    restart: always
+    restart: unless-stopped # always에서 변경 - 수동 중지 시 재시작 안 함
     environment:
       - REPO_URL=https://github.com/sprtms16/science-news-shorts-automation
       - RUNNER_NAME=shorts-server-runner
-      - ACCESS_TOKEN=${GITHUB_PAT}
+      - ACCESS_TOKEN=${GITHUB_PAT} # PAT 토큰 (만료 시 수동 갱신 필요)
       - RUNNER_SCOPE=repo
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
       - REPLACE_EXISTING_RUNNER=true
       - TZ=Asia/Seoul
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep Runner.Listener > /dev/null || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s # 초기 60초는 실패 무시
     deploy:
       resources:
         limits:
           memory: 4G
+        reservations:
+          memory: 2G # 최소 2GB 예약
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3 # 3번 실패 시 중지 (무한 재시작 방지)
+        window: 120s
     security_opt:
       - apparmor:unconfined
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./runner-work:/tmp/runner
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
