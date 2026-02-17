@@ -580,8 +580,8 @@ class ProductionService(
             lines.add(currentLine.toString())
         }
 
-        // Group lines into triplets (max 3 lines per subtitle display)
-        return lines.chunked(3).map { it.joinToString("\n") }
+        // Group lines into pairs (max 2 lines per subtitle display)
+        return lines.chunked(2).map { it.joinToString("\n") }
     }
 
     // Phase 2: Generate SRT file with cumulative timestamps
