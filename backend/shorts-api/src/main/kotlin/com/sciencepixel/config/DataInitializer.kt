@@ -106,7 +106,7 @@ class DataInitializer(
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
                     2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing**: Total narration duration is optimized for **50-59 seconds** (assuming 1.10x speed).
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous narrative.
                        - Avoid abrupt topic changes between scenes - use transition words/phrases (그런데, 하지만, 게다가, 이처럼, 바로).
@@ -152,7 +152,7 @@ class DataInitializer(
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
                     2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing**: Total narration duration is optimized for **50-59 seconds** (assuming 1.10x speed).
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous chilling narrative.
                        - Avoid abrupt breaks - use transition phrases (그런데, 하지만, 그 순간, 이후, 결국).
@@ -200,7 +200,7 @@ class DataInitializer(
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
                     2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing**: Total narration duration is optimized for **50-59 seconds** (assuming 1.10x speed).
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous financial narrative.
                        - Avoid abrupt topic changes between scenes - use transition words/phrases (그런데, 하지만, 또한, 이에 따라, 결국).
@@ -248,7 +248,7 @@ class DataInitializer(
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
                     2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing**: Total narration duration is optimized for **50-59 seconds** (assuming 1.10x speed).
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous historical narrative.
                        - Avoid abrupt jumps in time - use transition phrases (그 후, 이어서, 결국, 그 순간, 당시).

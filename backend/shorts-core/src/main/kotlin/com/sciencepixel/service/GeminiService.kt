@@ -451,13 +451,13 @@ class GeminiService(
             [General Hard Rules]
             1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
             2. **Scene Count**: YOU MUST split the story into **exactly 14 scenes**. No more, no less.
-            3. **Sentence Length**: Each scene's sentence MUST be **35-46 Korean characters (글자)** long.
-               This is CRITICAL for timing. Aim for 38-44 characters when possible, but 35-46 is acceptable.
+            3. **Sentence Length**: Each scene's sentence MUST be **33-43 Korean characters (글자)** long.
+               This is CRITICAL for timing. Aim for 38-42 characters. SHORT and PUNCHY sentences only.
                BAD (too short, 12자): "이건 놀라운 발견입니다."
-               BAD (too long, 50자): "이 발견은 기존의 물리학 법칙을 완전히 뒤집을 수 있는 혁명적인 연구 결과로 평가받고 있습니다."
-               GOOD (40자): "이 발견은 기존 물리학의 법칙을 완전히 뒤집을 수 있는 혁명적 연구입니다."
-            4. **Duration**: The total script MUST be **50-59 seconds** when read aloud at normal Korean speech speed.
-               At 1.10x playback speed this produces a 45-54 second video. Target approximately 490-644 total Korean characters.
+               BAD (too long, 48자): "이 발견은 기존의 물리학 법칙을 완전히 뒤집을 수 있는 혁명적인 연구 결과입니다."
+               GOOD (40자): "이 발견은 기존 물리학 법칙을 뒤집을 수 있는 혁명적 연구입니다."
+            4. **Duration**: The total script MUST be **47-55 seconds** when read aloud at normal Korean speech speed.
+               At 1.10x playback speed this produces a 43-50 second video. Target approximately 470-550 total Korean characters.
             5. **Language**: MUST BE KOREAN (한국어).
             6. **Tone & Speech Style**: Use formal/polite Korean (존댓말) throughout ALL scenes.
                End sentences with formal endings: -습니다, -입니다, -됩니다, -있습니다.
@@ -636,27 +636,23 @@ class GeminiService(
                 if (attempt < maxAttempts) continue else break
             }
 
-            // === 검증 2: 각 씬 글자 수 35-46 (1.10x 속도 기준) ===
-            val invalidScenes = scriptResponse.scenes.mapIndexedNotNull { i, scene ->
-                val len = scene.sentence.length
-                if (len < 35 || len > 46) i to len else null
-            }
-
-            if (invalidScenes.isNotEmpty()) {
-                logger.warn("⚠️ Scene length validation failed: {} scenes out of 35-46 char range: {}. Retry $attempt/$maxAttempts",
-                    invalidScenes.size, invalidScenes.take(3))
-                if (attempt < maxAttempts) continue else break
-            }
-
-            // === 검증 3: 예상 길이 ===
+            // === 검증 2: 총 duration 체크 (씬별 글자수 soft 로그만) ===
             val totalChars = scriptResponse.scenes.sumOf { it.sentence.length }
             val estimatedRawDuration = totalChars / 10.0  // ~10 한국어 글자/초
             val adjustedDuration = estimatedRawDuration / 1.10
 
-            logger.info("✓ Script validation passed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.10x")
+            val tooLongScenes = scriptResponse.scenes.mapIndexedNotNull { i, scene ->
+                val len = scene.sentence.length
+                if (len > 50) i to len else null
+            }
+            if (tooLongScenes.isNotEmpty()) {
+                logger.warn("⚠️ Scene length soft-check: {} scenes over 50 chars (will affect duration): {}", tooLongScenes.size, tooLongScenes.take(3))
+            }
 
-            if (adjustedDuration < 45 || adjustedDuration > 57) {
-                logger.warn("⚠️ Duration estimate borderline: ${String.format("%.1f", adjustedDuration)}s (target 45-57s @ 1.10x). Retry $attempt/$maxAttempts")
+            logger.info("✓ Script scenes parsed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.10x")
+
+            if (adjustedDuration < 43 || adjustedDuration > 60) {
+                logger.warn("⚠️ Duration out of range: ${String.format("%.1f", adjustedDuration)}s (target 43-60s @ 1.10x). Retry $attempt/$maxAttempts")
                 if (attempt < maxAttempts) continue else break
             }
 
