@@ -256,7 +256,7 @@ services:
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
       - APP_SCHEDULING_BATCH_CRON=0 30 17 * * *
-      - APP_SCHEDULING_UPLOAD_CRON=0 0 18 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0/10 18-19 * * * # 18:00-19:00 사이 10분마다 체크
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8083/callback
       - JAVA_OPTS=-Xmx512m -Xms256m
@@ -297,7 +297,7 @@ services:
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
       - APP_SCHEDULING_BATCH_CRON=0 30 6 * * *
-      - APP_SCHEDULING_UPLOAD_CRON=0 0 7 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0/10 7-8 * * * # 07:00-08:00 사이 10분마다 체크
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8084/callback
       - JAVA_OPTS=-Xmx512m -Xms256m
