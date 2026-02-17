@@ -551,7 +551,7 @@ class GeminiService(
 
         // === 검증 & 재시도 로직 ===
         var attempt = 0
-        val maxAttempts = 3
+        val maxAttempts = 7  // Increased from 3 to allow more retries for duration validation
 
         while (attempt < maxAttempts) {
             attempt++
@@ -650,9 +650,19 @@ class GeminiService(
 
             logger.info("✓ Script scenes parsed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.10x")
 
-            if (adjustedDuration < 43 || adjustedDuration > 60) {
-                logger.warn("⚠️ Duration out of range: ${String.format("%.1f", adjustedDuration)}s (target 43-60s @ 1.10x). Retry $attempt/$maxAttempts")
-                if (attempt < maxAttempts) continue else break
+            // Soft validation: Hard fail only outside 35-65s, warn for 35-43s and 60-65s
+            when {
+                adjustedDuration < 35 || adjustedDuration > 65 -> {
+                    logger.warn("❌ Duration HARD FAIL: ${String.format("%.1f", adjustedDuration)}s (must be 35-65s). Retry $attempt/$maxAttempts")
+                    if (attempt < maxAttempts) continue else break
+                }
+                adjustedDuration < 43 || adjustedDuration > 60 -> {
+                    logger.warn("⚠️ Duration outside ideal range: ${String.format("%.1f", adjustedDuration)}s (ideal: 43-60s, acceptable: 35-65s). Accepting anyway.")
+                    // Continue - soft warning only
+                }
+                else -> {
+                    logger.info("✅ Duration PERFECT: ${String.format("%.1f", adjustedDuration)}s (43-60s target)")
+                }
             }
 
             // === 검증 성공! ===
