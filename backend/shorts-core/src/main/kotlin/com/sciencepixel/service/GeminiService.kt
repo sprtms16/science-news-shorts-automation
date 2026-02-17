@@ -450,14 +450,14 @@ class GeminiService(
             
             [General Hard Rules]
             1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
-            2. **Scene Count**: YOU MUST split the story into **exactly 18 scenes**. No more, no less.
+            2. **Scene Count**: YOU MUST split the story into **exactly 14 scenes**. No more, no less.
             3. **Sentence Length**: Each scene's sentence MUST be **25-45 Korean characters (글자)** long.
                This is CRITICAL for timing. Aim for 30-40 characters when possible, but 25-45 is acceptable.
                BAD (too short, 12자): "이건 놀라운 발견입니다."
                BAD (too long, 50자): "이 발견은 기존의 물리학 법칙을 완전히 뒤집을 수 있는 혁명적인 연구 결과로 평가받고 있습니다."
                GOOD (35자): "이 발견은 기존 물리학의 법칙을 완전히 뒤집을 수 있는 연구 결과입니다."
-            4. **Duration**: The total script MUST be **50-55 seconds** when read aloud at normal Korean speech speed.
-               At 1.15x playback speed this produces a 43-48 second video. Target approximately 540-720 total Korean characters.
+            4. **Duration**: The total script MUST be **50-59 seconds** when read aloud at normal Korean speech speed.
+               At 1.15x playback speed this produces a 43-51 second video. Target approximately 420-630 total Korean characters.
             5. **Language**: MUST BE KOREAN (한국어).
             6. **Tone & Speech Style**: Use formal/polite Korean (존댓말) throughout ALL scenes.
                End sentences with formal endings: -습니다, -입니다, -됩니다, -있습니다.
@@ -630,9 +630,9 @@ class GeminiService(
                 if (attempt < maxAttempts) continue else return ScriptResponse(emptyList(), "tech", title = title, description = summary, tags = listOf("Science", "Technology", "Shorts"))
             }
 
-            // === 검증 1: 씬 개수 = 18 ===
-            if (scriptResponse.scenes.size != 18) {
-                logger.warn("⚠️ Scene count validation failed: {} scenes (expected 18). Retry $attempt/$maxAttempts", scriptResponse.scenes.size)
+            // === 검증 1: 씬 개수 = 14 ===
+            if (scriptResponse.scenes.size != 14) {
+                logger.warn("⚠️ Scene count validation failed: {} scenes (expected 14). Retry $attempt/$maxAttempts", scriptResponse.scenes.size)
                 if (attempt < maxAttempts) continue else break
             }
 
@@ -653,7 +653,7 @@ class GeminiService(
             val estimatedRawDuration = totalChars / 10.0  // ~10 한국어 글자/초
             val adjustedDuration = estimatedRawDuration / 1.15
 
-            logger.info("✓ Script validation passed: 18 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.15x")
+            logger.info("✓ Script validation passed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.15x")
 
             if (adjustedDuration < 43 || adjustedDuration > 58) {
                 logger.warn("⚠️ Duration estimate borderline: ${String.format("%.1f", adjustedDuration)}s (target 50-55s). Retry $attempt/$maxAttempts")
