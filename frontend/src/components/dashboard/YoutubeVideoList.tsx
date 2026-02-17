@@ -51,7 +51,14 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, select
         if (node) observer.current.observe(node);
     }, [loading, loadingMore, nextPage]);
 
+    // AbortController for canceling in-flight requests
+    const abortRef = useRef<AbortController | null>(null);
+
     const fetchVideos = async (page: string | null = '0') => {
+        // Cancel previous request
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         const isInitial = page === '0';
 
         if (isInitial) {
@@ -64,7 +71,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, select
         setError(null);
         try {
             const url = `${getApiBase(selectedChannel)}/admin/youtube/my-videos?size=24&page=${page}&channelId=${selectedChannel}`;
-            const response = await axios.get(url);
+            const response = await axios.get(url, { signal: controller.signal });
 
             if (isInitial) {
                 setVideos(response.data.videos);
@@ -74,6 +81,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, select
             // Fix: response field name is nextPageToken, not nextPage
             setNextPage(response.data.nextPageToken);
         } catch (err: any) {
+            if (axios.isCancel(err)) return; // Ignore canceled requests
             console.error('Failed to fetch YouTube videos:', err);
             setError(err.message || 'Failed to load videos from YouTube.');
         } finally {

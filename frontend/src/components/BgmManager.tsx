@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { showSuccess, showError, confirmAction } from '../lib/toast';
 import '../App.css';
 
@@ -11,30 +11,49 @@ interface BgmEntity {
     errorMessage?: string;
 }
 
-const BgmManager: React.FC = () => {
+interface BgmManagerProps {
+    selectedChannel: string;
+}
+
+const BgmManager: React.FC<BgmManagerProps> = ({ selectedChannel }) => {
+    const apiBase = `/api/${selectedChannel}`;
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [uploading, setUploading] = useState(false);
     const [forceCategory, setForceCategory] = useState("auto");
     const [isDragging, setIsDragging] = useState(false);
     const [bgmList, setBgmList] = useState<BgmEntity[]>([]);
 
+    // AbortController for canceling in-flight requests
+    const abortRef = useRef<AbortController | null>(null);
+
     const fetchBgmList = useCallback(async () => {
+        // Cancel previous request
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         try {
-            const res = await fetch('/api/science/admin/bgm/list');
+            const res = await fetch(`${apiBase}/admin/bgm/list`, { signal: controller.signal });
             if (res.ok) {
                 const data = await res.json();
                 setBgmList(data);
             }
-        } catch (e) {
+        } catch (e: any) {
+            if (e.name === 'AbortError') return; // Ignore canceled requests
             console.error("Failed to fetch BGM list", e);
         }
-    }, []);
+    }, [apiBase]);
 
     useEffect(() => {
         fetchBgmList();
+
+        // Only poll if there are items in progress
+        const hasPending = bgmList.some(b => b.status === 'PENDING' || b.status === 'PROCESSING');
+        if (!hasPending) return;
+
         const interval = setInterval(fetchBgmList, 3000);
         return () => clearInterval(interval);
-    }, [fetchBgmList]);
+    }, [fetchBgmList, bgmList]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -71,7 +90,7 @@ const BgmManager: React.FC = () => {
         formData.append("forceCategory", forceCategory);
 
         try {
-            const response = await fetch('/api/science/admin/bgm/upload', {
+            const response = await fetch(`${apiBase}/admin/bgm/upload`, {
                 method: 'POST',
                 body: formData,
             });
@@ -95,7 +114,7 @@ const BgmManager: React.FC = () => {
     const handleRetry = async (id: string) => {
         if (!await confirmAction("Retry AI verification for this item?")) return;
         try {
-            const res = await fetch(`/api/science/admin/bgm/retry/${id}`, { method: 'POST' });
+            const res = await fetch(`${apiBase}/admin/bgm/retry/${id}`, { method: 'POST' });
             if (res.ok) {
                 showSuccess("Retry initiated!");
                 fetchBgmList();
@@ -111,7 +130,7 @@ const BgmManager: React.FC = () => {
     const handleDelete = async (id: string) => {
         if (!await confirmAction("Are you sure you want to delete this BGM? This cannot be undone.")) return;
         try {
-            const res = await fetch(`/api/science/admin/bgm/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${apiBase}/admin/bgm/${id}`, { method: 'DELETE' });
             if (res.ok) {
                 fetchBgmList();
             } else {
@@ -128,7 +147,7 @@ const BgmManager: React.FC = () => {
         if (newMood === null || newMood === bgm.mood) return;
 
         try {
-            const res = await fetch(`/api/science/admin/bgm/${bgm.id}`, {
+            const res = await fetch(`${apiBase}/admin/bgm/${bgm.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ mood: newMood })
