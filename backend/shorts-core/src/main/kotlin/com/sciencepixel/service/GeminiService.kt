@@ -451,19 +451,19 @@ class GeminiService(
             [General Hard Rules]
             1. **NO GREETINGS**: Never use "안녕하세요", "반가워요", or any introductory remarks. Start directly with the HOOK.
             2. **Scene Count**: YOU MUST split the story into **exactly 14 scenes**. No more, no less.
-            3. **Sentence Length**: Each scene's sentence MUST be **25-45 Korean characters (글자)** long.
-               This is CRITICAL for timing. Aim for 30-40 characters when possible, but 25-45 is acceptable.
+            3. **Sentence Length**: Each scene's sentence MUST be **35-46 Korean characters (글자)** long.
+               This is CRITICAL for timing. Aim for 38-44 characters when possible, but 35-46 is acceptable.
                BAD (too short, 12자): "이건 놀라운 발견입니다."
                BAD (too long, 50자): "이 발견은 기존의 물리학 법칙을 완전히 뒤집을 수 있는 혁명적인 연구 결과로 평가받고 있습니다."
-               GOOD (35자): "이 발견은 기존 물리학의 법칙을 완전히 뒤집을 수 있는 연구 결과입니다."
+               GOOD (40자): "이 발견은 기존 물리학의 법칙을 완전히 뒤집을 수 있는 혁명적 연구입니다."
             4. **Duration**: The total script MUST be **50-59 seconds** when read aloud at normal Korean speech speed.
-               At 1.15x playback speed this produces a 43-51 second video. Target approximately 420-630 total Korean characters.
+               At 1.10x playback speed this produces a 45-54 second video. Target approximately 490-644 total Korean characters.
             5. **Language**: MUST BE KOREAN (한국어).
             6. **Tone & Speech Style**: Use formal/polite Korean (존댓말) throughout ALL scenes.
                End sentences with formal endings: -습니다, -입니다, -됩니다, -있습니다.
                NEVER use informal speech (반말) like -해, -야, -다, -네, -지.
                Example: "이것은 놀라운 발견입니다" (GOOD) vs "이것은 놀라운 발견이다" (BAD).
-            7. **Fast Delivery**: Write sentences that are dense and rhythmic, optimized for 1.15x narration speed. Do NOT use filler words, but do NOT make sentences too short either.
+            7. **Natural Delivery**: Write sentences that are dense and rhythmic, optimized for 1.10x narration speed. Do NOT use filler words, but do NOT make sentences too short either.
             8. **Information Density**: Don't explain loosely. Pack as much interesting value as possible into every second.
             
             [Input]
@@ -636,14 +636,14 @@ class GeminiService(
                 if (attempt < maxAttempts) continue else break
             }
 
-            // === 검증 2: 각 씬 글자 수 25-45 (완화된 범위) ===
+            // === 검증 2: 각 씬 글자 수 35-46 (1.10x 속도 기준) ===
             val invalidScenes = scriptResponse.scenes.mapIndexedNotNull { i, scene ->
                 val len = scene.sentence.length
-                if (len < 25 || len > 45) i to len else null
+                if (len < 35 || len > 46) i to len else null
             }
 
             if (invalidScenes.isNotEmpty()) {
-                logger.warn("⚠️ Scene length validation failed: {} scenes out of 25-45 char range: {}. Retry $attempt/$maxAttempts",
+                logger.warn("⚠️ Scene length validation failed: {} scenes out of 35-46 char range: {}. Retry $attempt/$maxAttempts",
                     invalidScenes.size, invalidScenes.take(3))
                 if (attempt < maxAttempts) continue else break
             }
@@ -651,12 +651,12 @@ class GeminiService(
             // === 검증 3: 예상 길이 ===
             val totalChars = scriptResponse.scenes.sumOf { it.sentence.length }
             val estimatedRawDuration = totalChars / 10.0  // ~10 한국어 글자/초
-            val adjustedDuration = estimatedRawDuration / 1.15
+            val adjustedDuration = estimatedRawDuration / 1.10
 
-            logger.info("✓ Script validation passed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.15x")
+            logger.info("✓ Script validation passed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.10x")
 
-            if (adjustedDuration < 43 || adjustedDuration > 58) {
-                logger.warn("⚠️ Duration estimate borderline: ${String.format("%.1f", adjustedDuration)}s (target 50-55s). Retry $attempt/$maxAttempts")
+            if (adjustedDuration < 45 || adjustedDuration > 57) {
+                logger.warn("⚠️ Duration estimate borderline: ${String.format("%.1f", adjustedDuration)}s (target 45-57s @ 1.10x). Retry $attempt/$maxAttempts")
                 if (attempt < maxAttempts) continue else break
             }
 
