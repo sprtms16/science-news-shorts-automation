@@ -428,6 +428,7 @@ services:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_EXTRA_ARGS=--hostname=shorts-admin
       - TS_SERVE_CONFIG=/config/serve.json
+      - TS_CERT_DOMAIN=shorts-admin.taile6413.ts.net
       - TZ=Asia/Seoul
     deploy:
       resources:
