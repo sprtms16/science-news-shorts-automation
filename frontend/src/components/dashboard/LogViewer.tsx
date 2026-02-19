@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import { clsx } from 'clsx';
 import { Terminal, AlertCircle, Info, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -19,26 +19,36 @@ export const LogViewer: React.FC<{ t: any }> = ({ t }) => {
     const [loading, setLoading] = useState(false);
     const [totalPages, setTotalPages] = useState(0);
 
-    useEffect(() => {
-        fetchLogs();
-        const interval = setInterval(fetchLogs, 5000); // Auto refresh
-        return () => clearInterval(interval);
-    }, [page]);
+    const abortRef = useRef<AbortController | null>(null);
 
-    const fetchLogs = async () => {
+    const fetchLogs = useCallback(async () => {
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         try {
             setLoading(true);
-            // Note: In local dev, we might need to proxy this or use absolute URL
-            // But assuming Nginx or Vite proxy is configured.
-            const res = await axios.get(`http://localhost:8082/api/logs?page=${page}&size=20`);
+            const res = await axios.get(`/logs-api/api/logs?page=${page}&size=20`, {
+                signal: controller.signal,
+            });
             setLogs(res.data.content);
             setTotalPages(res.data.totalPages);
         } catch (e) {
-            console.error("Failed to fetch logs", e);
+            if (!axios.isCancel(e)) {
+                console.error("Failed to fetch logs", e);
+            }
         } finally {
             setLoading(false);
         }
-    };
+    }, [page]);
+
+    useEffect(() => {
+        fetchLogs();
+        const interval = setInterval(fetchLogs, 5000);
+        return () => {
+            clearInterval(interval);
+            abortRef.current?.abort();
+        };
+    }, [fetchLogs]);
 
     const getLevelColor = (level: string) => {
         switch (level) {

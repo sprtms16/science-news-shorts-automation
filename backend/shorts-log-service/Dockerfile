@@ -1,7 +1,17 @@
 FROM gradle:8.5-jdk17 AS build
 WORKDIR /app
+
+# Copy build files for dependency resolution (cached layer)
+COPY build.gradle.kts settings.gradle.kts ./
+
+# Download dependencies (cached layer - only invalidated when dependencies change)
+RUN gradle dependencies --parallel --no-daemon || true
+
+# Copy source code
 COPY . .
-RUN gradle clean build -x test --no-daemon
+
+# Build (without clean for faster builds)
+RUN gradle build -x test --parallel --no-daemon
 
 FROM eclipse-temurin:17-jdk-jammy
 WORKDIR /app

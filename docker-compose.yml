@@ -1,20 +1,50 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   github-runner:
     image: myoung34/github-runner:latest
     container_name: shorts-github-runner
-    restart: always
+    restart: unless-stopped # always에서 변경 - 수동 중지 시 재시작 안 함
     environment:
       - REPO_URL=https://github.com/sprtms16/science-news-shorts-automation
       - RUNNER_NAME=shorts-server-runner
-      - ACCESS_TOKEN=${GITHUB_PAT}
+      - ACCESS_TOKEN=${GITHUB_PAT} # PAT 토큰 (만료 시 수동 갱신 필요)
       - RUNNER_SCOPE=repo
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
+      - REPLACE_EXISTING_RUNNER=true
+      - TZ=Asia/Seoul
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep Runner.Listener > /dev/null || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s # 초기 60초는 실패 무시
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G # 최소 2GB 예약
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3 # 3번 실패 시 중지 (무한 재시작 방지)
+        window: 120s
     security_opt:
       - apparmor:unconfined
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./runner-work:/tmp/runner
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -22,15 +52,28 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_4LW_COMMANDS_WHITELIST: "ruok,stat,srvr"
+      TZ: Asia/Seoul
     ports:
       - "2181:2181"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    healthcheck:
+      test: [ "CMD", "/usr/bin/nc", "-z", "localhost", "2181" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *default-logging
     restart: unless-stopped
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     container_name: shorts-kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
       - "9092:9092"
       - "29092:29092"
@@ -42,10 +85,24 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: "-Xmx2g -Xms1g"
+      TZ: Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    healthcheck:
+      test: [ "CMD", "/usr/bin/nc", "-z", "localhost", "9092" ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    logging: *default-logging
     restart: unless-stopped
 
   ai-media-service:
     build: ./backend/ai-media-service
+    image: shorts-ai-service:latest
     container_name: shorts-ai-service
     ports:
       - "8000:8000"
@@ -54,11 +111,13 @@ services:
       - ~/.cache/huggingface:/root/.cache/huggingface # Model Caching
     deploy:
       resources:
+        limits:
+          memory: 8G
         reservations:
           devices:
             - driver: nvidia
               count: 1
-              capabilities: [ gpu ]
+              capabilities: [ gpu, video ]
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -72,43 +131,187 @@ services:
       - "27017:27017"
     environment:
       - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 2G
     volumes:
       - mongo-data:/data/db
     restart: unless-stopped
 
-  shorts-controller:
+  shorts-science:
     build:
       context: ./backend
-      dockerfile: Dockerfile.kotlin
-    container_name: shorts-controller
+      dockerfile: shorts-api/Dockerfile
+    image: shorts-api:latest
+    container_name: shorts-science-controller
     ports:
       - "8080:8080"
       - "8888:8888" # YouTube OAuth Callback
     depends_on:
-      - ai-media-service
-      - mongo
-      - kafka
+      ai-media-service:
+        condition: service_started
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
     volumes:
       - shorts-shared-data:/app/shared-data
-      - ./backend/tokens:/app/tokens
+      - ./backend/client_secret:/app/client_secret # YouTube OAuth credentials
+      - shorts-tokens:/app/tokens
+
     env_file:
       - .env
     environment:
+      - SHORTS_CHANNEL_ID=science
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_SCIENCE_B64}
       - AI_SERVICE_URL=http://shorts-ai-service:8000
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
-      - YOUTUBE_CLIENT_SECRET_JSON_B64=${YOUTUBE_CLIENT_SECRET_JSON_B64}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 10,40 * * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
-      # 알림 설정 (선택사항)
-      - NOTIFICATION_DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL:-}
-      - NOTIFICATION_TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
-      - NOTIFICATION_TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    logging: *default-logging
+    restart: unless-stopped
+
+  shorts-horror:
+    image: shorts-api:latest
+    container_name: shorts-horror-controller
+    ports:
+      - "8081:8080"
+    depends_on:
+      ai-media-service:
+        condition: service_started
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
+      - shorts-tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=horror
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_HORROR_B64}
+      - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 20,50 * * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
+      - TZ=Asia/Seoul
+      - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    logging: *default-logging
+    restart: unless-stopped
+
+  shorts-stocks:
+    image: shorts-api:latest
+    container_name: shorts-stocks-controller
+    ports:
+      - "8083:8080"
+    depends_on:
+      ai-media-service:
+        condition: service_started
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
+      - shorts-tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=stocks
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_STOCKS_B64}
+      - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 30 17 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0/10 18-19 * * * # 18:00-19:00 사이 10분마다 체크
+      - TZ=Asia/Seoul
+      - YOUTUBE_REDIRECT_URI=http://localhost:8083/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    logging: *default-logging
+    restart: unless-stopped
+
+  shorts-history:
+    image: shorts-api:latest
+    container_name: shorts-history-controller
+    ports:
+      - "8084:8080"
+    depends_on:
+      ai-media-service:
+        condition: service_started
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
+      - shorts-tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=history
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${SECRET_HISTORY_B64}
+      - AI_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - APP_FEATURE_REMOTE_RENDERING=true
+      - APP_FEATURE_CONSUMER_SCRIPT=true
+      - APP_FEATURE_CONSUMER_SCENE=false
+      - APP_FEATURE_CONSUMER_RENDER=false
+      - APP_SCHEDULING_BATCH_CRON=0 30 6 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0/10 7-8 * * * # 07:00-08:00 사이 10분마다 체크
+      - TZ=Asia/Seoul
+      - YOUTUBE_REDIRECT_URI=http://localhost:8084/callback
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+    logging: *default-logging
+    restart: unless-stopped
 
   shorts-log-service:
     build:
       context: ./backend/shorts-log-service
+    image: shorts-log-service:latest
     container_name: shorts-log-service
     ports:
       - "8082:8082"
@@ -119,15 +322,101 @@ services:
       - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/shorts-logs
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - TZ=Asia/Seoul
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging: *default-logging
+    restart: unless-stopped
+
+  shorts-renderer:
+    build:
+      context: ./backend
+      dockerfile: shorts-worker/Dockerfile
+    image: shorts-worker:latest
+    container_name: shorts-renderer
+    depends_on:
+      ai-media-service:
+        condition: service_started
+      mongo:
+        condition: service_started
+      kafka:
+        condition: service_started
+    volumes:
+      - shorts-shared-data:/app/shared-data
+      - ./backend/client_secret:/app/client_secret
+      - shorts-tokens:/app/tokens
+    env_file:
+      - .env
+    environment:
+      - SHORTS_CHANNEL_ID=renderer
+      - PYTHON_SERVICE_URL=http://shorts-ai-service:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/sciencepixel
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - APP_FEATURE_REMOTE_RENDERING=false
+      - APP_FEATURE_CONSUMER_SCRIPT=false
+      - APP_FEATURE_CONSUMER_SCENE=true
+      - APP_FEATURE_CONSUMER_RENDER=true
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - TZ=Asia/Seoul
+      - JAVA_OPTS=-Xmx6144m -Xms3072m
+    deploy:
+      resources:
+        limits:
+          memory: 20G
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu, video ]
+
+  renderer-autoscaler:
+    build: ./backend/autoscaler
+    image: shorts-autoscaler:latest
+    container_name: shorts-autoscaler
+    depends_on:
+      - kafka
+      - shorts-renderer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/compose # docker-compose.yml location
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - CONSUMER_GROUP=renderer-group
+      - TARGET_SERVICE=shorts-renderer
+      - IMAGE_NAME=shorts-worker:latest # 모니터링 및 업데이트할 이미지 명시
+      - AUTO_UPGRADE=true # 새 이미지 감지 시 자동 컨테이너 교체 활성화
+      - MIN_REPLICAS=1
+      - MAX_REPLICAS=5
+      - SCALE_UP_THRESHOLD=5
+      - SCALE_DOWN_THRESHOLD=2
+      - CHECK_INTERVAL=30
+      - COOLDOWN_PERIOD=60
+      - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *default-logging
     restart: unless-stopped
 
   frontend-server:
     build: ./frontend
+    image: shorts-frontend:latest
     container_name: shorts-frontend
     network_mode: "service:tailscale"
     depends_on:
       - tailscale
-      - shorts-controller
+      - shorts-science
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *default-logging
     restart: unless-stopped
 
   tailscale:
@@ -138,10 +427,18 @@ services:
       - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_EXTRA_ARGS=--hostname=shorts-admin
+      - TS_SERVE_CONFIG=/config/serve.json
+      - TS_CERT_DOMAIN=shorts-admin.taile6413.ts.net
+      - TZ=Asia/Seoul
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     ports:
       - "3000:80"
     volumes:
       - ./vpn-state:/var/lib/tailscale
+      - ./tailscale-config:/config
       - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
@@ -151,5 +448,4 @@ services:
 volumes:
   mongo-data:
   shorts-shared-data:
-
-
+  shorts-tokens: # 신규 추가: YouTube 인증 토큰 저장용 영구 볼륨

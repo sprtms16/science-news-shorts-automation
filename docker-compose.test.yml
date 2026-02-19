@@ -1,0 +1,114 @@
+services:
+  zookeeper-test:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: shorts-zookeeper-test
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "12181:2181"
+    restart: unless-stopped
+
+  kafka-test:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: shorts-kafka-test
+    depends_on:
+      - zookeeper-test
+    ports:
+      - "19092:9092"
+      - "12909:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper-test:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-test:29092,PLAINTEXT_HOST://localhost:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    restart: unless-stopped
+
+  ai-media-service-test:
+    build: ./backend/ai-media-service
+    container_name: shorts-ai-service-test
+    ports:
+      - "18000:8000"
+    volumes:
+      - shorts-shared-data-test:/app/output
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - TZ=Asia/Seoul
+    restart: unless-stopped
+
+  mongo-test:
+    image: mongo:latest
+    container_name: shorts-mongo-test
+    ports:
+      - "37017:27017"
+    environment:
+      - TZ=Asia/Seoul
+    volumes:
+      - mongo-data-test:/data/db
+    restart: unless-stopped
+
+  shorts-controller-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.kotlin
+    container_name: shorts-controller-test
+    ports:
+      - "18080:8080"
+      - "18888:8888"
+    depends_on:
+      - ai-media-service-test
+      - mongo-test
+      - kafka-test
+    volumes:
+      - shorts-shared-data-test:/app/shared-data
+      - ./backend/tokens-test:/app/tokens
+    env_file:
+      - .env.test
+    environment:
+      - AI_SERVICE_URL=http://ai-media-service-test:8000
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo-test:27017/sciencepixel-test
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-test:29092
+      - YOUTUBE_CLIENT_SECRET_JSON_B64=${YOUTUBE_CLIENT_SECRET_JSON_B64}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - PEXELS_API_KEY=${PEXELS_API_KEY}
+      - TZ=Asia/Seoul
+
+  shorts-log-service-test:
+    build:
+      context: ./backend/shorts-log-service
+    container_name: shorts-log-service-test
+    ports:
+      - "18082:8082"
+    depends_on:
+      - kafka-test
+      - mongo-test
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://mongo-test:27017/shorts-logs-test
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka-test:29092
+      - TZ=Asia/Seoul
+    restart: unless-stopped
+
+  frontend-server-test:
+    build: ./frontend
+    container_name: shorts-frontend-test
+    ports:
+      - "13000:80"
+    depends_on:
+      - shorts-controller-test
+    restart: unless-stopped
+
+volumes:
+  mongo-data-test:
+  shorts-shared-data-test:

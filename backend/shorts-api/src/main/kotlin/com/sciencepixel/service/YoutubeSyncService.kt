@@ -1,0 +1,91 @@
+package com.sciencepixel.service
+
+import com.sciencepixel.domain.YoutubeVideoEntity
+import com.sciencepixel.repository.YoutubeVideoRepository
+import org.springframework.scheduling.annotation.Scheduled
+import org.springframework.stereotype.Service
+import java.time.LocalDateTime
+import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+
+@Service
+class YoutubeSyncService(
+    private val youtubeService: YoutubeService,
+    private val youtubeVideoRepository: YoutubeVideoRepository,
+    @org.springframework.beans.factory.annotation.Value("\${SHORTS_CHANNEL_ID:science}") private val channelId: String
+) {
+
+    /**
+     * Sync YouTube videos to local DB every 1 hour.
+     * Initially performs a deep sync, then incremental.
+     * initialDelay prevents immediate auth request on server startup.
+     */
+    @Scheduled(fixedRate = 3600000, initialDelay = 300000) // 1 hour, start after 5 minutes
+    fun syncVideos() {
+
+        println("📡 [$channelId] Starting YouTube video sync...")
+        try {
+            var pageToken: String? = null
+            var count = 0
+            
+            // Limit to last 100 for periodic sync, or more if needed
+            // For the first time, one might want to fetch more.
+            // Let's fetch up to 50 (1 page) every hour, which is usually enough for a shorts channel.
+            // But to be safe, let's fetch until we see duplicates we already have.
+            
+            val allFetchedIds = mutableSetOf<String>()
+            var oldestPublishedAt: String? = null
+
+            do {
+                val response = youtubeService.getMyVideosStats(limit = 50, pageToken = pageToken)
+                val videos = response.videos
+                
+                if (videos.isEmpty()) break
+                
+                allFetchedIds.addAll(videos.map { it.videoId })
+                if (videos.isNotEmpty()) {
+                    val currentOldest = videos.last().publishedAt
+                    if (oldestPublishedAt == null || currentOldest < oldestPublishedAt!!) {
+                        oldestPublishedAt = currentOldest
+                    }
+                }
+
+                val entities = videos.map { stat ->
+                    YoutubeVideoEntity(
+                        videoId = stat.videoId,
+                        channelId = channelId, // 추가
+                        title = stat.title,
+                        description = stat.description,
+                        viewCount = stat.viewCount,
+                        likeCount = stat.likeCount,
+                        publishedAt = stat.publishedAt,
+                        thumbnailUrl = stat.thumbnailUrl,
+                        updatedAt = LocalDateTime.now()
+                    )
+                }
+                
+                youtubeVideoRepository.saveAll(entities)
+                count += entities.size
+                
+                pageToken = response.nextPageToken
+                
+            } while (pageToken != null)
+
+            // Pruning logic: Only prune for CURRENT channel
+            if (allFetchedIds.isNotEmpty()) {
+                val localVideos = youtubeVideoRepository.findByChannelId(channelId)
+                val toDelete = localVideos.filter { local ->
+                    !allFetchedIds.contains(local.videoId) && (oldestPublishedAt == null || local.publishedAt >= oldestPublishedAt!!)
+                }
+                if (toDelete.isNotEmpty()) {
+                    youtubeVideoRepository.deleteAll(toDelete)
+                    println("🧹 [$channelId] Pruned ${toDelete.size} deleted videos from local DB.")
+                }
+            }
+            
+            println("✅ [$channelId] YouTube sync completed. Synced $count videos.")
+        } catch (e: Exception) {
+            println("❌ Error during YouTube sync: ${e.message}")
+        }
+    }
+}

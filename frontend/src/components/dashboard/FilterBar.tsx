@@ -9,9 +9,11 @@ interface FilterBarProps {
     setStatusFilter: (status: string) => void;
     videos: VideoHistory[];
     t: any;
+    hideStatusFilter?: boolean;
+    hiddenOptions?: string[];
 }
 
-export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFilter, videos, t }: FilterBarProps) {
+export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFilter, videos, t, hideStatusFilter, hiddenOptions = [] }: FilterBarProps) {
 
     const filteredCount = videos.filter(v => {
         const matchesSearch = v.title.toLowerCase().includes(searchTerm.toLowerCase());
@@ -21,6 +23,16 @@ export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFi
                     v.status === statusFilter;
         return matchesSearch && matchesStatus;
     }).length;
+
+    const options = [
+        { value: "ALL", label: t.statusAll },
+        { value: "UPLOADED", label: `✅ ${t.statusUploaded}` },
+        { value: "COMPLETED", label: `📦 ${t.statusCompleted}` },
+        { value: "SCRIPTING", label: "📜 Scripting" },
+        { value: "ASSETS_GENERATING", label: "🎨 Assets" },
+        { value: "RENDERING", label: "🎬 Rendering" },
+        { value: "FAILED", label: "❌ " + t.statusFailed }
+    ];
 
     return (
         <div className="glass-morphism p-5 rounded-2xl border border-[var(--glass-border)] flex flex-col lg:flex-row items-stretch lg:items-end gap-5">
@@ -40,7 +52,7 @@ export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFi
                     {searchTerm && (
                         <button
                             onClick={() => setSearchTerm('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-black dark:hover:text-white transition-colors"
                         >
                             <X size={14} />
                         </button>
@@ -48,29 +60,31 @@ export function FilterBar({ searchTerm, setSearchTerm, statusFilter, setStatusFi
                 </div>
             </div>
 
-            <div className="lg:w-64">
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Status Intelligence</label>
-                <div className="relative">
-                    <select
-                        className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-purple-500/50 outline-none cursor-pointer appearance-none transition-all"
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2364748b\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
-                    >
-                        <option value="ALL" className="bg-slate-900 text-white dark:bg-slate-900">{t.statusAll}</option>
-                        <option value="UPLOADED" className="bg-slate-900 text-white dark:bg-slate-900">✅ {t.statusUploaded}</option>
-                        <option value="COMPLETED" className="bg-slate-900 text-white dark:bg-slate-900">📦 {t.statusCompleted}</option>
-                        <option value="CREATING" className="bg-slate-900 text-white dark:bg-slate-900">⚙️ {t.statusCreating}</option>
-                        <option value="FAILED" className="bg-slate-900 text-white dark:bg-slate-900">❌ {t.statusFailed}</option>
-                    </select>
+            {!hideStatusFilter && (
+                <div className="lg:w-64">
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 ml-1">Status Intelligence</label>
+                    <div className="relative">
+                        <select
+                            className="w-full bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2.5 text-sm text-[var(--text-primary)] focus:border-purple-500/50 outline-none cursor-pointer appearance-none transition-all"
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            style={{ backgroundImage: 'url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%2364748b\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3e%3cpolyline points=\'6 9 12 15 18 9\'%3e%3c/polyline%3e%3c/svg%3e")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
+                        >
+                            {options.filter(opt => !hiddenOptions.includes(opt.value)).map(opt => (
+                                <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-900 text-black dark:text-white">
+                                    {opt.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
-            </div>
+            )}
 
             <div className="flex items-center justify-between lg:justify-end gap-3 lg:pb-0.5">
                 <div className="px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--input-border)] text-[11px] font-bold text-[var(--text-secondary)]">
-                    {t.totalFiltered}: <span className="text-purple-400 font-mono text-xs">{filteredCount}</span>
+                    {t.totalFiltered}: <span className="text-purple-600 dark:text-purple-400 font-mono text-xs">{filteredCount}</span>
                 </div>
-                <div className="px-4 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] font-bold text-purple-400">
+                <div className="px-4 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11px] font-bold text-purple-600 dark:text-purple-400">
                     {t.totalSystem}: <span className="font-mono text-xs">{videos.length}</span>
                 </div>
             </div>

@@ -16,6 +16,7 @@ export const translations = {
         statusCreating: '생성 중',
         statusQueued: '대기 중',
         statusFailed: '생성 실패',
+        statusUploadFailed: '업로드 실패',
         statusNotUploaded: '미업로드',
         syncData: '데이터 동기화',
         loading: '로딩 중',
@@ -57,6 +58,8 @@ export const translations = {
         queueBufferSize: '큐 버퍼 크기',
         bufferDescription: '최대 보관 가능한 처리 완료 자산 수입니다. 도달 시 AI 생산이 일시 중지됩니다.',
         commit: '확인',
+        uploadInterval: '업로드 간격 (시간)',
+        uploadIntervalDescription: '자동 업로드 주기 설정 (예: 1.5 = 1시간 30분)',
         youtubeQuotaShield: '유튜브 할당량 보호',
         uploadBlockActive: '업로드 차단 활성화',
         autoResumeScheduled: '자동 재개 예정 시간',
@@ -85,7 +88,13 @@ export const translations = {
         regenThumbnailsTitle: "썸네일 자동 재생성",
         regenThumbnailsDesc: "기존 영상의 제목과 설명을 분석하여 Pexels에서 고화질 썸네일을 찾아 자동으로 업데이트합니다.",
         runRegenThumbnails: "썸네일 재생성 실행",
-        manualUpload: "유튜브 업로드"
+        manualUpload: "유튜브 업로드",
+        clearFailedTitle: "실패 기록 일괄 삭제",
+        clearFailedDesc: "현재 채널의 '생성 실패' 상태인 모든 기록을 삭제하고 관련 파일을 서버에서 제거합니다.",
+        runClearFailed: "실패 기록 삭제 실행",
+        resetSourcesTitle: "기본 리소스 초기화 (Seed)",
+        resetSourcesDesc: "모든 뉴스/괴담 수집 리소스를 공장 출고 상태로 초기화하고 최신 기사 수집을 준비합니다. 현재 채널에 관계없이 시스템 전역에 적용됩니다.",
+        runResetSources: "리소스 초기화 실행"
     },
     en: {
         dashboard: 'Dashboard',
@@ -102,6 +111,7 @@ export const translations = {
         statusCreating: 'Creating',
         statusQueued: 'Queued',
         statusFailed: 'Failed',
+        statusUploadFailed: 'Upload Failed',
         statusNotUploaded: 'Not Uploaded',
         syncData: 'Sync Data',
         loading: 'Loading',
@@ -143,6 +153,8 @@ export const translations = {
         queueBufferSize: 'Queue Buffer Size',
         bufferDescription: 'Maximum assets to maintain in storage. Production pauses when reached.',
         commit: 'Commit',
+        uploadInterval: 'Upload Interval (Hours)',
+        uploadIntervalDescription: 'Set automated upload frequency (e.g., 1.5 = 1h 30m)',
         youtubeQuotaShield: 'YouTube Quota Shield',
         uploadBlockActive: 'Upload Block Active',
         autoResumeScheduled: 'Auto-resume scheduled for',
@@ -171,6 +183,12 @@ export const translations = {
         regenThumbnailsTitle: "Auto-Regenerate Thumbnails",
         regenThumbnailsDesc: "Analyzes existing video titles/descriptions to find and update high-quality thumbnails from Pexels.",
         runRegenThumbnails: "Run Regeneration",
-        manualUpload: "Upload to YouTube"
+        manualUpload: "Upload to YouTube",
+        clearFailedTitle: "Clear Failed History",
+        clearFailedDesc: "Permanently delete all 'Failed' records and their associated files for the current channel.",
+        runClearFailed: "Clear Failed Records",
+        resetSourcesTitle: "Reset Default Sources (Seed)",
+        resetSourcesDesc: "Reset all news/horror collection sources to factory defaults and prepare for fresh fetching. Applies system-wide regardless of current channel.",
+        runResetSources: "Run Reset Sources"
     }
 };

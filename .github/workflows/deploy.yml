@@ -15,19 +15,43 @@ jobs:
       - name: Generate .env file
         env:
           JSON_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
+          SECRET_SCIENCE: ${{ secrets.YOUTUBE_CLIENT_SECRET_SCIENCE }}
+          SECRET_HORROR: ${{ secrets.YOUTUBE_CLIENT_SECRET_HORROR }}
+          SECRET_STOCKS: ${{ secrets.YOUTUBE_CLIENT_SECRET_STOCKS }}
+          SECRET_HISTORY: ${{ secrets.YOUTUBE_CLIENT_SECRET_HISTORY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> .env
-          echo "PEXELS_API_KEY=${{ secrets.PEXELS_API_KEY }}" >> .env
-          echo "TAILSCALE_AUTHKEY=${{ secrets.TAILSCALE_AUTHKEY }}" >> .env
-          echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}" >> .env
+          echo "GEMINI_API_KEY=$GEMINI_API_KEY" >> .env
+          echo "PEXELS_API_KEY=$PEXELS_API_KEY" >> .env
+          echo "TAILSCALE_AUTHKEY=$TAILSCALE_AUTHKEY" >> .env
+          echo "DISCORD_WEBHOOK_URL=$DISCORD_WEBHOOK_URL" >> .env
           
-          # Base64 Encode JSON Secret to avoid quote parsing issues
           echo "YOUTUBE_CLIENT_SECRET_JSON_B64=$(echo -n "$JSON_SECRET" | base64 -w 0)" >> .env
+          
+          # Inject Channel Specific Secrets into .env (Base64 Encoded to prevent JSON Quote issues)
+          echo "SECRET_SCIENCE_B64=$(echo -n "$SECRET_SCIENCE" | base64 -w 0)" >> .env
+          echo "SECRET_HORROR_B64=$(echo -n "$SECRET_HORROR" | base64 -w 0)" >> .env
+          echo "SECRET_STOCKS_B64=$(echo -n "$SECRET_STOCKS" | base64 -w 0)" >> .env
+          echo "SECRET_HISTORY_B64=$(echo -n "$SECRET_HISTORY" | base64 -w 0)" >> .env
 
       - name: Deploy to Docker Compose
         run: |
           # Clean up old images
           docker image prune -f
-          
-          # Start services with forced recreation to ensure new builds are used
-          docker-compose up -d --build --force-recreate ai-media-service mongo shorts-controller shorts-log-service frontend-server tailscale zookeeper kafka
+
+          # Build images in parallel first
+          docker-compose build --parallel
+
+          # Start app services with forced recreation (Excluding github-runner to avoid build interruption)
+          docker-compose up -d --force-recreate \
+            zookeeper kafka mongo ai-media-service \
+            shorts-science shorts-horror shorts-stocks shorts-history \
+            shorts-log-service shorts-renderer renderer-autoscaler \
+            frontend-server tailscale
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -f .env

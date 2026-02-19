@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -8,6 +9,13 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ t, settings, saveSetting }: SettingsPanelProps) {
+    const [maxGenValue, setMaxGenValue] = useState(
+        settings.find(s => s.key === 'MAX_GENERATION_LIMIT')?.value || '10'
+    );
+    const [intervalValue, setIntervalValue] = useState(
+        settings.find(s => s.key === 'UPLOAD_INTERVAL_HOURS')?.value || '1'
+    );
+
     return (
         <div className="max-w-4xl grid gap-8">
             <div className="glass-morphism p-8 md:p-10 rounded-3xl border border-[var(--glass-border)]">
@@ -26,13 +34,40 @@ export function SettingsPanel({ t, settings, saveSetting }: SettingsPanelProps) 
                             <input
                                 type="number"
                                 className="bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2 text-[var(--text-primary)] w-24 focus:border-purple-500/50 outline-none font-mono font-bold transition-all text-center"
-                                defaultValue={settings.find(s => s.key === 'MAX_GENERATION_LIMIT')?.value || '10'}
-                                id="maxGenInput"
+                                value={maxGenValue}
+                                onChange={(e) => setMaxGenValue(e.target.value)}
                             />
                             <button
                                 onClick={() => {
-                                    const val = (document.getElementById('maxGenInput') as HTMLInputElement).value;
-                                    saveSetting('MAX_GENERATION_LIMIT', val, 'Max unuploaded videos to keep buffered');
+                                    saveSetting('MAX_GENERATION_LIMIT', maxGenValue, 'Max unuploaded videos to keep buffered');
+                                }}
+                                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all active:scale-95"
+                            >
+                                {t.commit}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row md:items-center gap-6 p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)]">
+                        <div className="flex-1">
+                            <h4 className="text-base font-bold text-[var(--text-primary)] mb-1">
+                                {t.uploadInterval}
+                            </h4>
+                            <p className="text-xs text-[var(--text-secondary)]">
+                                {t.uploadIntervalDescription}
+                            </p>
+                        </div>
+                        <div className="flex gap-3 shrink-0">
+                            <input
+                                type="number"
+                                step="0.1"
+                                className="bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl px-4 py-2 text-[var(--text-primary)] w-24 focus:border-purple-500/50 outline-none font-mono font-bold transition-all text-center"
+                                value={intervalValue}
+                                onChange={(e) => setIntervalValue(e.target.value)}
+                            />
+                            <button
+                                onClick={() => {
+                                    saveSetting('UPLOAD_INTERVAL_HOURS', intervalValue, 'Hours between automated uploads');
                                 }}
                                 className="px-6 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg shadow-purple-500/20 transition-all active:scale-95"
                             >

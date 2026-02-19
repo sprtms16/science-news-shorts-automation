@@ -22,9 +22,15 @@ interface YoutubeVideoStat {
 interface YoutubeVideoListProps {
     t: any;
     language: 'ko' | 'en';
+    selectedChannel: string;
 }
 
-const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
+// Helper to get channel-specific API base path
+function getApiBase(channel: string): string {
+    return `/api/${channel}`;
+}
+
+const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language, selectedChannel }) => {
     const [videos, setVideos] = useState<YoutubeVideoStat[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
@@ -45,7 +51,14 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
         if (node) observer.current.observe(node);
     }, [loading, loadingMore, nextPage]);
 
+    // AbortController for canceling in-flight requests
+    const abortRef = useRef<AbortController | null>(null);
+
     const fetchVideos = async (page: string | null = '0') => {
+        // Cancel previous request
+        abortRef.current?.abort();
+        const controller = new AbortController();
+        abortRef.current = controller;
         const isInitial = page === '0';
 
         if (isInitial) {
@@ -57,8 +70,8 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
 
         setError(null);
         try {
-            const url = `/admin/youtube/my-videos?size=24&page=${page}`;
-            const response = await axios.get(url);
+            const url = `${getApiBase(selectedChannel)}/admin/youtube/my-videos?size=24&page=${page}&channelId=${selectedChannel}`;
+            const response = await axios.get(url, { signal: controller.signal });
 
             if (isInitial) {
                 setVideos(response.data.videos);
@@ -68,6 +81,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
             // Fix: response field name is nextPageToken, not nextPage
             setNextPage(response.data.nextPageToken);
         } catch (err: any) {
+            if (axios.isCancel(err)) return; // Ignore canceled requests
             console.error('Failed to fetch YouTube videos:', err);
             setError(err.message || 'Failed to load videos from YouTube.');
         } finally {
@@ -80,7 +94,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
         if (!window.confirm(language === 'ko' ? '이 영상의 설명을 새로 생성하여 업데이트하시겠습니까?' : 'Do you want to regenerate and update the description for this video?')) return;
 
         try {
-            const response = await axios.post(`/admin/youtube/fix-video-description?videoId=${videoId}`);
+            const response = await axios.post(`${getApiBase(selectedChannel)}/admin/youtube/fix-video-description?videoId=${videoId}&channelId=${selectedChannel}`);
             if (response.data.status === 'success') {
                 alert(language === 'ko' ? '설명이 성공적으로 수정되었습니다.' : 'Description fixed successfully.');
             }
@@ -94,7 +108,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
         setLoading(true);
         setError(null);
         try {
-            await axios.post('/admin/youtube/sync');
+            await axios.post(`${getApiBase(selectedChannel)}/admin/youtube/sync?channelId=${selectedChannel}`);
             await fetchVideos('0'); // Refresh list after sync
         } catch (err: any) {
             console.error('Sync failed:', err);
@@ -106,7 +120,7 @@ const YoutubeVideoList: React.FC<YoutubeVideoListProps> = ({ t, language }) => {
 
     useEffect(() => {
         fetchVideos('0');
-    }, []);
+    }, [selectedChannel]);
 
     if (loading && videos.length === 0) {
         return (

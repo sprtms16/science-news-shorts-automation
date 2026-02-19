@@ -12,7 +12,7 @@ import {
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts' | 'reset-sources') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -165,6 +165,28 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                         </div>
                     </div>
 
+                    {/* Clear Failed Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-red-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <AlertCircle size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-red-500 mb-1">{t.clearFailedTitle || "Clear Failed History"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.clearFailedDesc || "Permanently delete all 'Failed' records and their associated files for the current channel."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('clear-failed')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-red-500/20"
+                                >
+                                    {t.runClearFailed || "Clear Failed Records"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-indigo-500/30 transition-all group md:col-span-2">
                         <div className="flex items-start gap-6">
                             <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0 group-hover:scale-105 transition-transform">
@@ -202,6 +224,72 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                                     className="px-8 py-3 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-indigo-500/20"
                                 >
                                     {t.triggerUpload}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Cleanup Workspaces Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-gray-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-gray-500/10 flex items-center justify-center text-gray-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <Trash2 size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-gray-400 mb-1">{t.cleanupWorkspacesTitle || "Cleanup Temp Workspaces"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.cleanupWorkspacesDesc || "Aggressively delete all temporary files in 'workspace/' directory to free up disk space."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('cleanup-workspaces')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-gray-600/10 hover:bg-gray-600 text-gray-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-gray-500/20"
+                                >
+                                    {t.runCleanupWorkspaces || "Run Cleanup"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Refresh Prompts Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-fuchsia-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-fuchsia-500/10 flex items-center justify-center text-fuchsia-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <ShieldCheck size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-fuchsia-400 mb-1">{t.refreshPromptsTitle || "Refresh System Prompts"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.refreshPromptsDesc || "Reload system prompts from the codebase defaults. This will update the prompts in the database with the latest code changes."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('refresh-prompts')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-fuchsia-600/10 hover:bg-fuchsia-600 text-fuchsia-400 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-fuchsia-500/20"
+                                >
+                                    {t.runRefreshPrompts || "Sync Prompts"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Reset Sources Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-red-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <RefreshCw size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-red-400 mb-1">{t.resetSourcesTitle || "Reset Default Sources"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.resetSourcesDesc || "Reset all news collection sources to factory defaults."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('reset-sources')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-red-600/10 hover:bg-red-600 text-red-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-red-500/20"
+                                >
+                                    {t.runResetSources || "Run Reset"}
                                 </button>
                             </div>
                         </div>
