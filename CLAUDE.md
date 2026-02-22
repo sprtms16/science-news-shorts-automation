@@ -6,6 +6,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Automated YouTube Shorts pipeline that ingests RSS science/horror/stocks/history news, generates scripts via Google Gemini, sources video clips from Pexels, renders with FFmpeg, and uploads to YouTube. A single codebase serves multiple YouTube channels via per-container `SHORTS_CHANNEL_ID` env var.
 
+### Channels
+
+| ID | Name | Port | Schedule |
+|----|------|------|----------|
+| `science` | 사이언스 픽셀 | 8080 | Every hour at :10, :40 |
+| `horror` | 미스터리 픽셀 | 8081 | Every hour at :20, :50 |
+| `stocks` | 밸류 픽셀 | 8083 | Daily 17:30 → Upload 18-19:00 |
+| `history` | 메모리 픽셀 | 8084 | Daily 06:30 → Upload 07-08:00 |
+
+### Content Guidelines
+
+**CRITICAL**: All video narration scripts MUST use formal/polite Korean (존댓말):
+- Use formal endings: -습니다, -입니다, -됩니다, -있습니다
+- NEVER use informal speech (반말): -해, -야, -다, -네, -지
+- This applies to all prompts in the `system_prompt` collection
+
 ## Build & Run Commands
 
 ### Backend (Kotlin/Spring Boot 3.2, Gradle, JDK 17)
@@ -83,10 +99,42 @@ Same Docker image, different container per channel. Channel is selected by `SHOR
 
 ## Deployment
 
-CI/CD via GitHub Actions (`.github/workflows/deploy.yml`): push to `develop` triggers self-hosted runner deployment. Secrets are injected into `.env` at deploy time. The runner itself is a Docker container excluded from force-recreate.
+**CRITICAL - Deployment Workflow**: NEVER manually restart containers or services. Always use GitHub deployment workflow:
+
+1. Commit and push changes to `develop` branch
+2. GitHub Actions self-hosted runner automatically deploys
+3. Runner container (`shorts-github-runner`) is excluded from force-recreate
+
+```bash
+git add .
+git commit -m "your changes"
+git push origin develop  # This triggers auto-deployment
+```
+
+CI/CD pipeline (`.github/workflows/deploy.yml`):
+- Watches `develop` branch for changes
+- Builds Docker images in parallel
+- Recreates all services except `shorts-github-runner`
+- Sends Discord notification on completion
 
 Production is accessed through Tailscale VPN (frontend shares Tailscale's network namespace).
 
+### Service Restart Policies
+
+All services are configured to auto-restart after system reboot:
+- `github-runner`: `restart: always` (starts even if manually stopped)
+- All other services: `restart: unless-stopped` (starts unless manually stopped)
+
 ## Database
 
-MongoDB with channel-isolated collections. `VideoHistory` uses compound indexes on `channelId`. Tokens for YouTube OAuth stored in `backend/tokens/` volume mount.
+**Database name**: `sciencepixel` (NOT shorts_db)
+- MongoDB running on port 27017
+- Channel-isolated collections with compound indexes on `channelId`
+- System prompts stored in `system_prompt` collection
+- YouTube OAuth tokens stored in `backend/tokens/` volume mount
+
+Important collections:
+- `video_history` — Video metadata and status tracking
+- `system_prompt` — Channel-specific prompts (must use 존댓말)
+- `bgm_entity` — Background music assets
+- `quota_usage` — API quota tracking (Gemini, YouTube)
