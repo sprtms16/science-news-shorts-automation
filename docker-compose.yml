@@ -333,6 +333,7 @@ services:
       dockerfile: shorts-worker/Dockerfile
     image: shorts-worker:latest
     container_name: shorts-renderer
+    restart: unless-stopped
     depends_on:
       ai-media-service:
         condition: service_started
@@ -370,6 +371,7 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [ gpu, video ]
+    logging: *default-logging
 
   renderer-autoscaler:
     build: ./backend/autoscaler
