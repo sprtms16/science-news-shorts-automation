@@ -105,14 +105,14 @@ class DataInitializer(
 
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
-                    2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
+                    2. **Structure**: The script MUST have **10 to 14 scenes** depending on the content length.
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **25-45 Korean characters (글자)**. Keep it dynamic and natural.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous narrative.
                        - Avoid abrupt topic changes between scenes - use transition words/phrases (그런데, 하지만, 게다가, 이처럼, 바로).
                        - Write as if the background music continues uninterrupted - the narration should feel like a single flowing story.
                        - The last word/phrase of a scene should naturally lead into the first word of the next scene.
-                    5. **Signature Outro**: "미래의 조각을 모으는 곳, 사이언스 픽셀이었습니다." (Keep it as the very last line).
+                    5. **Signature Outro**: End naturally, optionally using "사이언스 픽셀이었습니다." or a thought-provoking question. Do not force the exact same outro every time.
 
                     [Input]
                     Title: {title}
@@ -128,7 +128,7 @@ class DataInitializer(
                         "sources": ["source1", "source2"],
                         "scenes": [
                             {"sentence": "Punchy Korean Sentence 1", "keyword": "visual english keyword for stock footage"},
-                            ... (Total 14 scenes)
+                            ... (Total 10~14 scenes)
                         ],
                         "mood": "Tech, Futuristic, Exciting, Curious, Synth, Modern, Bright, Inspirational"
                     }
@@ -151,14 +151,14 @@ class DataInitializer(
 
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
-                    2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
+                    2. **Structure**: The script MUST have **10 to 14 scenes** based on the story pacing.
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **25-45 Korean characters (글자)**. Keep it natural.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous chilling narrative.
                        - Avoid abrupt breaks - use transition phrases (그런데, 하지만, 그 순간, 이후, 결국).
                        - Write as if the eerie background music continues uninterrupted - maintain atmospheric flow.
                        - Build tension progressively across scenes - each scene should escalate from the previous.
-                    5. **Signature Outro**: "미스터리 픽셀이었습니다." (Keep it as the very last line).
+                    5. **Signature Outro**: End dramatically. Optionally use "미스터리 픽셀이었습니다." but vary the exact phrasing.
 
                     [Input]
                     Title: {title}
@@ -174,7 +174,7 @@ class DataInitializer(
                         "sources": ["source1", "source2"],
                         "scenes": [
                             {"sentence": "Punchy Korean Sentence 1", "keyword": "visual eerie english keyword for stock footage"},
-                            ... (Total 14 scenes)
+                            ... (Total 10~14 scenes)
                         ],
                         "mood": "Terrifying, Bone-chilling, Visceral Horror, Deep Suspense, Nightmare, Dark Ambient, Disturbing, Psychological Thriller, Gruesome, Eerie"
                     }
@@ -199,14 +199,14 @@ class DataInitializer(
 
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
-                    2. **Structure**: The script MUST have exactly **14 scenes**.
-                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **33-43 Korean characters (글자)**. Aim for 38-42 chars. Short, punchy sentences only.
+                    2. **Structure**: The script MUST have **10 to 14 scenes** depending on complexity.
+                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **25-45 Korean characters (글자)**.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous financial narrative.
                        - Avoid abrupt topic changes between scenes - use transition words/phrases (그런데, 하지만, 또한, 이에 따라, 결국).
                        - Write as if the background music continues uninterrupted - the analysis should feel like a single flowing story.
                        - Build the analysis logically: context → fact → implication → conclusion.
-                    5. **Signature Outro**: "가치를 찾는 곳, 밸류 픽셀이었습니다." (Keep it as the very last line).
+                    5. **Signature Outro**: End with an insightful thought. Optionally use "밸류 픽셀이었습니다." but vary the wording.
 
                     [Input]
                     Title: {title}
@@ -222,7 +222,7 @@ class DataInitializer(
                         "sources": ["source1", "source2"],
                         "scenes": [
                             {"sentence": "Professional Korean Sentence 1", "keyword": "visual financial english keyword for stock footage"},
-                            ... (Total 14 scenes)
+                            ... (Total 10~14 scenes)
                         ],
                         "mood": "Professional, Corporate, Business, Financial, Analytical, Confident, Modern, Clean, Sophisticated"
                     }
@@ -290,7 +290,7 @@ class DataInitializer(
     }
 
     private fun seedSettings() {
-        val defaultInterval = "1" // Default 1 Hour
+        val defaultInterval = "12" // Default 12 Hours (Reduced from 1 Hour to avoid spam detection)
         val channelConfigs = mapOf(
             "science" to defaultInterval,
             "horror" to defaultInterval,

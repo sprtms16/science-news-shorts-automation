@@ -110,19 +110,21 @@ class VideoUploadService(
                 .map { it.trim().take(30) }
                 .distinct()
                 .filter { it.isNotBlank() && it.length > 1 }
-                .take(20)
+                .shuffled() // Shuffle to avoid identical tag orders
+                .take(8) // Limit to 8 to avoid tag stuffing
 
             val masterScript = if (video.description.isNotBlank()) video.description else video.summary
             
             // 1. Sources (Append if available)
             val sourcesLine = if (video.sources.isNotEmpty()) "\n\n출처: ${video.sources.joinToString(", ")}" else ""
 
-            // 2. AI Context Tags (Dynamic, Lowercase)
-            val aiContextTags = keywords.joinToString(" ") { "#${it.trim().lowercase().replace(" ", "_")}" }
+            // 2. AI Context Tags (Dynamic, Lowercase, Limit to 3)
+            val aiContextTags = keywords.shuffled().take(3).joinToString(" ") { "#${it.trim().lowercase().replace(" ", "_")}" }
             
             // 3. Assemble Final Description
-            // Format: Master Script + Sources + AI Context Tags + Channel Default Tags
-            val finalDescription = "$masterScript$sourcesLine\n\n$aiContextTags ${channelBehavior.defaultHashtags}"
+            // Format: Master Script + Sources + AI Context Tags + Channel Default Tags (reduced)
+            val defaultHashtagsArr = channelBehavior.defaultHashtags.split(" ").filter { it.isNotBlank() }.shuffled().take(2).joinToString(" ")
+            val finalDescription = "$masterScript$sourcesLine\n\n$aiContextTags $defaultHashtagsArr".trim()
 
             val thumbnailFile = if (video.thumbnailPath.isNotBlank()) File(video.thumbnailPath) else null
 
