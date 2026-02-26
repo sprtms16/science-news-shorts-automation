@@ -68,21 +68,26 @@ class VideoProcessor(
                 return@forEachIndexed
             }
 
-            // 1.2 Semantic Deduplication
-            val recentVideos = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(
-                channelId, 
-                org.springframework.data.domain.PageRequest.of(0, 30)
-            ).content
-            
-            if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
-                 println("  ⏭️ candidate $attempt skipped (High Semantic Similarity)")
-                 return@forEachIndexed
-            }
-
-            // 1.3 Safety Filter
-            if (!geminiService.checkSensitivity(item.title, item.summary, channelId)) {
-                 println("  ⛔ candidate $attempt skipped (Sensitive Content)")
-                 return@forEachIndexed
+            try {
+                // 1.2 Semantic Deduplication
+                val recentVideos = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(
+                    channelId, 
+                    org.springframework.data.domain.PageRequest.of(0, 30)
+                ).content
+                
+                if (geminiService.checkSimilarity(item.title, item.summary, recentVideos)) {
+                     println("  ⏭️ candidate $attempt skipped (High Semantic Similarity)")
+                     return@forEachIndexed
+                }
+    
+                // 1.3 Safety Filter
+                if (!geminiService.checkSensitivity(item.title, item.summary, channelId)) {
+                     println("  ⛔ candidate $attempt skipped (Sensitive Content)")
+                     return@forEachIndexed
+                }
+            } catch (e: Exception) {
+                println("  ⚠️ candidate $attempt skipped (Gemini API Error: ${e.message})")
+                return@forEachIndexed
             }
 
             // If we reach here, the item is safe and not a duplicate!

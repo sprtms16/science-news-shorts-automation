@@ -129,8 +129,8 @@ class BatchScheduler(
         recoverFailedGenerations()
         recoverOrphanedQueuedJobs() // Added: Rescue stuck QUEUED items
         processRetryQueue()
-        monitorStuckRetries()
         recoverStuckUploads()
+        recoverMissedDailyBatch()
     }
 
     // Phase 46: Paced Auto-Retry for persistent failures (Every 30 mins)
@@ -168,6 +168,31 @@ class BatchScheduler(
             errorMessage = "Auto-rescued after 1hr persistent failure (Paced Retry)",
             updatedAt = java.time.LocalDateTime.now()
         ))
+    }
+
+    // New: 당일 배치가 정상적으로 수행되지 않아 생성된 영상이 0건일 때 강제로 배치를 재트리거
+    private fun recoverMissedDailyBatch() {
+        val minIntervalHours = when(channelId) {
+            "stocks", "history" -> 24L
+            else -> return // science, horror 등은 시간 단위로 돔
+        }
+
+        // 기준: 오전 9시 이후인데도 오늘 생성된 영상(진행 중이거나 완료된 것)이 하나도 없다면 문제 상황으로 간주
+        val now = java.time.LocalDateTime.now()
+        if (now.hour < 9) return 
+
+        val startOfDay = now.toLocalDate().atStartOfDay()
+        
+        // FAILED를 제외한 유효 생성 혹은 진행 중인 항목 검사
+        val validCount = videoHistoryRepository.findAllByChannelIdOrderByCreatedAtDesc(channelId, org.springframework.data.domain.PageRequest.of(0, 100))
+            .count { it.createdAt.isAfter(startOfDay) && it.status != VideoStatus.FAILED }
+
+        if (validCount == 0) {
+            println("⚠️ [$channelId] No valid generations found today despite being past 9 AM. Missed daily batch? Triggering automatically...")
+            // Limit 확인을 triggerBatchJob 내부에서 다시 강제 통과시키지 않고 자연스럽게 진행 (강제로 force=true 시 무한 생성 유의)
+            // validCount가 없으므로 force=false로 넘겨도 통과됨
+            triggerBatchJob(force = false)
+        }
     }
 
     // New: Rescue Orphaned QUEUED items (Stuck > 1 hour)
