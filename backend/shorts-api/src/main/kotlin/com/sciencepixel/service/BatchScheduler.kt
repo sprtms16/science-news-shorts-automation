@@ -391,12 +391,11 @@ class BatchScheduler(
     fun scheduleUploads() {
         println("⏰ Batch Scheduler: Checking Upload Schedule for [$channelId] at ${Date()}")
 
-        // 1. Determine Upload Interval
-        // Stocks, History -> 1 per day (24 hours min interval, or just once per calendar day?)
-        // Science, Horror -> 1 per hour
-        val minIntervalHours = when(channelId) {
+        // 1. Determine Upload Interval from DB settings
+        val settingOpt = systemSettingRepository.findByChannelIdAndKey(channelId, "UPLOAD_INTERVAL_HOURS")
+        val minIntervalHours = settingOpt?.value?.toLongOrNull() ?: when(channelId) {
             "stocks", "history" -> 24L
-            else -> 1L
+            else -> 12L // Updated default for science, horror
         }
 
         // 2. Check Last Upload Time
@@ -412,6 +411,7 @@ class BatchScheduler(
         } else {
              println("🆕 [$channelId] No previous uploads found. Proceeding with first upload.")
         }
+
 
         // 3. Find Next Ready Video (FIFO)
         // Find oldest COMPLETED video

@@ -42,6 +42,23 @@ class YoutubeUploadScheduler(
             return
         }
 
+        // 1.5 Determine Upload Interval before fetching list
+        val settingOpt = systemSettingRepository.findByChannelIdAndKey(channelId, "UPLOAD_INTERVAL_HOURS")
+        val minIntervalHours = settingOpt?.value?.toLongOrNull() ?: when(channelId) {
+            "stocks", "history" -> 24L
+            else -> 12L
+        }
+
+        val lastUploaded = repository.findFirstByChannelIdAndStatusOrderByUpdatedAtDesc(channelId, VideoStatus.UPLOADED)
+        val now = java.time.LocalDateTime.now()
+        if (lastUploaded != null) {
+            val hoursSinceLastUpload = java.time.temporal.ChronoUnit.HOURS.between(lastUploaded.updatedAt, now)
+            if (hoursSinceLastUpload < minIntervalHours) {
+                println("⏳ [$channelId] Upload skipped (YoutubeUploadScheduler). Last upload was $hoursSinceLastUpload hours ago (Min Interval: $minIntervalHours hrs).")
+                return
+            }
+        }
+
         // 2. Fetch target videos (COMPLETED only)
         // We only pick ONE video to upload per cycle.
         val pendingVideos = repository.findByChannelIdAndStatus(channelId, VideoStatus.COMPLETED)
