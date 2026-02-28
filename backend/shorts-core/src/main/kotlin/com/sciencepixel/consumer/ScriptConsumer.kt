@@ -127,7 +127,7 @@ class ScriptConsumer(
             e.printStackTrace()
             // Mark as FAILED in DB
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
-            videoHistoryRepository.findByChannelIdAndLink(event.channelId, event.url)?.let { 
+            videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(event.channelId, event.url)?.let { 
                 videoHistoryRepository.save(it.copy(
                     status = VideoStatus.FAILED, 
                     failureStep = "SCRIPT",
@@ -140,7 +140,7 @@ class ScriptConsumer(
 
     private fun getOrCreateHistory(event: RssNewItemEvent): VideoHistory {
         // Simple check by link (assuming unique per news per channel)
-        val existing = videoHistoryRepository.findByChannelIdAndLink(event.channelId, event.url)
+        val existing = videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(event.channelId, event.url)
         if (existing != null) return existing
 
         val initialVideo = VideoHistory(
@@ -157,9 +157,9 @@ class ScriptConsumer(
             videoHistoryRepository.save(initialVideo)
         } catch (e: org.springframework.dao.DuplicateKeyException) {
             println("⚠️ Race condition detected for link: ${event.url} in channel ${event.channelId}. Returning existing record.")
-            videoHistoryRepository.findByChannelIdAndLink(event.channelId, event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url} in ${event.channelId}")
+            videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(event.channelId, event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url} in ${event.channelId}")
         } catch (e: Exception) {
-             val checkAgain = videoHistoryRepository.findByChannelIdAndLink(event.channelId, event.url)
+             val checkAgain = videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(event.channelId, event.url)
              if (checkAgain != null) return checkAgain
              throw e
         }

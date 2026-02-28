@@ -174,7 +174,7 @@ class ScriptConsumer(
             // Mark as FAILED or BLOCKED in DB
             val event = try { objectMapper.readValue(message, RssNewItemEvent::class.java) } catch(ex: Exception) { null }
             event?.let { 
-                videoHistoryRepository.findByChannelIdAndLink(channelId, it.url)?.let { v ->
+                videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, it.url)?.let { v ->
                     videoHistoryRepository.save(v.copy(
                         status = if (isSafety) VideoStatus.BLOCKED else VideoStatus.FAILED, 
                         failureStep = if (isSafety) "SAFETY" else "SCRIPT",
@@ -191,7 +191,7 @@ class ScriptConsumer(
         println("💀 [$channelId] Message moved to DLT after all retries: $topic")
         try {
             val event = objectMapper.readValue(message, RssNewItemEvent::class.java)
-            videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)?.let { 
+            videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, event.url)?.let { 
                 videoHistoryRepository.save(it.copy(
                     status = VideoStatus.FAILED, 
                     failureStep = "SCRIPT_RETRY_EXHAUSTED",
@@ -206,7 +206,7 @@ class ScriptConsumer(
 
     private fun getOrCreateHistory(event: RssNewItemEvent): VideoHistory {
         // Simple check by link (assuming unique per news per channel)
-        val existing = videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)
+        val existing = videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, event.url)
         if (existing != null) return existing
 
         val initialVideo = VideoHistory(
@@ -223,9 +223,9 @@ class ScriptConsumer(
             videoHistoryRepository.save(initialVideo)
         } catch (e: org.springframework.dao.DuplicateKeyException) {
             println("⚠️ Race condition detected for link: ${event.url} in channel $channelId. Returning existing record.")
-            videoHistoryRepository.findByChannelIdAndLink(channelId, event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url}")
+            videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, event.url) ?: throw IllegalStateException("Record should exist but not found: ${event.url}")
         } catch (e: Exception) {
-             val checkAgain = videoHistoryRepository.findByChannelIdAndLink(channelId, event.url)
+             val checkAgain = videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, event.url)
              if (checkAgain != null) return checkAgain
              throw e
         }

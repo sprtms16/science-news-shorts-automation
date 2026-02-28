@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
-    fun findByChannelIdAndLink(channelId: String, link: String): VideoHistory?
+    fun findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId: String, link: String): VideoHistory?
     fun findByChannelIdAndStatus(channelId: String, status: VideoStatus): List<VideoHistory>
     fun findByChannelIdAndStatusIn(channelId: String, statuses: Collection<VideoStatus>): List<VideoHistory>
     fun findByStatusIn(statuses: Collection<VideoStatus>): List<VideoHistory>

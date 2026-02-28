@@ -51,8 +51,8 @@ class VideoProcessor(
                 item.link
             }
 
-            if (videoHistoryRepository.findByChannelIdAndLink(channelId, item.link) != null || 
-                videoHistoryRepository.findByChannelIdAndLink(channelId, normalizedLink) != null) {
+            if (videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, item.link) != null || 
+                videoHistoryRepository.findFirstByChannelIdAndLinkOrderByCreatedAtDesc(channelId, normalizedLink) != null) {
                 println("  ⏭️ candidate $attempt skipped (Link Duplicate)")
                 return@forEachIndexed
             }
