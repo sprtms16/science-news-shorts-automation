@@ -12,7 +12,7 @@ import {
 
 interface ToolsPanelProps {
     t: any;
-    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts' | 'reset-sources') => void;
+    runBatchAction: (action: 'rematch-files' | 'regenerate-all-metadata' | 'regenerate-missing-files' | 'sync-uploaded' | 'cleanup-sensitive' | 'upload-pending' | 'prune-deleted' | 'translate-uploaded' | 'growth-analysis' | 'regenerate-thumbnails' | 'clear-failed' | 'cleanup-workspaces' | 'refresh-prompts' | 'reset-sources' | 'trigger-manual-generate') => void;
     loading: boolean;
     toolsResult: any;
 }
@@ -27,6 +27,28 @@ export function ToolsPanel({ t, runBatchAction, loading, toolsResult }: ToolsPan
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Manual Generate Card */}
+                    <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-green-500/30 transition-all group md:col-span-2">
+                        <div className="flex items-start gap-6">
+                            <div className="w-14 h-14 rounded-2xl bg-green-500/10 flex items-center justify-center text-green-500 shrink-0 group-hover:scale-105 transition-transform">
+                                <PlayCircle size={28} />
+                            </div>
+                            <div className="flex-1">
+                                <h4 className="text-lg font-bold text-green-500 mb-1">{t.manualGenerateTitle || "Manual Video Generation"}</h4>
+                                <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-4">
+                                    {t.manualGenerateDesc || "Fetch new news and forcefully start video generation immediately. Use this to trigger the batch without waiting for the scheduler."}
+                                </p>
+                                <button
+                                    onClick={() => runBatchAction('trigger-manual-generate')}
+                                    disabled={loading}
+                                    className="px-8 py-3 bg-green-600/10 hover:bg-green-600 text-green-500 hover:text-white disabled:opacity-50 rounded-xl font-bold transition-all border border-green-500/20"
+                                >
+                                    {t.runManualGenerate || "Trigger Generation"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Growth Analysis Card */}
                     <div className="p-6 bg-[var(--input-bg)] rounded-2xl border border-[var(--input-border)] hover:border-pink-500/30 transition-all group md:col-span-2">
                         <div className="flex items-start gap-6">

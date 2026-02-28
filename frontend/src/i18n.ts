@@ -94,7 +94,10 @@ export const translations = {
         runClearFailed: "실패 기록 삭제 실행",
         resetSourcesTitle: "기본 리소스 초기화 (Seed)",
         resetSourcesDesc: "모든 뉴스/괴담 수집 리소스를 공장 출고 상태로 초기화하고 최신 기사 수집을 준비합니다. 현재 채널에 관계없이 시스템 전역에 적용됩니다.",
-        runResetSources: "리소스 초기화 실행"
+        runResetSources: "리소스 초기화 실행",
+        manualGenerateTitle: "수동 영상 생성",
+        manualGenerateDesc: "새로운 뉴스를 수집하여 강제로 영상 생성을 즉시 시작합니다. 스케줄러를 기다리지 않고 바로 트리거할 때 사용합니다.",
+        runManualGenerate: "생성 트리거 실행"
     },
     en: {
         dashboard: 'Dashboard',
@@ -189,6 +192,9 @@ export const translations = {
         runClearFailed: "Clear Failed Records",
         resetSourcesTitle: "Reset Default Sources (Seed)",
         resetSourcesDesc: "Reset all news/horror collection sources to factory defaults and prepare for fresh fetching. Applies system-wide regardless of current channel.",
-        runResetSources: "Run Reset Sources"
+        runResetSources: "Run Reset Sources",
+        manualGenerateTitle: "Manual Video Generation",
+        manualGenerateDesc: "Fetch new news and forcefully start video generation immediately. Use this to trigger the batch without waiting for the scheduler.",
+        runManualGenerate: "Trigger Generation"
     }
 };
