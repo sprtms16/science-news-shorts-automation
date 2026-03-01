@@ -170,7 +170,7 @@ services:
       - APP_FEATURE_CONSUMER_SCRIPT=true
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
-      - APP_SCHEDULING_BATCH_CRON=0 10,40 * * * *
+      - APP_SCHEDULING_BATCH_CRON=0 0 0,3,6,9,12,15,18,21 * * *
       - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
@@ -211,7 +211,7 @@ services:
       - APP_FEATURE_CONSUMER_SCRIPT=true
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
-      - APP_SCHEDULING_BATCH_CRON=0 20,50 * * * *
+      - APP_SCHEDULING_BATCH_CRON=0 0 1,4,7,10,13,16,19,22 * * *
       - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback

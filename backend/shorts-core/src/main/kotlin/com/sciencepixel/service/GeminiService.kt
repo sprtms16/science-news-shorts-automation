@@ -1181,53 +1181,9 @@ class GeminiService(
      * Check if the new topic is substantively the same as any of the previous videos.
      */
     fun checkSimilarity(newTitle: String, newSummary: String, history: List<com.sciencepixel.domain.VideoHistory>): Boolean {
-        if (history.isEmpty()) return false
-
-        val historyText = history.joinToString("\n") { 
-            "- [${it.id}] ${it.title} (${it.summary.take(50)}...)" 
-        }
-
-        val prompt = """
-            [Task]
-            Check if the "New News Item" is effectively the SAME TOPIC/STORY as any of the "Recent Videos" for the channel '${getChannelName()}'.
-            Ignore minor differences in wording, source, or catchy AI titles. 
-            If they cover the same core event, story, or research, it IS a duplicate.
-            
-            [New News Item]
-            Title: $newTitle
-            Summary: $newSummary
-            
-            [Recent Videos from ${getChannelName()}]
-            $historyText
-            
-            [Output]
-            Answer ONLY "YES" or "NO".
-            - YES: It is a duplicate.
-            - NO: It is a new topic.
-        """.trimIndent()
-
-        val responseText = callGeminiWithRetry(prompt, channelId) ?: return false
-        
-        return try {
-            val candidateText = JSONObject(responseText)
-                .getJSONArray("candidates")
-                .getJSONObject(0)
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-                .trim()
-                .uppercase()
-            
-            val isDuplicate = candidateText.contains("YES")
-            if (isDuplicate) {
-                logger.info("Gemini Semantic Check ({}): DUPLICATE detected for '{}'", channelId, newTitle)
-            }
-            isDuplicate
-        } catch (e: Exception) {
-            logger.error("Similarity Check Error for {}: {}", channelId, e.message)
-            false 
-        }
+        // [Optimization] Disabled AI semantic check to save API quota and prevent 429 limits.
+        // Relying on exact title/link duplication checks instead.
+        return false
     }
 
     /**
@@ -1235,56 +1191,8 @@ class GeminiService(
      * Detects Politics, Religion, Ideology, or Social Conflicts.
      */
     fun checkSensitivity(title: String, summary: String, channelId: String): Boolean {
-        // [Policy] Stocks channel deals with politics/economy naturally. Disable filter.
-        if (channelId == "stocks") return true
-
-        val nicheAvoidance = when (channelId) {
-            "science" -> "Politics, Religion, Ideology, or Social Conflicts unrelated to science."
-            "horror" -> "Real-life trauma, sensitive criminal cases still in court, or hate speech."
-            "stocks" -> "Illegal financial advice, market manipulation, or non-financial political agenda."
-            "history" -> "Promotion of hate groups, modern political propaganda, or sensitive religious conflicts."
-            else -> "General controversial topics."
-        }
-
-        val prompt = """
-            [Task]
-            Analyze if the following news item is primarily about SENSITIVE or CONTROVERSIAL topics that should be avoided for the channel '${getChannelName()}'.
-            
-            [Topics to Avoid for ${getChannelName()}]
-            $nicheAvoidance
-            
-            [General Rule]
-            - Stay within the core niche.
-            
-            [Input News]
-            Title: $title
-            Summary: $summary
-            
-            [Output]
-            Answer ONLY "SAFE" or "UNSAFE".
-        """.trimIndent()
-
-        val responseText = callGeminiWithRetry(prompt, channelId) ?: return true 
-
-        return try {
-            val candidateText = JSONObject(responseText)
-                .getJSONArray("candidates")
-                .getJSONObject(0)
-                .getJSONObject("content")
-                .getJSONArray("parts")
-                .getJSONObject(0)
-                .getString("text")
-                .trim()
-                .uppercase()
-            
-            val isUnsafe = candidateText.contains("UNSAFE")
-            if (isUnsafe) {
-                logger.warn("Safety Filter ({}): UNSAFE topic detected for '{}'", channelId, title)
-            }
-            !isUnsafe // Return TRUE if SAFE
-        } catch (e: Exception) {
-            logger.error("Safety Check Error for {}: {}", channelId, e.message)
-            true // Default to SAFE
-        }
+        // [Optimization] Disabled AI sensitivity check to save API quota.
+        // Assuming RSS feeds from reputable scientific/news sources are safe by default.
+        return true
     }
 }
