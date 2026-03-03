@@ -170,8 +170,8 @@ services:
       - APP_FEATURE_CONSUMER_SCRIPT=true
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
-      - APP_SCHEDULING_BATCH_CRON=0 0 0,3,6,9,12,15,18,21 * * *
-      - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
+      - APP_SCHEDULING_BATCH_CRON=0 0 0,4,8,12,16,20 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 0,3,6,9,12,15,18,21 * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8080/callback
       - JAVA_OPTS=-Xmx512m -Xms256m
@@ -211,8 +211,8 @@ services:
       - APP_FEATURE_CONSUMER_SCRIPT=true
       - APP_FEATURE_CONSUMER_SCENE=false
       - APP_FEATURE_CONSUMER_RENDER=false
-      - APP_SCHEDULING_BATCH_CRON=0 0 1,4,7,10,13,16,19,22 * * *
-      - APP_SCHEDULING_UPLOAD_CRON=0 0 * * * *
+      - APP_SCHEDULING_BATCH_CRON=0 0 1,5,9,13,17,21 * * *
+      - APP_SCHEDULING_UPLOAD_CRON=0 0 1,4,7,10,13,16,19,22 * * *
       - TZ=Asia/Seoul
       - YOUTUBE_REDIRECT_URI=http://localhost:8081/callback
       - JAVA_OPTS=-Xmx512m -Xms256m

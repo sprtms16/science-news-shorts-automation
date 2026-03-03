@@ -46,6 +46,7 @@ class YoutubeUploadScheduler(
         val settingOpt = systemSettingRepository.findByChannelIdAndKey(channelId, "UPLOAD_INTERVAL_HOURS")
         val minIntervalHours = settingOpt?.value?.toLongOrNull() ?: when(channelId) {
             "stocks", "history" -> 24L
+            "science", "horror" -> 3L
             else -> 12L
         }
 
