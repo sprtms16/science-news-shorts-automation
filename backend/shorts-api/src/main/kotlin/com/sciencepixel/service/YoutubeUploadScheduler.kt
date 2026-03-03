@@ -52,20 +52,21 @@ class YoutubeUploadScheduler(
         val lastUploaded = repository.findFirstByChannelIdAndStatusOrderByUpdatedAtDesc(channelId, VideoStatus.UPLOADED)
         val now = java.time.LocalDateTime.now()
         if (lastUploaded != null) {
-            val hoursSinceLastUpload = java.time.temporal.ChronoUnit.HOURS.between(lastUploaded.updatedAt, now)
+            val lastUploadDate = lastUploaded.updatedAt.toLocalDate()
+            val today = now.toLocalDate()
             
-            // Fix: For intervals >= 24h, if the last upload was yesterday (calendar day), it counts as safe to upload again.
-            if (minIntervalHours >= 24L) {
-                val lastUploadDate = lastUploaded.updatedAt.toLocalDate()
-                val today = java.time.LocalDate.now()
-                
-                if (!lastUploadDate.isBefore(today) && hoursSinceLastUpload < minIntervalHours) {
-                    println("⏳ [$channelId] Upload skipped (YoutubeUploadScheduler). Last upload was today ($hoursSinceLastUpload hours ago). Waiting for next calendar day.")
+            // For history and stocks (or any channel with >= 24h interval), check purely by calendar date
+            if (minIntervalHours >= 24L || channelId == "history" || channelId == "stocks") {
+                if (!lastUploadDate.isBefore(today)) {
+                    println("⏳ [$channelId] Upload skipped. Already uploaded today ($lastUploadDate). Waiting for next calendar date.")
                     return
                 }
-            } else if (hoursSinceLastUpload < minIntervalHours) {
-                println("⏳ [$channelId] Upload skipped (YoutubeUploadScheduler). Last upload was $hoursSinceLastUpload hours ago (Min Interval: $minIntervalHours hrs).")
-                return
+            } else {
+                val hoursSinceLastUpload = java.time.temporal.ChronoUnit.HOURS.between(lastUploaded.updatedAt, now)
+                if (hoursSinceLastUpload < minIntervalHours) {
+                    println("⏳ [$channelId] Upload skipped (YoutubeUploadScheduler). Last upload was $hoursSinceLastUpload hours ago (Min Interval: $minIntervalHours hrs).")
+                    return
+                }
             }
         }
 
