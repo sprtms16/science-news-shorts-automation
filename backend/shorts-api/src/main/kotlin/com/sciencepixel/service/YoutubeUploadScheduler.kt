@@ -53,13 +53,19 @@ class YoutubeUploadScheduler(
         val lastUploaded = repository.findFirstByChannelIdAndStatusOrderByUpdatedAtDesc(channelId, VideoStatus.UPLOADED)
         val now = java.time.LocalDateTime.now()
         if (lastUploaded != null) {
-            val lastUploadDate = lastUploaded.updatedAt.toLocalDate()
-            val today = now.toLocalDate()
+            val seoulZone = java.time.ZoneId.of("Asia/Seoul")
+            val systemZone = java.time.ZoneId.systemDefault()
             
-            // For history and stocks (or any channel with >= 24h interval), check purely by calendar date
+            // Convert the stored generic LocalDateTime to a KST-aware LocalDate
+            val lastUploadInstant = lastUploaded.updatedAt.atZone(systemZone).toInstant()
+            val lastUploadDateKst = lastUploadInstant.atZone(seoulZone).toLocalDate()
+            
+            val todayKst = java.time.ZonedDateTime.now(seoulZone).toLocalDate()
+            
+            // For history and stocks (or any channel with >= 24h interval), check purely by calendar date in KST
             if (minIntervalHours >= 24L || channelId == "history" || channelId == "stocks") {
-                if (!lastUploadDate.isBefore(today)) {
-                    println("⏳ [$channelId] Upload skipped. Already uploaded today ($lastUploadDate). Waiting for next calendar date.")
+                if (!lastUploadDateKst.isBefore(todayKst)) {
+                    println("⏳ [$channelId] Upload skipped. Already uploaded today ($lastUploadDateKst KST). Waiting for next calendar date.")
                     return
                 }
             } else {
