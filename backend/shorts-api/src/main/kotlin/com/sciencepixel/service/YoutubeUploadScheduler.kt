@@ -83,7 +83,8 @@ class YoutubeUploadScheduler(
             .sortedBy { it.createdAt } // Oldest first
             .filter { 
                 if (channelBehavior.requiresStrictDateCheck) {
-                    val startOfDay = java.time.LocalDate.now().atStartOfDay()
+                    val seoulZone = java.time.ZoneId.of("Asia/Seoul")
+                    val startOfDay = java.time.LocalDate.now(seoulZone).atStartOfDay()
                     val isToday = it.createdAt.isAfter(startOfDay)
                     if (!isToday) {
                         println("⏳ [$channelId] Skipping old video (Created: ${it.createdAt}) due to strict 'Today's News' policy.")
