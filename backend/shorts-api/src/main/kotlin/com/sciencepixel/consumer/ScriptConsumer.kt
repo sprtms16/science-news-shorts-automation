@@ -7,6 +7,7 @@ import com.sciencepixel.event.KafkaEventPublisher
 import com.sciencepixel.event.RssNewItemEvent
 import com.sciencepixel.event.ScriptCreatedEvent
 import com.sciencepixel.repository.VideoHistoryRepository
+import com.sciencepixel.service.BatchScheduler
 import com.sciencepixel.service.GeminiService
 import com.sciencepixel.service.JobClaimService
 import com.sciencepixel.service.LogPublisher
@@ -83,9 +84,8 @@ class ScriptConsumer(
 
             // Daily Limit Check using ChannelBehavior
             if (!isManualRetry && channelBehavior.dailyLimit == 1) {
-                val startOfDay = java.time.LocalDate.now().atStartOfDay()
-                val successStatuses = listOf(VideoStatus.SCRIPTING, VideoStatus.ASSETS_QUEUED, VideoStatus.RENDER_QUEUED, VideoStatus.RENDERING, VideoStatus.COMPLETED, VideoStatus.UPLOADING, VideoStatus.UPLOADED)
-                val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, successStatuses, startOfDay)
+                val startOfDay = java.time.LocalDate.now(BatchScheduler.SEOUL_ZONE).atStartOfDay()
+                val dailyCount = videoHistoryRepository.countByChannelIdAndStatusInAndCreatedAtAfter(channelId, BatchScheduler.DAILY_LIMIT_STATUSES, startOfDay)
                 
                 if (dailyCount >= channelBehavior.dailyLimit) {
                     println("🛑 [$channelId] Daily limit reached (Count: $dailyCount). Skipping execution for today.")

@@ -28,10 +28,10 @@ class VideoProcessor(
         val limit = systemSettingRepository.findByChannelIdAndKey(channelId, "MAX_GENERATION_LIMIT")
             ?.value?.toIntOrNull() ?: channelBehavior.dailyLimit
         
-        val currentActive = videoHistoryRepository.findByChannelIdAndStatusNotIn(channelId, listOf(
-            VideoStatus.UPLOADED, 
+        val currentActive = videoHistoryRepository.countByChannelIdAndStatusNotIn(channelId, listOf(
+            VideoStatus.UPLOADED,
             VideoStatus.FAILED
-        )).size
+        ))
         
         if (currentActive >= limit) {
             println("🛑 [$channelId] Mid-Batch Check: Buffer limit reached ($currentActive >= $limit). Skipping batch bundle.")
@@ -57,8 +57,8 @@ class VideoProcessor(
                 return@forEachIndexed
             }
 
-            if (videoHistoryRepository.findByChannelIdAndTitle(channelId, item.title).isNotEmpty() || 
-                videoHistoryRepository.findByChannelIdAndRssTitle(channelId, item.title).isNotEmpty()) {
+            if (videoHistoryRepository.existsByChannelIdAndTitle(channelId, item.title) ||
+                videoHistoryRepository.existsByChannelIdAndRssTitle(channelId, item.title)) {
                 println("  ⏭️ candidate $attempt skipped (Local DB Title Duplicate)")
                 return@forEachIndexed
             }

@@ -34,6 +34,13 @@ interface VideoHistoryRepository : MongoRepository<VideoHistory, String> {
     ])
     fun findDuplicateLinks(channelId: String): List<DuplicateLinkGroup>
 
+    // Count / Exists queries (avoid full document load)
+    fun countByChannelIdAndStatusIn(channelId: String, statuses: Collection<VideoStatus>): Long
+    fun countByChannelIdAndStatus(channelId: String, status: VideoStatus): Long
+    fun countByChannelIdAndStatusNotIn(channelId: String, statuses: Collection<VideoStatus>): Long
+    fun existsByChannelIdAndTitle(channelId: String, title: String): Boolean
+    fun existsByChannelIdAndRssTitle(channelId: String, rssTitle: String): Boolean
+
     // Daily Limit Check
     fun countByChannelIdAndStatusInAndCreatedAtAfter(channelId: String, statuses: Collection<VideoStatus>, date: java.time.LocalDateTime): Long
 

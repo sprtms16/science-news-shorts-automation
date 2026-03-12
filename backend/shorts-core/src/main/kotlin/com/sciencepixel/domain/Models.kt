@@ -9,7 +9,9 @@ import java.time.LocalDateTime
 
 @Document(collection = "video_history")
 @CompoundIndexes(
-    CompoundIndex(name = "channel_link_idx", def = "{'channelId': 1, 'link': 1}", unique = true)
+    CompoundIndex(name = "channel_link_idx", def = "{'channelId': 1, 'link': 1}", unique = true),
+    CompoundIndex(name = "channel_status_created_idx", def = "{'channelId': 1, 'status': 1, 'createdAt': -1}"),
+    CompoundIndex(name = "channel_status_updated_idx", def = "{'channelId': 1, 'status': 1, 'updatedAt': -1}")
 )
 data class VideoHistory(
     @Id
