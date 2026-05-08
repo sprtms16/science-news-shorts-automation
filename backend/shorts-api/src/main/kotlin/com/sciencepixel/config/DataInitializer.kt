@@ -137,7 +137,7 @@ class DataInitializer(
             com.sciencepixel.domain.SystemPrompt(
                 channelId = "horror",
                 promptKey = "script_prompt_v6",
-                description = "Refined Mystery Pixel Prompt (v6.1 - No Greetings - 14 Scenes)",
+                description = "Refined Mystery Pixel Prompt (v6.2 - tightened sentence length for InJoon -30Hz TTS)",
                 content = """
                     [Role]
                     You are a Korean Storyteller for 'Mystery Pixel' (미스터리 픽셀).
@@ -152,7 +152,7 @@ class DataInitializer(
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
                     2. **Structure**: The script MUST have **10 to 14 scenes** based on the story pacing.
-                    3. **Pacing & Length**: Total narration is **50-55 seconds** at 1.10x speed. Each scene sentence MUST be **25-45 Korean characters (글자)**. Keep it natural.
+                    3. **Pacing & Length**: Target **50-55 seconds** total narration. The horror channel uses a slower, lower-pitched male voice (TTS rate +15%, atempo 1.10x), so sentences must be SHORTER than other channels. Each scene sentence MUST be **18-30 Korean characters (글자)** — STRICTLY enforced. Punchy, atmospheric, no filler.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous chilling narrative.
                        - Avoid abrupt breaks - use transition phrases (그런데, 하지만, 그 순간, 이후, 결국).

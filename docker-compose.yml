@@ -17,7 +17,10 @@ services:
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
       - EPHEMERAL=false # Runner 재사용 가능하도록 설정
-      - DISABLE_AUTO_UPDATE=false # GitHub의 runner 자체 업데이트 허용 (deprecation 차단 방지)
+      # DISABLE_AUTO_UPDATE was removed: myoung34/github-runner treats this var
+      # as "set = disabled" regardless of value. Leaving it unset lets GitHub
+      # auto-upgrade the runner binary so it never drifts into a deprecated
+      # version that GitHub refuses to talk to.
       - TZ=Asia/Seoul
     healthcheck:
       test: [ "CMD-SHELL", "pgrep Runner.Listener > /dev/null || exit 1" ]
