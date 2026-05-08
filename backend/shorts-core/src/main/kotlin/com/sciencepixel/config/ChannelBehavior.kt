@@ -73,6 +73,30 @@ interface ChannelBehavior {
      * 음수일수록 낮고 음산하게, 양수일수록 높고 밝게 들립니다.
      */
     val ttsPitch: String get() = "+0Hz"
+
+    /**
+     * Channel-aware TTS lookup. Required because the renderer container runs
+     * with SHORTS_CHANNEL_ID=renderer (RendererChannelBehavior) but processes
+     * jobs for every channel, so the per-instance ttsVoice/Rate/Pitch above
+     * would always resolve to the renderer's defaults. Use these static
+     * lookups whenever the effective channelId is known at call time.
+     */
+    companion object {
+        fun ttsVoiceFor(channelId: String): String = when (channelId) {
+            "horror" -> "ko-KR-InJoonNeural"
+            else -> "ko-KR-SunHiNeural"
+        }
+
+        fun ttsRateFor(channelId: String): String = when (channelId) {
+            "horror" -> "+15%"
+            else -> "+30%"
+        }
+
+        fun ttsPitchFor(channelId: String): String = when (channelId) {
+            "horror" -> "-30Hz"
+            else -> "+0Hz"
+        }
+    }
 }
 
 /**
