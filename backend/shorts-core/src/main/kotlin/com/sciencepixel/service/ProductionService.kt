@@ -178,7 +178,13 @@ class ProductionService(
                         // 오디오 생성 (atempo=1.10가 FFmpeg에서 적용되므로 duration 조정 필요)
                         println("🎙️ [Scene $i] Generating audio: $cleanSentence")
                         val rawDuration = try {
-                            audioService.generateAudio(cleanSentence, audioFile)
+                            audioService.generateAudio(
+                                text = cleanSentence,
+                                outputFile = audioFile,
+                                voice = channelBehavior.ttsVoice,
+                                rate = channelBehavior.ttsRate,
+                                pitch = channelBehavior.ttsPitch
+                            )
                         } catch (e: Exception) {
                             println("⚠️ [Scene $i] Audio generation failed: ${e.message}. Using default duration 5.0s")
                             5.0
@@ -420,7 +426,13 @@ class ProductionService(
 
             // 2. Audio (Edge-TTS) - atempo=1.10가 FFmpeg에서 적용되므로 duration 조정 필요
             val rawDuration = try {
-                 audioService.generateAudio(scene.sentence, audioFile)
+                 audioService.generateAudio(
+                     text = scene.sentence,
+                     outputFile = audioFile,
+                     voice = channelBehavior.ttsVoice,
+                     rate = channelBehavior.ttsRate,
+                     pitch = channelBehavior.ttsPitch
+                 )
             } catch (e: Exception) {
                 println("⚠️ Audio generation failed: ${e.message}")
                 5.0

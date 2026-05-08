@@ -17,8 +17,19 @@ class AudioService {
     // We configured container_name in docker-compose as shorts-ai-service
     private val PYTHON_SERVICE_URL = "http://shorts-ai-service:8000/generate-audio"
 
-    fun generateAudio(text: String, outputFile: File): Double {
-        val json = JSONObject().put("text", text).put("voice", "ko-KR-SunHiNeural").toString()
+    fun generateAudio(
+        text: String,
+        outputFile: File,
+        voice: String = "ko-KR-SunHiNeural",
+        rate: String = "+30%",
+        pitch: String = "+0Hz"
+    ): Double {
+        val json = JSONObject()
+            .put("text", text)
+            .put("voice", voice)
+            .put("rate", rate)
+            .put("pitch", pitch)
+            .toString()
         val request = Request.Builder()
             .url(PYTHON_SERVICE_URL)
             .post(RequestBody.create("application/json".toMediaType(), json))
@@ -26,36 +37,34 @@ class AudioService {
 
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw RuntimeException("TTS Error: ${response.code}")
-            
+
             val resJson = JSONObject(response.body?.string() ?: "{}")
-            // Python service returns filename. Because valid volume share, we can just use the file
-            // But wait, Python saves to /app/output which is mapped to shared-data.
-            // Kotlin service also maps shared-data to /app/shared-data.
-            // So if Python says "audio_uuid.mp3", Kotlin can find it in /app/shared-data/audio_uuid.mp3
-            
-            // However, the AudioService interface provided in manifest implies it puts file to `outputFile`.
-            // In ProductionService code provided: val duration = audioService.generateAudio(..., audioFile)
-            // So we need to copy or move the file from shared-data if Python writes to random name.
-            
-            // Re-reading manifest AudioService.kt:
-            // "return resJson.optDouble("duration", 5.0)"
-            // It seems it relies on shared volume implicitly.
-            // Let's implement logic to ensure the file exists at outputFile.
-            
             val generatedFilename = resJson.getString("filename")
-            val sharedDir = File("shared-data") // in container: /app/shared-data
+            val sharedDir = File("shared-data")
             val sourceFile = File(sharedDir, generatedFilename)
-            
-            // Wait retry for file system sync if needed (usually instant on local volume)
-            if (sourceFile.exists()) {
-                sourceFile.copyTo(outputFile, overwrite = true)
-                sourceFile.delete() // Clean up temp file from shared-data root
-                println("🔊 TTS saved to workspace: ${outputFile.name}")
-            } else {
-                 println("⚠️ Audio file not found at ${sourceFile.absolutePath}")
+
+            if (!sourceFile.exists()) {
+                throw IllegalStateException("TTS audio file not found: ${sourceFile.absolutePath}")
             }
-            
-            return resJson.optDouble("duration", 5.0) // Mock duration if not enabled in Python yet
+            if (sourceFile.length() == 0L) {
+                sourceFile.delete()
+                throw IllegalStateException("TTS audio file is empty (0 bytes): ${sourceFile.absolutePath}")
+            }
+
+            sourceFile.copyTo(outputFile, overwrite = true)
+            sourceFile.delete()
+
+            if (!outputFile.exists() || outputFile.length() == 0L) {
+                throw IllegalStateException("TTS output file is missing or empty after copy: ${outputFile.absolutePath}")
+            }
+
+            val duration = resJson.optDouble("duration", 0.0)
+            if (duration <= 0.0) {
+                throw IllegalStateException("TTS returned non-positive duration ($duration) for ${outputFile.name}")
+            }
+
+            println("🔊 TTS saved to workspace: ${outputFile.name} (voice=$voice, pitch=$pitch)")
+            return duration
         }
     }
 

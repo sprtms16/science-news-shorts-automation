@@ -73,10 +73,35 @@ class TTSRequest(BaseModel):
     text: str
     voice: str = "ko-KR-SunHiNeural"
     rate: str = "+30%"  # 1.3x speed by default
+    pitch: str = "+0Hz"  # neutral pitch by default; negative values lower the tone
 
 class BGMRequest(BaseModel):
     prompt: str
     duration: int = 15 # seconds to generate (will be looped if needed)
+
+# Default fallback voice — used when the requested voice/pitch combo produces empty audio.
+DEFAULT_TTS_VOICE = "ko-KR-SunHiNeural"
+DEFAULT_TTS_RATE = "+30%"
+DEFAULT_TTS_PITCH = "+0Hz"
+
+
+async def _synthesize(text: str, voice: str, rate: str, pitch: str, output_path: str) -> float:
+    """Run edge-tts and return measured duration. Raises if the produced file is empty."""
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+    await communicate.save(output_path)
+
+    if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+        raise RuntimeError(f"edge-tts produced empty file (voice={voice}, pitch={pitch})")
+
+    try:
+        duration = MP3(output_path).info.length
+    except Exception as e:
+        raise RuntimeError(f"edge-tts produced unreadable MP3: {e}")
+
+    if duration <= 0:
+        raise RuntimeError(f"edge-tts produced 0-duration audio (voice={voice}, pitch={pitch})")
+
+    return duration
 
 # --Endpoints --
 @app.get("/")
@@ -85,27 +110,50 @@ def health_check():
 
 @app.post("/generate-audio")
 async def generate_audio(request: TTSRequest):
-    try:
-        filename = f"audio_{uuid.uuid4()}.mp3"
-        output_path = os.path.join(OUTPUT_DIR, filename)
-        
-        # Add rate parameter for speed control
-        communicate = edge_tts.Communicate(request.text, request.voice, rate=request.rate)
-        await communicate.save(output_path)
-        
-        # Get actual duration using mutagen
+    filename = f"audio_{uuid.uuid4()}.mp3"
+    output_path = os.path.join(OUTPUT_DIR, filename)
+
+    # Multi-tier fallback so we never return a missing/empty audio file.
+    # Tier 1: requested voice + rate + pitch
+    # Tier 2: requested voice + rate, neutral pitch (some voices reject extreme pitch)
+    # Tier 3: default voice + default rate + neutral pitch (last-resort known-good)
+    attempts = [
+        (request.voice, request.rate, request.pitch),
+        (request.voice, request.rate, DEFAULT_TTS_PITCH),
+        (DEFAULT_TTS_VOICE, DEFAULT_TTS_RATE, DEFAULT_TTS_PITCH),
+    ]
+    # Deduplicate while keeping order so we don't retry an identical configuration.
+    seen = set()
+    unique_attempts = []
+    for attempt in attempts:
+        if attempt not in seen:
+            seen.add(attempt)
+            unique_attempts.append(attempt)
+
+    last_error = None
+    for idx, (voice, rate, pitch) in enumerate(unique_attempts):
         try:
-            audio = MP3(output_path)
-            duration = audio.info.length
-        except Exception:
-            duration = 5.0  # fallback
-        
-        
-        logger.log("INFO", f"TTS Generated: {request.text[:30]}...", f"File: {filename}, Dur: {duration:.2f}s")
-        return {"status": "success", "filename": filename, "duration": duration} 
-    except Exception as e:
-        logger.log("ERROR", "TTS Generation Failed", f"Error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+            duration = await _synthesize(request.text, voice, rate, pitch, output_path)
+            if idx > 0:
+                logger.log(
+                    "WARN",
+                    f"TTS Fallback used (tier {idx + 1})",
+                    f"voice={voice}, rate={rate}, pitch={pitch}, text={request.text[:30]}",
+                )
+            logger.log("INFO", f"TTS Generated: {request.text[:30]}...", f"File: {filename}, Dur: {duration:.2f}s, voice={voice}, pitch={pitch}")
+            return {"status": "success", "filename": filename, "duration": duration}
+        except Exception as e:
+            last_error = e
+            logger.log("WARN", f"TTS attempt {idx + 1} failed", f"voice={voice}, pitch={pitch}, error={e}")
+            # Remove partial/empty file before next attempt so the caller never sees stale bytes.
+            if os.path.exists(output_path):
+                try:
+                    os.remove(output_path)
+                except OSError:
+                    pass
+
+    logger.log("ERROR", "TTS Generation Failed (all fallbacks exhausted)", f"Error: {last_error}")
+    raise HTTPException(status_code=500, detail=f"TTS failed after {len(unique_attempts)} attempts: {last_error}")
 
 @app.post("/generate-bgm")
 async def generate_bgm(request: BGMRequest):

@@ -57,6 +57,22 @@ interface ChannelBehavior {
      * 설명란에 추가할 기본 해시태그 (Description Hashtags)
      */
     val defaultHashtags: String get() = "#shorts"
+
+    /**
+     * TTS voice ID. ko-KR 기본 음성: SunHiNeural(여, friendly) / InJoonNeural(남)
+     */
+    val ttsVoice: String get() = "ko-KR-SunHiNeural"
+
+    /**
+     * TTS speed. edge-tts rate 형식 (예: "+30%", "-10%")
+     */
+    val ttsRate: String get() = "+30%"
+
+    /**
+     * TTS pitch. edge-tts pitch 형식 (예: "+0Hz", "-30Hz", "+50Hz")
+     * 음수일수록 낮고 음산하게, 양수일수록 높고 밝게 들립니다.
+     */
+    val ttsPitch: String get() = "+0Hz"
 }
 
 /**
@@ -96,9 +112,14 @@ class HorrorChannelBehavior : ChannelBehavior {
     
     override fun getExtraPrompt(today: String) = ""
     override fun getBgmCategory() = "suspense"
-    
+
     override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
     override val defaultHashtags = "#공포 #괴담 #미스터리 #호러 #shorts"
+
+    // 호러 분위기용 TTS: 남성 보이스 + 낮은 pitch + 약간 느린 속도
+    override val ttsVoice = "ko-KR-InJoonNeural"
+    override val ttsRate = "+15%"
+    override val ttsPitch = "-30Hz"
 }
 
 /**
