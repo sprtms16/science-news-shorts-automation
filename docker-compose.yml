@@ -17,7 +17,7 @@ services:
       - RUNNER_WORKDIR=/tmp/runner
       - LABELS=self-hosted,linux,x64
       - EPHEMERAL=false # Runner 재사용 가능하도록 설정
-      - DISABLE_AUTO_UPDATE=true # 자동 업데이트 비활성화
+      - DISABLE_AUTO_UPDATE=false # GitHub의 runner 자체 업데이트 허용 (deprecation 차단 방지)
       - TZ=Asia/Seoul
     healthcheck:
       test: [ "CMD-SHELL", "pgrep Runner.Listener > /dev/null || exit 1" ]
