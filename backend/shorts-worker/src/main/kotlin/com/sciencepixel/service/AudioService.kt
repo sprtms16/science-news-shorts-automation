@@ -22,13 +22,15 @@ class AudioService {
         outputFile: File,
         voice: String = "ko-KR-SunHiNeural",
         rate: String = "+30%",
-        pitch: String = "+0Hz"
+        pitch: String = "+0Hz",
+        volume: String = "+0%"
     ): Double {
         val json = JSONObject()
             .put("text", text)
             .put("voice", voice)
             .put("rate", rate)
             .put("pitch", pitch)
+            .put("volume", volume)
             .toString()
         val request = Request.Builder()
             .url(PYTHON_SERVICE_URL)
@@ -63,7 +65,7 @@ class AudioService {
                 throw IllegalStateException("TTS returned non-positive duration ($duration) for ${outputFile.name}")
             }
 
-            println("🔊 TTS saved to workspace: ${outputFile.name} (voice=$voice, pitch=$pitch)")
+            println("🔊 TTS saved to workspace: ${outputFile.name} (voice=$voice, pitch=$pitch, volume=$volume)")
             return duration
         }
     }

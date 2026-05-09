@@ -186,7 +186,8 @@ class ProductionService(
                                 outputFile = audioFile,
                                 voice = ChannelBehavior.ttsVoiceFor(effectiveChannelId),
                                 rate = ChannelBehavior.ttsRateFor(effectiveChannelId),
-                                pitch = ChannelBehavior.ttsPitchFor(effectiveChannelId)
+                                pitch = ChannelBehavior.ttsPitchFor(effectiveChannelId),
+                                volume = ChannelBehavior.ttsVolumeFor(effectiveChannelId)
                             )
                         } catch (e: Exception) {
                             println("⚠️ [Scene $i] Audio generation failed: ${e.message}. Using default duration 5.0s")
@@ -435,7 +436,8 @@ class ProductionService(
                      outputFile = audioFile,
                      voice = ChannelBehavior.ttsVoiceFor(channelId),
                      rate = ChannelBehavior.ttsRateFor(channelId),
-                     pitch = ChannelBehavior.ttsPitchFor(channelId)
+                     pitch = ChannelBehavior.ttsPitchFor(channelId),
+                     volume = ChannelBehavior.ttsVolumeFor(channelId)
                  )
             } catch (e: Exception) {
                 println("⚠️ Audio generation failed: ${e.message}")

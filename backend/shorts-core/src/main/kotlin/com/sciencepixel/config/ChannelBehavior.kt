@@ -75,11 +75,26 @@ interface ChannelBehavior {
     val ttsPitch: String get() = "+0Hz"
 
     /**
+     * TTS volume. edge-tts volume 형식 (예: "+0%", "-15%", "+10%").
+     * 음수면 더 조용 → 청자 집중도 ↑ (호러 톤에 효과적).
+     */
+    val ttsVolume: String get() = "+0%"
+
+    /**
      * Channel-aware TTS lookup. Required because the renderer container runs
      * with SHORTS_CHANNEL_ID=renderer (RendererChannelBehavior) but processes
      * jobs for every channel, so the per-instance ttsVoice/Rate/Pitch above
      * would always resolve to the renderer's defaults. Use these static
      * lookups whenever the effective channelId is known at call time.
+     *
+     * Horror values are picked from acoustic-prosody research:
+     *   - InJoon (male) — lower baseline F0 = more "threatening" perception
+     *   - pitch -50Hz   — Korean male F0 ~120Hz baseline → ~70Hz; deepens
+     *                     threat tone without entering vocal-fry territory
+     *   - rate -5%      — slow speech reads as "potent / threatening" in
+     *                     prosody studies; not so slow it sounds drowsy
+     *   - volume -15%   — quiet narration forces listener focus and reads as
+     *                     intimate menace (horror trope)
      */
     companion object {
         fun ttsVoiceFor(channelId: String): String = when (channelId) {
@@ -88,13 +103,18 @@ interface ChannelBehavior {
         }
 
         fun ttsRateFor(channelId: String): String = when (channelId) {
-            "horror" -> "+15%"
+            "horror" -> "-5%"
             else -> "+30%"
         }
 
         fun ttsPitchFor(channelId: String): String = when (channelId) {
-            "horror" -> "-30Hz"
+            "horror" -> "-50Hz"
             else -> "+0Hz"
+        }
+
+        fun ttsVolumeFor(channelId: String): String = when (channelId) {
+            "horror" -> "-15%"
+            else -> "+0%"
         }
     }
 }
@@ -140,10 +160,12 @@ class HorrorChannelBehavior : ChannelBehavior {
     override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
     override val defaultHashtags = "#공포 #괴담 #미스터리 #호러 #shorts"
 
-    // 호러 분위기용 TTS: 남성 보이스 + 낮은 pitch + 약간 느린 속도
+    // 호러 분위기용 TTS: 남성 보이스 + 깊은 pitch + 느린 속도 + 낮은 볼륨
+    // (값은 ChannelBehavior.companion의 horror lookup과 동기화)
     override val ttsVoice = "ko-KR-InJoonNeural"
-    override val ttsRate = "+15%"
-    override val ttsPitch = "-30Hz"
+    override val ttsRate = "-5%"
+    override val ttsPitch = "-50Hz"
+    override val ttsVolume = "-15%"
 }
 
 /**
