@@ -87,21 +87,25 @@ interface ChannelBehavior {
      * would always resolve to the renderer's defaults. Use these static
      * lookups whenever the effective channelId is known at call time.
      *
-     * Horror values v6.7 — calibrated from a survey of top Korean 괴담 radio
-     * channels (돌비공포라디오, 왓섭, 쌈무이, 조선별곡, 유민지 호신마마):
-     *   - HyunsuMultilingualNeural (male) — most natural / expressive ko-KR
-     *     male voice in the free Edge TTS tier; reads as a calm narrator
-     *     rather than a movie-trailer voiceover.
-     *   - pitch -10Hz   — barely below natural baseline. The earlier -50Hz
-     *                     manufactured "menace" but pulled the voice into
-     *                     synthetic trailer-territory.
-     *   - rate -10%     — Korean clear-speech zone (~70-74% of conversational
-     *                     pace per PMC6773961). Slow enough to feel deliberate
-     *                     without dragging.
-     *   - volume -5%    — minimal attenuation. Real intimacy comes from
-     *                     close-mic + post-EQ, not from quieter TTS output.
-     * Replaces the v6.5/6.6 "threat tone" recipe (-50Hz / -5% / -15%) which
-     * produced an unsettling but storytelling-incompatible voice.
+     * Horror values v6.8 — deeper acoustic analysis revealed v6.7's -10Hz was
+     * still pushing prosody too far from HyunsuMultilingual's training range,
+     * which is what was making the user perceive the voice as "wrong-feeling".
+     * Microsoft's own pitch-shift guidance is ±20%; large negative offsets on
+     * Neural voices introduce vocoder artifacts. Pull pitch BACK toward 0 and
+     * compensate with FFmpeg post-EQ for warmth (see ttsAudioPostFilter).
+     *
+     *   - HyunsuMultilingualNeural — same calm male voice as v6.7 (the 4
+     *     edge-tts-usable ko-KR voices: SunHi/InJoon/Hyunsu/HyunsuMultilingual.
+     *     BongJin/GookMin/JiMin/SeoHyeon/YuJin appear in Azure docs but are
+     *     NOT exposed by the free Edge TTS endpoint — sample tests showed
+     *     them returning a stuck 4.25s response regardless of prosody.)
+     *   - pitch -5Hz    — barely below natural; lets the voice keep its
+     *                     trained timbre instead of vocoding into menace.
+     *   - rate -12%     — slightly slower than v6.7. Korean clear-speech is
+     *                     ~70-74% of conversational; -12% lands in that zone
+     *                     without sounding dragged.
+     *   - volume -5%    — minimal attenuation. Intimacy comes from the post-EQ
+     *                     low-shelf + compressor below, not from quieter TTS.
      */
     companion object {
         fun ttsVoiceFor(channelId: String): String = when (channelId) {
@@ -110,12 +114,12 @@ interface ChannelBehavior {
         }
 
         fun ttsRateFor(channelId: String): String = when (channelId) {
-            "horror" -> "-10%"
+            "horror" -> "-12%"
             else -> "+30%"
         }
 
         fun ttsPitchFor(channelId: String): String = when (channelId) {
-            "horror" -> "-10Hz"
+            "horror" -> "-5Hz"
             else -> "+0Hz"
         }
 
@@ -125,22 +129,46 @@ interface ChannelBehavior {
         }
 
         /**
+         * FFmpeg audio filter chain applied AFTER atempo=1.10 to shape the TTS
+         * output toward a warm close-mic radio-narrator timbre that matches
+         * the perceptual signature of top Korean 괴담 channels (돌비, 왓섭,
+         * 쌈무이). Edge TTS's spectral envelope is "neutral studio" — flat,
+         * slightly hyper-articulated, missing the chest/proximity warmth and
+         * presence-band tame that real narration mics produce. This recipe
+         * reshapes that envelope without needing a different TTS engine.
+         *
+         *   - highpass 80 Hz   : strip subsonic rumble
+         *   - +2.5 dB at 180Hz : chest/proximity warmth (the standard vocal
+         *                       warmth zone is 200-300 Hz, +1-3 dB)
+         *   - -1.5 dB at 2.8kHz: tame the harsh nasal/presence band that TTS
+         *                       over-emphasizes (sounds "hyper-clear")
+         *   - -2 dB at 6.5kHz  : tame sibilance peak
+         *   - 3:1 compressor   : glues to broadcast feel without crushing dynamics
+         *   - alimiter         : safety against clipping
+         *
+         * Returns "" for channels that should not be reshaped — they keep the
+         * raw Edge TTS output (only atempo=1.10 applies) so news-pace channels
+         * stay punchy.
+         */
+        fun ttsAudioPostFilterFor(channelId: String): String = when (channelId) {
+            "horror" -> "highpass=f=80,equalizer=f=180:t=h:width=120:g=2.5,equalizer=f=2800:t=h:width=1500:g=-1.5,equalizer=f=6500:t=h:width=2000:g=-2,acompressor=threshold=-18dB:ratio=3:attack=15:release=120:makeup=3,alimiter=limit=0.95"
+            else -> ""
+        }
+
+        /**
          * Effective Korean speech rate (chars/sec, post-atempo) measured from
          * actual rendered output. Used by GeminiService to validate that a
          * generated script's narration will fit the Shorts <60s window.
          * Calibrate by dividing observed final-video duration by total chars.
          *
-         *   - horror : HyunsuMultilingualNeural at rate -10%, atempo 1.10
-         *              → ~6.0 chars/sec (calm storyteller pace, bumped up from
-         *              v6.6's 5.6 because the new voice runs slightly faster
-         *              than InJoon at the same rate setting). Recalibrate by
-         *              dividing observed video duration by total chars after
-         *              the first batch of v6.7 renders.
+         *   - horror : HyunsuMultilingualNeural at rate -12%, atempo 1.10
+         *              → ~5.9 chars/sec (slightly slower than v6.7 because rate
+         *              moved from -10% to -12%; voice itself is unchanged).
          *   - others : SunHiNeural at rate +30%, atempo 1.10 → ~8.0 chars/sec
          *              (fast, news-pace delivery)
          */
         fun ttsCharsPerSecondFor(channelId: String): Double = when (channelId) {
-            "horror" -> 6.0
+            "horror" -> 5.9
             else -> 8.0
         }
     }
@@ -187,16 +215,16 @@ class HorrorChannelBehavior : ChannelBehavior {
     override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
     override val defaultHashtags = "#공포 #괴담 #미스터리 #호러 #shorts"
 
-    // Korean 괴담 narrator profile (v6.7): the consensus voice across top
-    // 괴담-radio channels (돌비공포라디오, 왓섭, 쌈무이, 조선별곡) is a calm,
-    // mid-pitched male reading voice — the BGM does the scaring, NOT the voice.
-    // HyunsuMultilingualNeural is the most natural-sounding ko-KR male in the
-    // free Edge TTS tier; pitch stays close to natural; rate sits in the
-    // measured "clear-speech" zone (~70-74% of conversational pace).
+    // Korean 괴담 narrator profile (v6.8) — pulled pitch BACK toward natural
+    // because a deeper acoustic survey found Edge TTS's "synthetic" perception
+    // gets WORSE the further prosody is pushed from the model's training
+    // distribution (Microsoft's own ±20% guidance). The fix is closer-to-
+    // natural prosody + slow-but-not-dragging rate + FFmpeg post-EQ for the
+    // warm close-mic radio-narrator timbre we couldn't get from prosody alone.
     // Values mirror ChannelBehavior.companion lookups below.
     override val ttsVoice = "ko-KR-HyunsuMultilingualNeural"
-    override val ttsRate = "-10%"
-    override val ttsPitch = "-10Hz"
+    override val ttsRate = "-12%"
+    override val ttsPitch = "-5Hz"
     override val ttsVolume = "-5%"
 }
 

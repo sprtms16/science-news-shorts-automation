@@ -197,7 +197,7 @@ class ProductionService(
                         val effectiveDuration = rawDuration / 1.10
 
                         println("✂️ [Scene $i] Editing scene (duration: ${String.format("%.2f", effectiveDuration)}s)")
-                        editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile)
+                        editSceneWithoutSubtitle(videoFile, audioFile, effectiveDuration, clipFile, effectiveChannelId)
 
                         SceneResult(
                             index = i,
@@ -489,7 +489,7 @@ class ProductionService(
     }
 
     // Phase 1: Edit scene WITHOUT subtitles
-    private fun editSceneWithoutSubtitle(video: File, audio: File, duration: Double, output: File) {
+    private fun editSceneWithoutSubtitle(video: File, audio: File, duration: Double, output: File, channelIdForAudioFx: String = channelId) {
         if (!video.exists()) {
             println("❌ [editSceneWithoutSubtitle] Video file does not exist: ${video.absolutePath}")
             throw IllegalArgumentException("Video file not found: ${video.name}")
@@ -499,7 +499,7 @@ class ProductionService(
 
         // GPU 코덱 사용 시도
         if (useGpuCodec) {
-            val success = tryEditSceneWithCodec(video, audio, duration, output, isImage, "h264_nvenc", "p4")
+            val success = tryEditSceneWithCodec(video, audio, duration, output, isImage, "h264_nvenc", "p4", channelIdForAudioFx)
             if (success) return
 
             // GPU 코덱 실패 시 fallback
@@ -508,7 +508,7 @@ class ProductionService(
         }
 
         // Software 코덱으로 재시도 또는 첫 시도
-        val success = tryEditSceneWithCodec(video, audio, duration, output, isImage, "libx264", "medium")
+        val success = tryEditSceneWithCodec(video, audio, duration, output, isImage, "libx264", "medium", channelIdForAudioFx)
         if (!success) {
             throw RuntimeException("Failed to edit scene with both GPU and CPU codecs: ${video.name}")
         }
@@ -521,7 +521,8 @@ class ProductionService(
         output: File,
         isImage: Boolean,
         videoCodec: String,
-        preset: String
+        preset: String,
+        channelIdForAudioFx: String
     ): Boolean {
         val cmd = mutableListOf("ffmpeg", "-y")
 
@@ -537,13 +538,18 @@ class ProductionService(
             cmd.addAll(listOf("-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100"))
         }
 
+        // atempo=1.10 (universal speedup) + optional per-channel post-EQ chain
+        // (e.g., horror gets a warm close-mic radio-narrator EQ recipe).
+        val channelPost = ChannelBehavior.ttsAudioPostFilterFor(channelIdForAudioFx)
+        val audioFilter = if (channelPost.isNotBlank()) "atempo=1.10,$channelPost" else "atempo=1.10"
+
         cmd.addAll(listOf(
             "-t", "$duration",
             "-vf", vfScaleFilter,
             "-r", "60",
             "-pix_fmt", "yuv420p",
             "-map", "0:v", "-map", "1:a",
-            "-af", "atempo=1.10",
+            "-af", audioFilter,
             "-c:v", videoCodec,
             "-c:a", "aac",
             "-ar", "44100",
