@@ -635,10 +635,21 @@ class GeminiService(
                 if (attempt < maxAttempts) continue else break
             }
 
-            // === 검증 2: 총 duration 체크 (씬별 글자수 soft 로그만) ===
+            // === 검증 2: 총 duration 체크 ===
+            // YouTube Shorts max length is 3 minutes (Oct 2024+). The ranking
+            // signal is retention (target 70%+), not length. Inflow Network's
+            // 5,400-shorts analysis found the 50-60s band gets ~22x the views
+            // of sub-10s clips, so we aim for the 45-60s sweet spot but allow
+            // 30-90s before failing — much wider than the legacy 35-65s.
+            //
+            // Estimate from CHANNEL-AWARE chars/sec: horror's slow threat-tone
+            // TTS renders at ~5.6 chars/sec; the SunHi +30% channels render at
+            // ~8.0 chars/sec. The legacy ~10 chars/sec assumption over-counted
+            // horror narration by ~1.8x and let 80-second scripts pass as 45s.
             val totalChars = scriptResponse.scenes.sumOf { it.sentence.length }
-            val estimatedRawDuration = totalChars / 10.0  // ~10 한국어 글자/초
-            val adjustedDuration = estimatedRawDuration / 1.10
+            val charsPerSecond = com.sciencepixel.config.ChannelBehavior.ttsCharsPerSecondFor(channelId)
+            val estimatedRawDuration = totalChars / charsPerSecond
+            val adjustedDuration = estimatedRawDuration / 1.10  // atempo 1.10 applied later
 
             val tooLongScenes = scriptResponse.scenes.mapIndexedNotNull { i, scene ->
                 val len = scene.sentence.length
@@ -648,20 +659,18 @@ class GeminiService(
                 logger.warn("⚠️ Scene length soft-check: {} scenes over 50 chars (will affect duration): {}", tooLongScenes.size, tooLongScenes.take(3))
             }
 
-            logger.info("✓ Script scenes parsed: 14 scenes, $totalChars chars, ~${String.format("%.1f", adjustedDuration)}s @ 1.10x")
+            logger.info("✓ Script scenes parsed: 14 scenes, $totalChars chars @ ${charsPerSecond} chars/s, ~${String.format("%.1f", adjustedDuration)}s @ 1.10x")
 
-            // Soft validation: Hard fail only outside 35-65s, warn for 35-43s and 60-65s
             when {
-                adjustedDuration < 35 || adjustedDuration > 65 -> {
-                    logger.warn("❌ Duration HARD FAIL: ${String.format("%.1f", adjustedDuration)}s (must be 35-65s). Retry $attempt/$maxAttempts")
+                adjustedDuration < 30 || adjustedDuration > 90 -> {
+                    logger.warn("❌ Duration HARD FAIL: ${String.format("%.1f", adjustedDuration)}s (must be 30-90s). Retry $attempt/$maxAttempts")
                     if (attempt < maxAttempts) continue else break
                 }
-                adjustedDuration < 43 || adjustedDuration > 60 -> {
-                    logger.warn("⚠️ Duration outside ideal range: ${String.format("%.1f", adjustedDuration)}s (ideal: 43-60s, acceptable: 35-65s). Accepting anyway.")
-                    // Continue - soft warning only
+                adjustedDuration < 45 || adjustedDuration > 60 -> {
+                    logger.warn("⚠️ Duration outside ideal 45-60s retention sweet spot: ${String.format("%.1f", adjustedDuration)}s. Accepting (30-90s OK).")
                 }
                 else -> {
-                    logger.info("✅ Duration PERFECT: ${String.format("%.1f", adjustedDuration)}s (43-60s target)")
+                    logger.info("✅ Duration PERFECT: ${String.format("%.1f", adjustedDuration)}s (45-60s retention sweet spot)")
                 }
             }
 

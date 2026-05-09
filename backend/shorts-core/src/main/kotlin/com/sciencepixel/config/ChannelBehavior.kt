@@ -116,6 +116,22 @@ interface ChannelBehavior {
             "horror" -> "-15%"
             else -> "+0%"
         }
+
+        /**
+         * Effective Korean speech rate (chars/sec, post-atempo) measured from
+         * actual rendered output. Used by GeminiService to validate that a
+         * generated script's narration will fit the Shorts <60s window.
+         * Calibrate by dividing observed final-video duration by total chars.
+         *
+         *   - horror : InJoonNeural at rate -5%, atempo 1.10 → ~5.6 chars/sec
+         *              (slow, deliberate threat-tone delivery)
+         *   - others : SunHiNeural at rate +30%, atempo 1.10 → ~8.0 chars/sec
+         *              (fast, news-pace delivery)
+         */
+        fun ttsCharsPerSecondFor(channelId: String): Double = when (channelId) {
+            "horror" -> 5.6
+            else -> 8.0
+        }
     }
 }
 
