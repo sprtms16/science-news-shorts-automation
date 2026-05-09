@@ -331,7 +331,7 @@ class ProductionService(
             val outcomeDir = File("shared-data/videos/$effectiveChannelId").apply { mkdirs() }
             val finalOutput = File(outcomeDir, "shorts_${sanitizedTitle}_$videoId.mp4")
 
-            burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceRanges)
+            burnSubtitlesAndMixBGM(mergedFile, srtFile, finalOutput, mood, workspace, silenceRanges, effectiveChannelId)
 
             if (!finalOutput.exists()) {
                 println("❌ [FinalizeVideo] Output file DOES NOT EXIST at ${finalOutput.absolutePath}")
@@ -690,7 +690,7 @@ class ProductionService(
     }
 
     // Phase 3b: Burn subtitles and Mix BGM into final video
-    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File, silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList()) {
+    private fun burnSubtitlesAndMixBGM(inputVideo: File, srtFile: File, output: File, mood: String, workspace: File, silenceRanges: List<com.sciencepixel.domain.SilenceRange> = emptyList(), channelIdForBgm: String = channelId) {
         if (!inputVideo.exists()) {
             throw IllegalArgumentException("Input video does not exist: ${inputVideo.absolutePath}")
         }
@@ -744,7 +744,7 @@ class ProductionService(
 
         val cmd = buildBurnSubtitlesCommand(
             inputVideo, bgmFile, srtPath, subtitleFilter,
-            silenceRanges, videoCodec, preset, output
+            silenceRanges, videoCodec, preset, output, channelIdForBgm
         )
 
         var success = executeFFmpeg(cmd, output, "Burn Subtitles & Mix BGM (codec: $videoCodec)", 15)
@@ -757,7 +757,7 @@ class ProductionService(
 
             val fallbackCmd = buildBurnSubtitlesCommand(
                 inputVideo, bgmFile, srtPath, subtitleFilter,
-                silenceRanges, "libx264", "medium", output
+                silenceRanges, "libx264", "medium", output, channelIdForBgm
             )
             success = executeFFmpeg(fallbackCmd, output, "Burn Subtitles & Mix BGM (fallback: libx264)", 15)
         }
@@ -775,7 +775,8 @@ class ProductionService(
         silenceRanges: List<com.sciencepixel.domain.SilenceRange>,
         videoCodec: String,
         preset: String,
-        output: File
+        output: File,
+        channelIdForBgm: String
     ): List<String> {
         val cmd = mutableListOf("ffmpeg", "-y", "-i", inputVideo.absolutePath)
 
@@ -783,14 +784,18 @@ class ProductionService(
             println("🎵 Mixing BGM: ${bgmFile.name}")
             cmd.addAll(listOf("-stream_loop", "-1", "-i", bgmFile.absolutePath))
 
+            // Per-channel BGM mix volume. Horror needs the BGM clearly audible
+            // (it carries the dread); other channels keep BGM as ambient bed.
+            val bgmVol = ChannelBehavior.bgmMixVolumeFor(channelIdForBgm)
+
             // Filter complex: mix voice and bgm
             val bgmVolumeFilter = if (silenceRanges.isNotEmpty()) {
                 val conditions = silenceRanges.joinToString("+") { range ->
                     "between(t,${range.start},${range.end})"
                 }
-                "volume='if($conditions, 0, 0.20)':eval=frame"
+                "volume='if($conditions, 0, $bgmVol)':eval=frame"
             } else {
-                "volume=0.20"
+                "volume=$bgmVol"
             }
 
             cmd.addAll(listOf(

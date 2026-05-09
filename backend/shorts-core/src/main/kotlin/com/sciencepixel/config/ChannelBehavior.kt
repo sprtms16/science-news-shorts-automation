@@ -175,6 +175,24 @@ interface ChannelBehavior {
             "horror" -> 5.5
             else -> 8.0
         }
+
+        /**
+         * BGM mix volume relative to narration. The renderer mixes narration
+         * at volume=1.2 (~+1.5dB) and BGM at this attenuation factor; the
+         * difference between the two should land in the 12-16 dB range so
+         * the BGM is present without burying the voice.
+         *
+         *   - horror : 0.45  (~-7dB → narration/BGM diff ~14 dB; the BGM
+         *              IS the dread, must be clearly audible. The legacy
+         *              0.20 buried it ~21 dB below narration which the user
+         *              perceived as "no BGM".)
+         *   - others : 0.20  (~-14dB; news/science/history channels treat
+         *              BGM as ambient bed under a voice-led explainer)
+         */
+        fun bgmMixVolumeFor(channelId: String): Double = when (channelId) {
+            "horror" -> 0.45
+            else -> 0.20
+        }
     }
 }
 
