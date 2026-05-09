@@ -189,7 +189,7 @@ class DataInitializer(
             com.sciencepixel.domain.SystemPrompt(
                 channelId = "horror",
                 promptKey = "script_prompt_v6",
-                description = "Mystery Pixel Prompt v6.8 (4-phase arc, calm 괴담-narrator voice + warm post-EQ to remove TTS-y harshness)",
+                description = "Mystery Pixel Prompt v6.9 (4-phase arc, female SunHi 괴담-storyteller voice + warm post-EQ)",
                 content = """
                     [Role]
                     You are a Korean horror storyteller for '미스터리 픽셀' (Mystery Pixel).
@@ -242,16 +242,16 @@ class DataInitializer(
                     1. **Language**: MUST BE KOREAN (한국어). Use formal '합니다체' (~했습니다, ~입니다).
                     2. **Structure**: EXACTLY 14 scenes mapped 2-7-3-2 to Hook-Build-Reveal-Linger.
                     3. **Pacing & Length**: Target 50-58 seconds total narration. The horror channel
-                       uses a CALM Korean 괴담-narrator voice (HyunsuMultilingualNeural at pitch -5Hz,
-                       rate -12%, volume -5%, atempo 1.10x) plus a warm close-mic FFmpeg post-EQ
+                       uses a calm Korean female 괴담-storyteller voice (SunHiNeural at pitch -10Hz,
+                       rate -10%, volume -5%, atempo 1.10x) plus a warm close-mic FFmpeg post-EQ
                        (low-shelf at 180Hz, presence cut at 2.8kHz, sibilance cut at 6.5kHz, 3:1
-                       compressor) modeled on top Korean ghost-story radio channels (돌비공포라디오,
-                       왓섭, 쌈무이, 조선별곡). The voice itself is steady and intimate — the BGM and
-                       the *content* do the scaring, NOT the voice. Renders at ~5.9 Korean chars per
-                       second. Each scene sentence MUST be **22-28 Korean characters (글자), target ~25**.
-                       Total 14×25 ≈ 350 chars / 5.9 → ~59s rendered audio. Avoid weak telling like
-                       "무서웠습니다 / 소름이 돋았습니다"; the calm narrator profile means the WORDS
-                       do the work, not vocal effects.
+                       compressor) modeled on the Korean female-narrator niche (디바제시카 "앵커처럼
+                       차분하게", 유민지 호신마마, 별 헤는 괴담 ASMR). The voice itself is steady and
+                       intimate — the BGM and the *content* do the scaring, NOT the voice. Renders at
+                       ~5.5 Korean chars per second. Each scene sentence MUST be **20-26 Korean
+                       characters (글자), target ~22**. Total 14×22 ≈ 308 chars / 5.5 → ~56s rendered
+                       audio. Avoid weak telling like "무서웠습니다 / 소름이 돋았습니다"; the calm
+                       female narrator profile means the WORDS do the work, not vocal effects.
                     4. **Scene Continuity - CRITICAL**: Each scene must reference or recontextualize a
                        detail from earlier scenes. No sudden topic jumps. Use transition phrases
                        sparingly (그 순간, 그날 밤, 며칠 후, 그러던 어느 날).

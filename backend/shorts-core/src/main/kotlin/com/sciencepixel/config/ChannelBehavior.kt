@@ -87,39 +87,43 @@ interface ChannelBehavior {
      * would always resolve to the renderer's defaults. Use these static
      * lookups whenever the effective channelId is known at call time.
      *
-     * Horror values v6.8 — deeper acoustic analysis revealed v6.7's -10Hz was
-     * still pushing prosody too far from HyunsuMultilingual's training range,
-     * which is what was making the user perceive the voice as "wrong-feeling".
-     * Microsoft's own pitch-shift guidance is ±20%; large negative offsets on
-     * Neural voices introduce vocoder artifacts. Pull pitch BACK toward 0 and
-     * compensate with FFmpeg post-EQ for warmth (see ttsAudioPostFilter).
+     * Horror values v6.9 — user A/B-tested 9 ko-KR voices at -10%/-10Hz/-5%
+     * and chose SunHi (female) as the only one that read as a calm 괴담
+     * storyteller rather than a synthetic newscaster. The four edge-tts-
+     * usable male voices (InJoon/Hyunsu/HyunsuMultilingual + InJoon style=sad
+     * not exposed) all share a similar synthetic timbre that fights the calm
+     * storyteller goal. The other five Azure-listed voices (BongJin/GookMin/
+     * JiMin/SeoHyeon/YuJin) are NOT exposed by the free Edge TTS endpoint —
+     * sample tests showed them returning a stuck 4.25s response regardless
+     * of prosody.
      *
-     *   - HyunsuMultilingualNeural — same calm male voice as v6.7 (the 4
-     *     edge-tts-usable ko-KR voices: SunHi/InJoon/Hyunsu/HyunsuMultilingual.
-     *     BongJin/GookMin/JiMin/SeoHyeon/YuJin appear in Azure docs but are
-     *     NOT exposed by the free Edge TTS endpoint — sample tests showed
-     *     them returning a stuck 4.25s response regardless of prosody.)
-     *   - pitch -5Hz    — barely below natural; lets the voice keep its
-     *                     trained timbre instead of vocoding into menace.
-     *   - rate -12%     — slightly slower than v6.7. Korean clear-speech is
-     *                     ~70-74% of conversational; -12% lands in that zone
-     *                     without sounding dragged.
-     *   - volume -5%    — minimal attenuation. Intimacy comes from the post-EQ
-     *                     low-shelf + compressor below, not from quieter TTS.
+     * This matches the agent finding that the Korean *female*-narrator niche
+     * (디바제시카, 유민지 호신마마, 별 헤는 괴담 ASMR) sounds more "intimate
+     * ghost-story reader" than the male-radio voices in TTS form.
+     *
+     *   - SunHiNeural   — female, "Friendly, Positive" descriptor; reads as
+     *                     warm-mid storyteller in the storyteller prosody.
+     *   - pitch -10Hz   — moderate downshift. Female baseline ~200Hz so
+     *                     -10Hz has more headroom than the male voices had.
+     *   - rate -10%     — Korean clear-speech zone (~70-74% of conversational
+     *                     pace per PMC6773961).
+     *   - volume -5%    — minimal attenuation. Real intimacy comes from the
+     *                     post-EQ low-shelf + compressor in
+     *                     ttsAudioPostFilterFor, not from quieter TTS.
      */
     companion object {
         fun ttsVoiceFor(channelId: String): String = when (channelId) {
-            "horror" -> "ko-KR-HyunsuMultilingualNeural"
+            "horror" -> "ko-KR-SunHiNeural"
             else -> "ko-KR-SunHiNeural"
         }
 
         fun ttsRateFor(channelId: String): String = when (channelId) {
-            "horror" -> "-12%"
+            "horror" -> "-10%"
             else -> "+30%"
         }
 
         fun ttsPitchFor(channelId: String): String = when (channelId) {
-            "horror" -> "-5Hz"
+            "horror" -> "-10Hz"
             else -> "+0Hz"
         }
 
@@ -161,14 +165,14 @@ interface ChannelBehavior {
          * generated script's narration will fit the Shorts <60s window.
          * Calibrate by dividing observed final-video duration by total chars.
          *
-         *   - horror : HyunsuMultilingualNeural at rate -12%, atempo 1.10
-         *              → ~5.9 chars/sec (slightly slower than v6.7 because rate
-         *              moved from -10% to -12%; voice itself is unchanged).
+         *   - horror : SunHiNeural at rate -10%, atempo 1.10
+         *              → ~5.5 chars/sec (slower female voice + slow rate;
+         *              recalibrate from a v6.9 sanity render before fine-tuning).
          *   - others : SunHiNeural at rate +30%, atempo 1.10 → ~8.0 chars/sec
          *              (fast, news-pace delivery)
          */
         fun ttsCharsPerSecondFor(channelId: String): Double = when (channelId) {
-            "horror" -> 5.9
+            "horror" -> 5.5
             else -> 8.0
         }
     }
@@ -215,16 +219,18 @@ class HorrorChannelBehavior : ChannelBehavior {
     override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
     override val defaultHashtags = "#공포 #괴담 #미스터리 #호러 #shorts"
 
-    // Korean 괴담 narrator profile (v6.8) — pulled pitch BACK toward natural
-    // because a deeper acoustic survey found Edge TTS's "synthetic" perception
-    // gets WORSE the further prosody is pushed from the model's training
-    // distribution (Microsoft's own ±20% guidance). The fix is closer-to-
-    // natural prosody + slow-but-not-dragging rate + FFmpeg post-EQ for the
-    // warm close-mic radio-narrator timbre we couldn't get from prosody alone.
-    // Values mirror ChannelBehavior.companion lookups below.
-    override val ttsVoice = "ko-KR-HyunsuMultilingualNeural"
-    override val ttsRate = "-12%"
-    override val ttsPitch = "-5Hz"
+    // Korean 괴담 narrator profile (v6.9) — switched to SunHi (female) after
+    // the user A/B-tested 9 voices: SunHi at -10%/-10Hz/-5% was the only one
+    // that read as a calm storyteller rather than a synthetic neural TTS.
+    // This matches the agent finding that the Korean female-narrator niche
+    // (디바제시카, 유민지 호신마마, 별 헤는 괴담 ASMR) sounds more "intimate
+    // ghost-story reader" than the male-radio voices in TTS form. The four
+    // male voices Edge TTS actually exposes (InJoon/Hyunsu/HyunsuMultilingual)
+    // all share a similar synthetic newscaster timbre that fights the calm
+    // storyteller goal.
+    override val ttsVoice = "ko-KR-SunHiNeural"
+    override val ttsRate = "-10%"
+    override val ttsPitch = "-10Hz"
     override val ttsVolume = "-5%"
 }
 
