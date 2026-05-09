@@ -138,3 +138,16 @@ Important collections:
 - `system_prompt` — Channel-specific prompts (must use 존댓말)
 - `bgm_entity` — Background music assets
 - `quota_usage` — API quota tracking (Gemini, YouTube)
+
+Full schema in [`docs/wiki/mongo-collections.md`](docs/wiki/mongo-collections.md).
+
+## Project Wiki ([`docs/wiki/`](docs/wiki/))
+
+Long-form project knowledge follows [Andrej Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — plain markdown entity pages, cross-linked with relative paths. Read the relevant page before changing the corresponding subsystem.
+
+- [`docs/wiki/index.md`](docs/wiki/index.md) — catalog of every page, organized by category
+- [`docs/wiki/log.md`](docs/wiki/log.md) — append-only chronological record of decisions / incidents / tunings
+- Per-channel pages: [horror](docs/wiki/horror-channel.md), [science](docs/wiki/science-channel.md), [stocks](docs/wiki/stocks-channel.md), [history](docs/wiki/history-channel.md)
+- Cross-cutting: [architecture](docs/wiki/architecture.md), [saga-flow](docs/wiki/saga-flow.md), [channel-behavior](docs/wiki/channel-behavior.md), [edge-tts-korean-voices](docs/wiki/edge-tts-korean-voices.md), [prompt-validator](docs/wiki/prompt-validator.md), [deployment-workflow](docs/wiki/deployment-workflow.md), [external-apis](docs/wiki/external-apis.md), [mongo-collections](docs/wiki/mongo-collections.md)
+
+**When making meaningful changes** (decision / incident / tune / refactor / new external knowledge), append a one-block entry to `docs/wiki/log.md` with the format `## [YYYY-MM-DD] <kind> | <title>` and update the affected entity page. Add new entity pages to `docs/wiki/index.md`.
