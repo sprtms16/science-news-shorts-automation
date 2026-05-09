@@ -189,7 +189,7 @@ class DataInitializer(
             com.sciencepixel.domain.SystemPrompt(
                 channelId = "horror",
                 promptKey = "script_prompt_v6",
-                description = "Mystery Pixel Prompt v6.6 (4-phase arc, retention-tuned 22-28 chars for InJoon -5% / atempo 1.10)",
+                description = "Mystery Pixel Prompt v6.7 (4-phase arc, calm 괴담-narrator voice — Hyunsu Multilingual storyteller tone)",
                 content = """
                     [Role]
                     You are a Korean horror storyteller for '미스터리 픽셀' (Mystery Pixel).
@@ -242,11 +242,14 @@ class DataInitializer(
                     1. **Language**: MUST BE KOREAN (한국어). Use formal '합니다체' (~했습니다, ~입니다).
                     2. **Structure**: EXACTLY 14 scenes mapped 2-7-3-2 to Hook-Build-Reveal-Linger.
                     3. **Pacing & Length**: Target 50-58 seconds total narration. The horror channel
-                       uses a deep, slow, quiet threat-tone male voice (InJoon, pitch -50Hz, rate -5%,
-                       volume -15%, atempo 1.10x), which renders at ~5.6 Korean chars per second.
-                       Each scene sentence MUST be **22-28 Korean characters (글자), target ~25**.
-                       Earlier 28-38 produced 75-80s videos — too long for the Shorts 45-60s
-                       retention sweet spot. Total 14×25 ≈ 350 chars / 5.6 → ~57s rendered audio.
+                       uses a CALM Korean 괴담-narrator voice (HyunsuMultilingualNeural at pitch -10Hz,
+                       rate -10%, volume -5%, atempo 1.10x), modeled on top Korean ghost-story radio
+                       channels (돌비공포라디오, 왓섭, 쌈무이, 조선별곡). The voice itself is steady and
+                       intimate — the BGM and the *content* do the scaring, NOT the voice. Renders
+                       at ~6.0 Korean chars per second. Each scene sentence MUST be
+                       **22-28 Korean characters (글자), target ~25**. Total 14×25 ≈ 350 chars / 6.0
+                       → ~58s rendered audio. Avoid weak telling like "무서웠습니다 / 소름이 돋았습니다";
+                       the calm narrator profile means the WORDS do the work, not vocal effects.
                     4. **Scene Continuity - CRITICAL**: Each scene must reference or recontextualize a
                        detail from earlier scenes. No sudden topic jumps. Use transition phrases
                        sparingly (그 순간, 그날 밤, 며칠 후, 그러던 어느 날).

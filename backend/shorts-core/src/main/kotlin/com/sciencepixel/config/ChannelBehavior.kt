@@ -87,33 +87,40 @@ interface ChannelBehavior {
      * would always resolve to the renderer's defaults. Use these static
      * lookups whenever the effective channelId is known at call time.
      *
-     * Horror values are picked from acoustic-prosody research:
-     *   - InJoon (male) — lower baseline F0 = more "threatening" perception
-     *   - pitch -50Hz   — Korean male F0 ~120Hz baseline → ~70Hz; deepens
-     *                     threat tone without entering vocal-fry territory
-     *   - rate -5%      — slow speech reads as "potent / threatening" in
-     *                     prosody studies; not so slow it sounds drowsy
-     *   - volume -15%   — quiet narration forces listener focus and reads as
-     *                     intimate menace (horror trope)
+     * Horror values v6.7 — calibrated from a survey of top Korean 괴담 radio
+     * channels (돌비공포라디오, 왓섭, 쌈무이, 조선별곡, 유민지 호신마마):
+     *   - HyunsuMultilingualNeural (male) — most natural / expressive ko-KR
+     *     male voice in the free Edge TTS tier; reads as a calm narrator
+     *     rather than a movie-trailer voiceover.
+     *   - pitch -10Hz   — barely below natural baseline. The earlier -50Hz
+     *                     manufactured "menace" but pulled the voice into
+     *                     synthetic trailer-territory.
+     *   - rate -10%     — Korean clear-speech zone (~70-74% of conversational
+     *                     pace per PMC6773961). Slow enough to feel deliberate
+     *                     without dragging.
+     *   - volume -5%    — minimal attenuation. Real intimacy comes from
+     *                     close-mic + post-EQ, not from quieter TTS output.
+     * Replaces the v6.5/6.6 "threat tone" recipe (-50Hz / -5% / -15%) which
+     * produced an unsettling but storytelling-incompatible voice.
      */
     companion object {
         fun ttsVoiceFor(channelId: String): String = when (channelId) {
-            "horror" -> "ko-KR-InJoonNeural"
+            "horror" -> "ko-KR-HyunsuMultilingualNeural"
             else -> "ko-KR-SunHiNeural"
         }
 
         fun ttsRateFor(channelId: String): String = when (channelId) {
-            "horror" -> "-5%"
+            "horror" -> "-10%"
             else -> "+30%"
         }
 
         fun ttsPitchFor(channelId: String): String = when (channelId) {
-            "horror" -> "-50Hz"
+            "horror" -> "-10Hz"
             else -> "+0Hz"
         }
 
         fun ttsVolumeFor(channelId: String): String = when (channelId) {
-            "horror" -> "-15%"
+            "horror" -> "-5%"
             else -> "+0%"
         }
 
@@ -123,13 +130,17 @@ interface ChannelBehavior {
          * generated script's narration will fit the Shorts <60s window.
          * Calibrate by dividing observed final-video duration by total chars.
          *
-         *   - horror : InJoonNeural at rate -5%, atempo 1.10 → ~5.6 chars/sec
-         *              (slow, deliberate threat-tone delivery)
+         *   - horror : HyunsuMultilingualNeural at rate -10%, atempo 1.10
+         *              → ~6.0 chars/sec (calm storyteller pace, bumped up from
+         *              v6.6's 5.6 because the new voice runs slightly faster
+         *              than InJoon at the same rate setting). Recalibrate by
+         *              dividing observed video duration by total chars after
+         *              the first batch of v6.7 renders.
          *   - others : SunHiNeural at rate +30%, atempo 1.10 → ~8.0 chars/sec
          *              (fast, news-pace delivery)
          */
         fun ttsCharsPerSecondFor(channelId: String): Double = when (channelId) {
-            "horror" -> 5.6
+            "horror" -> 6.0
             else -> 8.0
         }
     }
@@ -176,12 +187,17 @@ class HorrorChannelBehavior : ChannelBehavior {
     override val defaultTags = listOf("horror", "mystery", "creepy", "shorts")
     override val defaultHashtags = "#공포 #괴담 #미스터리 #호러 #shorts"
 
-    // 호러 분위기용 TTS: 남성 보이스 + 깊은 pitch + 느린 속도 + 낮은 볼륨
-    // (값은 ChannelBehavior.companion의 horror lookup과 동기화)
-    override val ttsVoice = "ko-KR-InJoonNeural"
-    override val ttsRate = "-5%"
-    override val ttsPitch = "-50Hz"
-    override val ttsVolume = "-15%"
+    // Korean 괴담 narrator profile (v6.7): the consensus voice across top
+    // 괴담-radio channels (돌비공포라디오, 왓섭, 쌈무이, 조선별곡) is a calm,
+    // mid-pitched male reading voice — the BGM does the scaring, NOT the voice.
+    // HyunsuMultilingualNeural is the most natural-sounding ko-KR male in the
+    // free Edge TTS tier; pitch stays close to natural; rate sits in the
+    // measured "clear-speech" zone (~70-74% of conversational pace).
+    // Values mirror ChannelBehavior.companion lookups below.
+    override val ttsVoice = "ko-KR-HyunsuMultilingualNeural"
+    override val ttsRate = "-10%"
+    override val ttsPitch = "-10Hz"
+    override val ttsVolume = "-5%"
 }
 
 /**
