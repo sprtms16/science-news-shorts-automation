@@ -213,74 +213,70 @@ class ContentProviderService(
     }
     
     fun fetchStockNews(source: RssSource): List<NewsItem> {
-        println("🔍 Fetching Dynamic Stock News...")
-        
-        // 1. Fetch General Business News (Base)
+        // Stocks videos are only useful while the news is fresh — anything older
+        // than 24h is dropped at the source so we can't accidentally pick a stale
+        // story for tonight's upload.
+        val freshnessWindowHours = 24L
+        val cutoff = java.util.Date(System.currentTimeMillis() - freshnessWindowHours * 60 * 60 * 1000)
+        println("🔍 Fetching Dynamic Stock News (cutoff: last ${freshnessWindowHours}h, after $cutoff)")
+
+        // 1. Fetch general business feed and drop anything older than the cutoff
         val baseEntries = fetchAndParseRss(source.url)
-        println("  - Base Feed: Found ${baseEntries.size} items")
-        
-        // 2. Extract Headlines for AI Analysis
-        val headlines = baseEntries.take(15).joinToString("\n") { 
-            "- ${it.title}" 
+        val freshBaseEntries = baseEntries.filter { it.publishedDate?.after(cutoff) == true }
+        println("  - Base Feed: ${freshBaseEntries.size}/${baseEntries.size} items within last ${freshnessWindowHours}h")
+
+        // 2. Extract trending tickers from FRESH headlines only (so the AI picks
+        //    today's movers rather than week-old buzz)
+        val headlines = freshBaseEntries.take(15).joinToString("\n") { "- ${it.title}" }
+        val trendingTickers = if (headlines.isBlank()) {
+            println("  - No fresh base headlines; skipping ticker analysis.")
+            emptyList()
+        } else {
+            geminiService.extractTrendingTickers(headlines)
         }
-        
-        // 3. AI Analysis: Find Trending Tickers
-        val trendingTickers = geminiService.extractTrendingTickers(headlines)
-        
-        // 4. Fetch Specific News for Tickers
+
+        // 3. Fetch ticker-specific news, applying the same 24h cutoff
         val specificNewsItems = mutableListOf<NewsItem>()
-        
         trendingTickers.forEach { ticker ->
             try {
-                // Google News Search RSS
                 val searchUrl = "https://news.google.com/rss/search?q=${ticker.replace(" ", "+")}+stock+news&hl=en-US&gl=US&ceid=US:en"
                 val searchEntries = fetchAndParseRss(searchUrl)
-                
-                // Take top 2 items and verify safety
-                val topItems = searchEntries.take(5).map { entry ->
+                val freshSearchEntries = searchEntries.filter { it.publishedDate?.after(cutoff) == true }
+
+                val topItems = freshSearchEntries.take(5).map { entry ->
                     NewsItem(
-                        title = "[${ticker.uppercase()}] ${entry.title}", 
+                        title = "[${ticker.uppercase()}] ${entry.title}",
                         summary = entry.description?.value ?: "",
                         link = entry.link ?: "",
                         sourceName = "Google News ($ticker)"
                     )
                 }.filter { item ->
-                    // Safety check for stock news contents
                     val isSafe = geminiService.checkSensitivity(item.title, item.summary, "stocks")
                     if (!isSafe) println("⛔ Stock Item Rejected for $ticker: ${item.title}")
                     isSafe
                 }.take(2)
-                
+
                 specificNewsItems.addAll(topItems)
-                println("  - Fetched ${topItems.size} safe items for '$ticker'")
-                
-                // Rate limit politeness
+                println("  - $ticker: ${topItems.size} safe items (out of ${freshSearchEntries.size} fresh in window)")
                 Thread.sleep(500)
             } catch (e: Exception) {
                 println("  - Failed to fetch news for $ticker: ${e.message}")
             }
         }
-        
-        // 5. Combine & Filter Base Items
-        // Filter base items to ensure they are from today (reusing logic)
-        val today = java.time.LocalDate.now()
-        val startOfDay = java.util.Date.from(today.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant())
-        
-        val filteredBaseItems = baseEntries
-            .filter { it.publishedDate != null && it.publishedDate.after(startOfDay) }
-            .take(5) // Take top 5 general stories
-            .map { entry ->
-                NewsItem(
-                    title = entry.title ?: "No Title",
-                    summary = entry.description?.value ?: "",
-                    link = entry.link ?: "",
-                    sourceName = source.title
-                )
-            }
-            
-        val finalResult = (specificNewsItems + filteredBaseItems).distinctBy { it.title }
-        println("✅ Dynamic Stock News: ${finalResult.size} items collected.")
-        
+
+        // 4. Combine. Empty result → caller should skip generation rather than
+        //    fall back to stale news.
+        val baseItems = freshBaseEntries.take(5).map { entry ->
+            NewsItem(
+                title = entry.title ?: "No Title",
+                summary = entry.description?.value ?: "",
+                link = entry.link ?: "",
+                sourceName = source.title
+            )
+        }
+
+        val finalResult = (specificNewsItems + baseItems).distinctBy { it.title }
+        println("✅ Stock News (last ${freshnessWindowHours}h): ${finalResult.size} fresh items")
         return finalResult
     }
 }
