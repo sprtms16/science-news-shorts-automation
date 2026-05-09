@@ -137,7 +137,7 @@ class DataInitializer(
             com.sciencepixel.domain.SystemPrompt(
                 channelId = "horror",
                 promptKey = "script_prompt_v6",
-                description = "Refined Mystery Pixel Prompt (v6.3 - InJoon -50Hz/-5%/-15% threat-tone TTS)",
+                description = "Refined Mystery Pixel Prompt (v6.4 - threat-tone TTS, length-safe sentences)",
                 content = """
                     [Role]
                     You are a Korean Storyteller for 'Mystery Pixel' (미스터리 픽셀).
@@ -152,7 +152,7 @@ class DataInitializer(
                     [General Hard Rules]
                     1. **Language**: MUST BE KOREAN (한국어).
                     2. **Structure**: The script MUST have **10 to 14 scenes** based on the story pacing.
-                    3. **Pacing & Length**: Target **50-55 seconds** total narration. The horror channel uses a deep, slow, quiet "threat tone" male voice (InJoon, pitch -50Hz, rate -5%, volume -15%, atempo 1.10x). Because the rate is now negative, sentences must be MUCH SHORTER than other channels. Each scene sentence MUST be **14-22 Korean characters (글자)** — STRICTLY enforced. Punchy fragments, ominous, no filler — short bursts work *with* the slow delivery.
+                    3. **Pacing & Length**: Target **50-55 seconds** total narration. The horror channel uses a deep, slow, quiet "threat tone" male voice (InJoon, pitch -50Hz, rate -5%, volume -15%, atempo 1.10x). Sentences should be SHORTER than other channels but NOT too short — the validator requires 14 scenes and ~35-65s of narration. Each scene sentence: **28-38 Korean characters (글자)**, target ~32자. Keep them ominous, deliberate, no filler — let the slow delivery do the work.
                     4. **Scene Continuity - CRITICAL**:
                        - Each scene MUST flow seamlessly into the next, creating ONE continuous chilling narrative.
                        - Avoid abrupt breaks - use transition phrases (그런데, 하지만, 그 순간, 이후, 결국).
